@@ -4,65 +4,77 @@ The most basic to-do list in Django: add a to-do, mark it done, delete it.
 
 ## Run it on your laptop
 
-You need Python 3.10 or newer. Check with `python3 --version` (on Windows, `py --version`).
+**1. Install uv, once.** uv installs Python and this project's packages for you.
 
-**1. Get the code.**
+Mac:
+
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+Windows (PowerShell):
+
+```powershell
+powershell -ExecutionPolicy ByPass -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+Close the terminal and open a new one, then check with `uv --version`.
+
+**2. Get the code.**
 
 ```bash
 git clone https://github.com/kreativitea/anyone-can-build-todo.git
 cd anyone-can-build-todo
 ```
 
-**2. Make a virtual environment and turn it on.** This keeps the project's packages
-separate from everything else on your computer. When it is on, your prompt starts with `(.venv)`.
-
-Mac:
+**3. Install the packages.** The first time, uv also downloads the right version of Python.
 
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-```
-
-Windows (PowerShell):
-
-```powershell
-py -m venv .venv
-.venv\Scripts\Activate.ps1
-```
-
-If Windows says running scripts is disabled, run
-`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, then try again.
-
-**3. Install the packages.**
-
-```bash
-pip install -r requirements.txt
+uv sync
 ```
 
 **4. Create the database.** This makes a file called `db.sqlite3`.
 
 ```bash
-python manage.py migrate
+uv run python manage.py migrate
 ```
 
-**5. Start the server.**
+**5. Turn on the commit checks.** From now on, every `git commit` checks your code first.
 
 ```bash
-python manage.py runserver
+uv run pre-commit install
+```
+
+**6. Start the server.**
+
+```bash
+uv run python manage.py runserver
 ```
 
 Open <http://127.0.0.1:8000/>. Press `Ctrl+C` in the terminal to stop the server.
 
-**6. Run the tests.**
+**7. Run the tests.**
 
 ```bash
-python manage.py test
+uv run python manage.py test
 ```
 
 You should see `Ran 5 tests` and `OK`.
 
-Next time, you only need to `cd` into the folder, turn the virtual environment on again
-(step 2, second line), and run step 5.
+On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 5, `make run` is step 6,
+`make test` is step 7. `make help` lists the rest.
+
+## Checks
+
+| Command | What it does |
+|---|---|
+| `uv run ruff check` | Finds mistakes and bad habits in the Python code |
+| `uv run ruff format` | Rewrites the Python code in the standard style |
+| `uv run pre-commit run --all-files` | Runs every commit check on every file |
+
+The commit checks run Ruff, Django's own check, and a few checks on every file. If a check fails
+because it fixed a file for you, look at the change, `git add` the file, and commit again. GitHub
+runs the same checks and the tests on every push.
 
 ## How it is put together
 
@@ -75,6 +87,7 @@ Next time, you only need to `cd` into the folder, turn the virtual environment o
 | `todos/views.py` | What happens when each address is visited |
 | `todos/templates/todos/todo_list.html` | The page you see |
 | `todos/tests.py` | The tests |
+| `AGENTS.md` | Instructions for the AI assistant (Codex reads it; `CLAUDE.md` points Claude to it) |
 
 ## Put it on the internet
 
@@ -82,18 +95,20 @@ A live server needs three environment variables. Never put their real values in 
 
 | Variable | Value |
 |---|---|
-| `DJANGO_SECRET_KEY` | A long random string. Make one with `python -c "import secrets; print(secrets.token_urlsafe(50))"` |
+| `DJANGO_SECRET_KEY` | A long random string. Make one with `uv run python -c "import secrets; print(secrets.token_urlsafe(50))"` |
 | `DJANGO_DEBUG` | `False` |
 | `DJANGO_ALLOWED_HOSTS` | The site's address without `https://`, for example `my-todo.onrender.com` |
+
+With `DJANGO_DEBUG` set to `False`, the site only works over HTTPS.
 
 Build command:
 
 ```bash
-pip install -r requirements.txt && python manage.py collectstatic --no-input && python manage.py migrate
+pip install uv && uv sync --locked --no-dev && uv run --no-dev python manage.py collectstatic --no-input && uv run --no-dev python manage.py migrate
 ```
 
 Start command:
 
 ```bash
-gunicorn config.wsgi
+uv run --no-dev gunicorn config.wsgi
 ```

@@ -6,15 +6,15 @@ from .models import Todo
 
 def todo_list(request):
     todos = Todo.objects.all()
-    return render(request, 'todos/todo_list.html', {'todos': todos})
+    return render(request, "todos/todo_list.html", {"todos": todos})
 
 
 @require_POST
 def todo_add(request):
-    title = request.POST.get('title', '').strip()
+    title = request.POST.get("title", "").strip()
     if title:
         Todo.objects.create(title=title)
-    return redirect('todo_list')
+    return redirect("todo_list")
 
 
 @require_POST
@@ -22,11 +22,11 @@ def todo_toggle(request, pk):
     todo = get_object_or_404(Todo, pk=pk)
     todo.done = not todo.done
     todo.save()
-    return redirect('todo_list')
+    return redirect("todo_list")
 
 
 @require_POST
 def todo_delete(request, pk):
     todo = get_object_or_404(Todo, pk=pk)
     todo.delete()
-    return redirect('todo_list')
+    return redirect("todo_list")
