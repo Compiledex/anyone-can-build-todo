@@ -115,7 +115,8 @@ def list_delete(request, pk):
 @require_POST
 def list_clear_completed(request, pk):
     """Delete every done to-do of this one list. Never reads to-do ids from the form."""
-    the_list = get_object_or_404(TodoList, pk=pk, owner=request.user)
+    # The owner and the members may clear; a stranger gets 404.
+    the_list = get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
     # delete() also counts rows deleted with each to-do, so use the Todo number only.
     _, per_model = the_list.todos.filter(done=True).delete()
     deleted = per_model.get("todos.Todo", 0)
