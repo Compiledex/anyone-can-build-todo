@@ -34,7 +34,8 @@ def render_list_page(request, the_list, form):
         "todos/todo_list.html",
         {
             "the_list": the_list,
-            "todos": the_list.todos.all(),
+            # All tags in one query, not one query per row.
+            "todos": the_list.todos.prefetch_related("tags"),
             # Always the whole list: "Clear completed" deletes all of these.
             "done_count": the_list.todos.filter(done=True).count(),
             "my_lists": request.user.todo_lists.all(),

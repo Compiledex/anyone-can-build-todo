@@ -258,10 +258,12 @@ class FixATypoTests(BrowserTestCase):
         page.get_by_label("Notes").fill(
             "The lactose-free one.\nAlso ask about oat milk.\n" + LONG_WORD
         )
+        page.get_by_label("Tags").fill("Work, #urgent")
         page.get_by_role("button", name="Save").click()
 
         row = page.get_by_role("listitem").filter(has_text="Buy milk")
         expect(row).to_be_visible()
+        expect(row.locator(".tag")).to_have_text(["#urgent", "#work"])
         expect(page.get_by_text("Buy mlik")).to_have_count(0)
 
         # The note is closed until the person opens it.

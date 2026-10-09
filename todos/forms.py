@@ -1,7 +1,9 @@
 from django import forms
 from django.contrib.auth import get_user_model
+from django.db import transaction
 
 from .models import Todo, TodoList
+from .tags import parse_tags
 
 
 class NoteField(forms.CharField):
@@ -31,6 +33,15 @@ class TodoForm(forms.ModelForm):
         widget=forms.Select(attrs={"aria-label": "Priority"}),
     )
 
+    # Not called `tags`: that is the model field, and Django would try to save
+    # the words as tag ids. Never put "tags" or "tag_names" in Meta.fields.
+    tag_names = forms.CharField(
+        required=False,
+        max_length=400,
+        label="Tags",
+        help_text="Separate tags with commas, for example: work, home",
+    )
+
     class Meta:
         model = Todo
         fields = ["title", "due_date", "description", "priority"]
@@ -44,6 +55,25 @@ class TodoForm(forms.ModelForm):
             # No priority was sent: keep the one the to-do has.
             return self.instance.priority
         return priority
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk:  # A new to-do has no tags yet.
+            self.initial["tag_names"] = ", ".join(
+                tag.name for tag in self.instance.tags.all()
+            )
+
+    def clean_tag_names(self):
+        return parse_tags(self.cleaned_data["tag_names"])
+
+    def save(self, commit=True):
+        # The add view uses commit=False and sends no tags, so tags are skipped.
+        if not commit:
+            return super().save(commit=False)
+        with transaction.atomic():  # The to-do and its tags, or nothing.
+            todo = super().save()
+            todo.set_tags(self.cleaned_data["tag_names"])
+        return todo
 
 
 class TodoListForm(forms.ModelForm):
