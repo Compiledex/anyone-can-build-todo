@@ -289,3 +289,10 @@ class ClearCompletedTests(LoggedInTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Clear completed")
         self.assertNotContains(response, self.clear_url(home))
+
+    def test_one_done_todo_uses_singular_words(self):
+        response = self.client.get(self.work_list.get_absolute_url())
+        self.assertContains(response, "Clear completed (1)")
+        self.assertContains(response, "Delete 1 done to-do? This cannot be undone.")
+        response = self.client.post(self.clear_url(self.work_list), follow=True)
+        self.assertContains(response, "Deleted 1 completed to-do.")
