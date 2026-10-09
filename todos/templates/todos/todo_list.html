@@ -1,46 +1,28 @@
-<!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>To-do list</title>
-  <link rel="icon" href="data:,">
-  <style>
-    body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem; }
-    form.add { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
-    form.add input { flex: 1; padding: 0.5rem; font-size: 1rem; }
-    ul { list-style: none; padding: 0; }
-    li { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0; border-bottom: 1px solid #ddd; }
-    li .title { flex: 1; }
-    li.done .title { text-decoration: line-through; color: #666; }
-    button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
-  </style>
-</head>
-<body>
+{% extends "base.html" %}
+
+{% block content %}
   <h1>To-do list</h1>
+
+  {% if form.errors %}
+    <div class="form-errors">
+      {{ form.non_field_errors }}
+      {{ form.title.errors }}
+    </div>
+  {% endif %}
 
   <form class="add" method="post" action="{% url 'todo_add' %}">
     {% csrf_token %}
-    <input name="title" aria-label="New to-do" placeholder="What needs doing?" maxlength="200" required autofocus>
+    <input name="title" aria-label="New to-do" placeholder="What needs doing?" maxlength="200"
+           required autofocus value="{{ form.title.value|default_if_none:'' }}"
+           {% if form.title.errors %}aria-invalid="true" aria-describedby="{{ form.title.auto_id }}_error"{% endif %}>
     <button type="submit">Add</button>
   </form>
 
-  <ul>
+  <ul class="todos">
     {% for todo in todos %}
-      <li class="{% if todo.done %}done{% endif %}">
-        <span class="title">{{ todo.title }}</span>
-        <form method="post" action="{% url 'todo_toggle' todo.pk %}">
-          {% csrf_token %}
-          <button type="submit">{% if todo.done %}Undo{% else %}Done{% endif %}</button>
-        </form>
-        <form method="post" action="{% url 'todo_delete' todo.pk %}">
-          {% csrf_token %}
-          <button type="submit">Delete</button>
-        </form>
-      </li>
+      {% include "todos/_todo_item.html" %}
     {% empty %}
       <li>Nothing to do yet. Add something above.</li>
     {% endfor %}
   </ul>
-</body>
-</html>
+{% endblock %}

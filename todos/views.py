@@ -1,20 +1,27 @@
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_POST
 
+from .forms import TodoForm
 from .models import Todo
 
 
-def todo_list(request):
+def render_list_page(request, form):
+    """The list page, with this add form (empty, or with the errors of a bad add)."""
     todos = Todo.objects.all()
-    return render(request, "todos/todo_list.html", {"todos": todos})
+    return render(request, "todos/todo_list.html", {"todos": todos, "form": form})
+
+
+def todo_list(request):
+    return render_list_page(request, TodoForm())
 
 
 @require_POST
 def todo_add(request):
-    title = request.POST.get("title", "").strip()
-    if title:
-        Todo.objects.create(title=title)
-    return redirect("todo_list")
+    form = TodoForm(request.POST)
+    if form.is_valid():
+        form.save()
+        return redirect("todo_list")
+    return render_list_page(request, form)
 
 
 @require_POST
