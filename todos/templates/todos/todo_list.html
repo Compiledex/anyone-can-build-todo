@@ -55,11 +55,24 @@
     <button type="submit">Add</button>
   </form>
 
+  {# GET: a search only reads. With no action, it stays on this list. #}
+  <form class="search" method="get" role="search">
+    <input type="search" name="q" aria-label="Search to-dos" placeholder="Search"
+           maxlength="200" value="{{ query_form.q.value|default_if_none:'' }}">
+    <button type="submit">Search</button>
+    {% if searching %}<a href="{{ request.path }}">Show all</a>{% endif %}
+  </form>
+  {{ query_form.q.errors }}
+
   <ul class="todos">
     {% for todo in todos %}
       {% include "todos/_todo_item.html" %}
     {% empty %}
-      <li>Nothing to do yet. Add something above.</li>
+      {% if searching %}
+        <li>No to-dos match “{{ q }}”.</li>
+      {% else %}
+        <li>Nothing to do yet. Add something above.</li>
+      {% endif %}
     {% endfor %}
   </ul>
 
