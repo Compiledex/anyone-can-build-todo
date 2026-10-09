@@ -282,7 +282,7 @@ What the review changed, and why:
 - New tests: spaces at the ends are removed, `%` is not a wildcard, 200 characters is still accepted.
 - The escape test now uses `"><script>`, so it also checks that the text cannot break out of `value="..."`.
 - The `html=True` test now says to use the whole `<input>` element: a partial element never matches.
-- The tag-leak test now gives user A's to-do a matching tag, so it fails if the sub-query is not scoped.
+- The tag-leak test now gives user A's to-do a matching tag. It fails if the main filter in `search` starts from `Todo.objects`. It cannot fail if only the tag sub-query starts from `Todo.objects`: the main filter still keeps only the open list's to-dos, so that mistake only makes the search slower, not wrong.
 - Removed `test_search_does_not_change_data`: a `GET` view that never writes makes it pass even if search were broken.
 - Listed every test that already passes before the change, as `AGENTS.md` asks for honesty about "see it fail".
 - Removed the open questions about keeping the search after Done/Delete and about search across lists: the build order already decides the first (#13 does it), and the second is under "Not part of this task".
