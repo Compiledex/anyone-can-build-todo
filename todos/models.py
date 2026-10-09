@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.db.models.functions import Lower
 from django.urls import reverse
+from django.utils import timezone
 
 
 class TodoList(models.Model):
@@ -40,9 +41,21 @@ class Todo(models.Model):
     title = models.CharField(max_length=200)
     done = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
+    due_date = models.DateField(null=True, blank=True)
 
     class Meta:
         ordering = ["created_at"]
 
     def __str__(self):
         return self.title
+
+    def is_overdue(self, today=None):
+        """True when the due date has passed and the to-do is not done.
+
+        Due today is not overdue. `today` is for tests; the page uses the real date.
+        """
+        if self.done or self.due_date is None:
+            return False
+        if today is None:
+            today = timezone.localdate()
+        return self.due_date < today

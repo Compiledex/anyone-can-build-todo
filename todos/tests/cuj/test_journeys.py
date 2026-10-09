@@ -1,5 +1,7 @@
 import re
+from datetime import timedelta
 
+from django.utils import timezone
 from playwright.sync_api import expect
 
 from accounts.tests.helpers import TEST_PASSWORD, make_user
@@ -53,11 +55,14 @@ class PlanAndFinishTests(BrowserTestCase):
         self.log_in_as(make_user_with_inbox())
         page.goto(self.live_server_url)
 
-        for title in ["Buy milk", "Call home"]:
-            page.get_by_label("New to-do").fill(title)
-            page.get_by_role("button", name="Add").click()
+        page.get_by_label("New to-do").fill("Buy milk")
+        page.get_by_label("Due date").fill("2030-01-15")
+        page.get_by_role("button", name="Add").click()
+        page.get_by_label("New to-do").fill("Call home")
+        page.get_by_role("button", name="Add").click()
 
         milk = page.get_by_role("listitem").filter(has_text="Buy milk")
+        expect(milk).to_contain_text("Due 15 Jan 2030")
         milk.get_by_role("button", name="Done").click()
         expect(milk).to_have_class(DONE)
         milk.get_by_role("button", name="Undo").click()
@@ -113,6 +118,13 @@ class ColorSchemeTests(BrowserTestCase):
         milk.get_by_role("button", name="Done").click()
         expect(milk).to_have_class(DONE)
 
+        # One overdue to-do, so its red date is checked too.
+        late = timezone.localdate() - timedelta(days=30)
+        page.get_by_label("New to-do").fill("Pay rent")
+        page.get_by_label("Due date").fill(late.isoformat())
+        page.get_by_role("button", name="Add").click()
+        expect(page.locator("li.overdue time")).to_be_visible()
+
         for scheme in ["light", "dark"]:
             with self.subTest(scheme=scheme):
                 page.emulate_media(color_scheme=scheme)
@@ -125,6 +137,7 @@ class ColorSchemeTests(BrowserTestCase):
                             text: color("li:not(.done) .title", "color"),
                             done: color("li.done .title", "color"),
                             header: color("header.site", "color"),
+                            overdue: color("li.overdue time", "color"),
                         };
                     }"""
                 )
@@ -142,6 +155,10 @@ class ColorSchemeTests(BrowserTestCase):
                 self.assertGreaterEqual(
                     contrast(colors["header"], colors["background"]), AA_CONTRAST
                 )
+                self.assertGreaterEqual(
+                    contrast(colors["overdue"], colors["background"]), AA_CONTRAST
+                )
+                self.assertNotEqual(colors["overdue"], colors["text"], colors)
 
 
 class TwoPeopleTests(BrowserTestCase):
