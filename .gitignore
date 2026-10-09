@@ -7,3 +7,5 @@ staticfiles/
 .env
 # Worktrees: each branch gets its own folder here (`make worktree BRANCH=name`).
 .claude/worktrees/
+# Copies of the test database that parallel test runs make.
+default_*.sqlite3
