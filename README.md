@@ -71,8 +71,8 @@ You should see `OK`, and then one line for each layer of tests:
 ```
 Test layers
   CUJ           1 passed
-  Integration  11 passed
-  Unit         11 passed
+  Integration  13 passed
+  Unit         14 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
@@ -113,8 +113,11 @@ runs the same checks and the tests on every push.
 | `config/urls.py` | Sends each address to the right app |
 | `todos/models.py` | The `Todo` table in the database |
 | `todos/urls.py` | The addresses of the to-do pages |
+| `todos/forms.py` | The form that checks a new to-do |
 | `todos/views.py` | What happens when each address is visited |
+| `todos/templates/base.html` | The frame every page shares: the colors, the style, the messages |
 | `todos/templates/todos/todo_list.html` | The page you see |
+| `todos/templates/todos/_todo_item.html` | One row of the list |
 | `todos/tests/` | The tests, one folder per layer |
 | `config/test_runner.py` | Sorts the tests into layers and counts them |
 | `AGENTS.md` | Instructions for the AI assistant (Codex reads it; `CLAUDE.md` points Claude to it) |

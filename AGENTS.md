@@ -18,8 +18,11 @@ in a SQLite database, the file `db.sqlite3`, which is not in git.
 | `config/urls.py` | Sends `/admin/` to Django's admin, and everything else to `todos/urls.py`. |
 | `todos/models.py` | The `Todo` table: `title`, `done`, `created_at`. |
 | `todos/urls.py` | The four addresses: the list, add, toggle, delete. |
-| `todos/views.py` | One function per address. Add, toggle and delete accept `POST` only, then send the browser back to the list. |
-| `todos/templates/todos/todo_list.html` | The one page: the add form and the list. |
+| `todos/forms.py` | `TodoForm`, the Django form for a to-do. It checks the title. |
+| `todos/views.py` | One function per address. Add, toggle and delete accept `POST` only, then send the browser back to the list. An invalid add shows the page again with the error. |
+| `todos/templates/base.html` | The shared page frame: the `<head>`, all the CSS (the colors are CSS variables), and the messages. |
+| `todos/templates/todos/todo_list.html` | The list page, which extends `base.html`: the errors, the add form and the list. |
+| `todos/templates/todos/_todo_item.html` | One row of the list (one `<li>`). |
 | `todos/tests/unit/` | Unit tests: one method on its own, no requests, no database. |
 | `todos/tests/integration/` | Integration tests: Django's test client, from the address to the database. |
 | `todos/tests/cuj/` | CUJ tests (critical user journeys): a real Chromium browser, driven by Playwright. |
