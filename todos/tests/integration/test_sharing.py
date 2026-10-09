@@ -160,6 +160,20 @@ class MemberCanTests(SharingTestCase):
         alices_page = self.client_for(self.alice).get(self.groceries.get_absolute_url())
         self.assertContains(alices_page, "The lactose-free one.")
 
+    def test_member_can_set_priority(self):
+        response = self.client.post(
+            self.url("todo_add", self.groceries.pk), {"title": "Eggs", "priority": "3"}
+        )
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        eggs = self.groceries.todos.get(title="Eggs")
+        self.assertEqual(eggs.priority, Todo.Priority.HIGH)
+        response = self.client.post(
+            self.url("todo_edit", self.milk.pk), {"title": "Milk", "priority": "1"}
+        )
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        self.milk.refresh_from_db()
+        self.assertEqual(self.milk.priority, Todo.Priority.LOW)
+
     def test_member_can_delete_todo(self):
         response = self.client.post(self.url("todo_delete", self.milk.pk))
         self.assertRedirects(response, self.groceries.get_absolute_url())
@@ -301,6 +315,20 @@ class StrangerTests(SharingTestCase):
         self.assertEqual(response.status_code, 404)
         self.milk.refresh_from_db()
         self.assertEqual(self.milk.description, "Alice's note.")
+        self.assertStillMilk()
+
+    def test_stranger_cannot_set_priority(self):
+        response = self.client.post(
+            self.url("todo_add", self.groceries.pk), {"title": "Eggs", "priority": "3"}
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(list(self.groceries.todos.all()), [self.milk])
+        response = self.client.post(
+            self.url("todo_edit", self.milk.pk), {"title": "Milk", "priority": "3"}
+        )
+        self.assertEqual(response.status_code, 404)
+        self.milk.refresh_from_db()
+        self.assertEqual(self.milk.priority, Todo.Priority.MEDIUM)
         self.assertStillMilk()
 
     def test_stranger_cannot_delete_todo(self):
