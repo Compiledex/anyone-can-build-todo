@@ -92,7 +92,7 @@ Add a package with `uv add <name>`, never with `pip install`. After changing `mo
      that it exists). A member gets the same 404 as a stranger.
   3. Create: set the owner or the list in the view (`form.save(commit=False)`, then
      `todo.todo_list = the_list`), never from the form.
-  4. A new model that belongs to a to-do is reached through a to-do the user owns, or gets its own
-     `owner` field and follows rules 1 to 3.
+  4. A new model that belongs to a to-do is reached through a to-do the user can see
+     (`get_visible_todo`), or gets its own `owner` field and follows rules 1 to 3.
   5. Every new view gets a test that another user gets 404 (`assertOtherUserGets404` from
      `accounts/tests/helpers.py`), and that the data did not change.

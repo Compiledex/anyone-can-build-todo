@@ -465,3 +465,29 @@ class LoggedOutTests(SharingTestCase):
                     fetch_redirect_response=False,
                 )
         self.assertEqual(list(self.groceries.members.all()), [self.bob])
+
+
+class EscapingTests(SharingTestCase):
+    def test_usernames_are_escaped(self):
+        owner = make_user("<b>ann")
+        member = make_user("<b>ben")
+        the_list = TodoList.objects.create(owner=owner, name="Tools")
+        the_list.members.add(member)
+
+        owners_page = self.client_for(owner).get(the_list.get_absolute_url())
+        self.assertContains(owners_page, 'aria-label="Remove &lt;b&gt;ben"')
+        self.assertContains(owners_page, '<span class="title">&lt;b&gt;ben</span>')
+        self.assertNotContains(owners_page, "<b>")
+
+        members_page = self.client_for(member).get(the_list.get_absolute_url())
+        self.assertContains(members_page, "Shared by &lt;b&gt;ann")
+        self.assertIn("Tools (&lt;b&gt;ann)", menu_part(members_page, SHARED_LISTS))
+        self.assertNotContains(members_page, "<b>")
+
+
+class NewListCancelTests(SharingTestCase):
+    def test_member_with_only_shared_lists_sees_cancel(self):
+        bob = self.client_for(self.bob)
+        bob.post(self.url("list_delete", self.bobs_list.pk))
+        response = bob.get(reverse("list_create"))
+        self.assertContains(response, f'href="{reverse("todo_list")}">Cancel</a>')

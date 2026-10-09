@@ -220,6 +220,7 @@ class ShareAListTests(BrowserTestCase):
         alice_page = self.page
         self.log_in_as(make_user_with_inbox())  # alice
         bob = make_user("bob")
+        make_user("carol")
         TodoList.objects.create(owner=bob, name="Bob's stuff")
 
         alice_page.goto(self.live_server_url)
@@ -232,6 +233,17 @@ class ShareAListTests(BrowserTestCase):
         alice_page.get_by_role("button", name="Share").click()
         expect(alice_page.get_by_text("Shared with bob.")).to_be_visible()
         sharing = alice_page.get_by_role("region", name="Sharing")
+        expect(sharing.get_by_role("listitem").filter(has_text="bob")).to_be_visible()
+
+        # alice shares with carol by mistake, and removes her again.
+        alice_page.get_by_label("Username to share with").fill("carol")
+        alice_page.get_by_role("button", name="Share").click()
+        expect(alice_page.get_by_text("Shared with carol.")).to_be_visible()
+        sharing.get_by_role("button", name="Remove carol").click()
+        expect(alice_page.get_by_text("carol was removed.")).to_be_visible()
+        expect(sharing.get_by_role("listitem").filter(has_text="carol")).to_have_count(
+            0
+        )
         expect(sharing.get_by_role("listitem").filter(has_text="bob")).to_be_visible()
 
         # bob, in a second browser with his own cookies.

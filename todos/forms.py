@@ -46,7 +46,16 @@ class ShareForm(forms.Form):
     A valid form gives the User in cleaned_data["username"].
     """
 
-    username = forms.CharField(max_length=150)
+    username = forms.CharField(
+        max_length=150,
+        widget=forms.TextInput(
+            attrs={
+                "aria-label": "Username to share with",
+                "placeholder": "Username",
+                "autocomplete": "off",
+            }
+        ),
+    )
 
     def __init__(self, *args, todo_list, **kwargs):
         super().__init__(*args, **kwargs)

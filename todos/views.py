@@ -80,7 +80,7 @@ def list_create(request):
     return render(
         request,
         "todos/list_form.html",
-        {"form": form, "has_lists": request.user.todo_lists.exists()},
+        {"form": form, "has_lists": TodoList.objects.visible_to(request.user).exists()},
     )
 
 

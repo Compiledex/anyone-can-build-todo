@@ -79,8 +79,7 @@
       {% endif %}
       <form class="add" method="post" action="{% url 'list_share' the_list.pk %}">
         {% csrf_token %}
-        <input name="username" aria-label="Username to share with" placeholder="Username"
-               maxlength="150" required autocomplete="off">
+        {{ share_form.username }}
         <button type="submit">Share</button>
       </form>
     </section>

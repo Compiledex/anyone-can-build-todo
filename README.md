@@ -66,7 +66,8 @@ uv run python manage.py runserver
 ```
 
 Open <http://127.0.0.1:8000/> and click *Create an account*. Each account sees only its own
-lists and to-dos, plus the lists other people share with it. Press `Ctrl+C` in the terminal to stop the server.
+lists and to-dos, plus the lists other people share with it. Press `Ctrl+C` in the terminal to
+stop the server.
 
 **8. Run the tests.**
 
@@ -79,7 +80,7 @@ You should see `OK`, and then one line for each layer of tests:
 ```
 Test layers
   CUJ           6 passed
-  Integration  145 passed
+  Integration  147 passed
   Unit         20 passed
 ```
 
