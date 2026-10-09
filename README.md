@@ -80,8 +80,8 @@ You should see `OK`, and then one line for each layer of tests:
 
 ```
 Test layers
-  CUJ           8 passed
-  Integration  264 passed
+  CUJ           9 passed
+  Integration  280 passed
   Unit         49 passed
 ```
 
@@ -128,7 +128,8 @@ runs the same checks and the tests on every push.
 | `todos/tags.py` | Cleans the tags a person types, like "work, #Home", and checks their limits |
 | `todos/recurrence.py` | Works out the next due date of a repeating to-do |
 | `todos/urls.py` | The addresses of the list and to-do pages |
-| `todos/forms.py` | The forms that check a to-do (with its tags), a step's title, a list's name, and the username to share a list with |
+| `todos/forms.py` | The forms that check a to-do (with its tags), a step's title, a list's name, the username to share a list with, and the search text |
+| `todos/queries.py` | Picks the to-dos a list page shows: the search in the title, the notes and the tags |
 | `todos/views.py` | What happens when each address is visited |
 | `todos/templates/base.html` | The frame every page shares: the colors, the style, who is logged in, the messages |
 | `todos/templates/todos/todo_list.html` | The page you see: one list |
