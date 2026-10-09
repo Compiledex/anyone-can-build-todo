@@ -2,6 +2,7 @@ import re
 
 from playwright.sync_api import expect
 
+from accounts.tests.helpers import TEST_PASSWORD, make_user
 from todos.tests.cuj.browser import BrowserTestCase
 
 DONE = re.compile(r"\bdone\b")
@@ -34,9 +35,14 @@ def contrast(color_a, color_b):
     return (lighter + 0.05) / (darker + 0.05)
 
 
+# The first password field only, not "Password confirmation".
+PASSWORD = re.compile(r"^Password:?$")
+
+
 class PlanAndFinishTests(BrowserTestCase):
     def test_plan_and_finish(self):
         page = self.page
+        self.log_in_as(make_user())
         page.goto(self.live_server_url)
 
         for title in ["Buy milk", "Call home"]:
@@ -61,6 +67,7 @@ class PlanAndFinishTests(BrowserTestCase):
 class ColorSchemeTests(BrowserTestCase):
     def test_readable_in_light_and_dark(self):
         page = self.page
+        self.log_in_as(make_user())
         page.goto(self.live_server_url)  # Opens the list page.
 
         for title in ["Buy milk", "Call home"]:
@@ -95,3 +102,40 @@ class ColorSchemeTests(BrowserTestCase):
                 self.assertGreaterEqual(
                     contrast(colors["done"], colors["background"]), AA_CONTRAST
                 )
+
+
+class TwoPeopleTests(BrowserTestCase):
+    def sign_up(self, username):
+        page = self.page
+        page.get_by_role("link", name="Create an account").click()
+        page.get_by_label("Username").fill(username)
+        page.get_by_label(PASSWORD).fill(TEST_PASSWORD)
+        page.get_by_label("Password confirmation").fill(TEST_PASSWORD)
+        page.get_by_role("button", name="Sign up").click()
+        expect(page.get_by_text(f"Logged in as {username}")).to_be_visible()
+
+    def log_out(self):
+        self.page.get_by_role("button", name="Log out").click()
+        expect(self.page.get_by_role("button", name="Log in")).to_be_visible()
+
+    def test_two_people_have_their_own_lists(self):
+        page = self.page
+        page.goto(self.live_server_url)
+        expect(page.get_by_role("button", name="Log in")).to_be_visible()
+
+        self.sign_up("alice")
+        page.get_by_label("New to-do").fill("Buy milk")
+        page.get_by_role("button", name="Add").click()
+        expect(page.get_by_role("listitem").filter(has_text="Buy milk")).to_be_visible()
+        self.log_out()
+
+        self.sign_up("bob")
+        expect(page.get_by_text("Nothing to do yet")).to_be_visible()
+        expect(page.get_by_text("Buy milk")).to_have_count(0)
+        self.log_out()
+
+        page.get_by_label("Username").fill("alice")
+        page.get_by_label(PASSWORD).fill(TEST_PASSWORD)
+        page.get_by_role("button", name="Log in").click()
+        expect(page.get_by_text("Logged in as alice")).to_be_visible()
+        expect(page.get_by_role("listitem").filter(has_text="Buy milk")).to_be_visible()

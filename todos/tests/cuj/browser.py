@@ -1,6 +1,8 @@
 import os
 
+from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
+from django.test import Client
 from playwright.sync_api import expect, sync_playwright
 
 # The server runs on this computer, so 5 seconds is plenty. Playwright's
@@ -43,3 +45,15 @@ class BrowserTestCase(StaticLiveServerTestCase):
 
     def tearDown(self):
         self.context.close()
+
+    def log_in_as(self, user):
+        """Give the browser this user's session cookie, so the test starts logged in.
+
+        Call it before the first page.goto().
+        """
+        client = Client()
+        client.force_login(user)
+        cookie = client.cookies[settings.SESSION_COOKIE_NAME]
+        self.context.add_cookies(
+            [{"name": cookie.key, "value": cookie.value, "url": self.live_server_url}]
+        )
