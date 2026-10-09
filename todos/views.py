@@ -3,8 +3,9 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.template.defaultfilters import pluralize
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from .forms import ShareForm, TodoForm, TodoListForm
+from .forms import ShareForm, TodoForm, TodoListForm, TodoQueryForm
 from .models import Todo, TodoList
+from .queries import apply_list_query
 
 # A view that reads or changes a list or its to-dos finds the list with
 #   get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
@@ -29,13 +30,21 @@ def render_list_page(request, the_list, form):
     errors of a bad add.
     """
     is_owner = the_list.owner_id == request.user.id
+    # Search (and later filter and sort) from the address. Only GET is read,
+    # so an invalid add (a POST) shows the whole list.
+    query_form = TodoQueryForm(request.GET)
+    # All tags in one query, not one query per row.
+    todos = apply_list_query(the_list.todos.prefetch_related("tags"), query_form)
+    q = query_form.cleaned_data.get("q", "")  # Filled by apply_list_query.
     return render(
         request,
         "todos/todo_list.html",
         {
             "the_list": the_list,
-            # All tags in one query, not one query per row.
-            "todos": the_list.todos.prefetch_related("tags"),
+            "todos": todos,
+            "query_form": query_form,
+            "q": q,
+            "searching": bool(q),
             # Always the whole list: "Clear completed" deletes all of these.
             "done_count": the_list.todos.filter(done=True).count(),
             "my_lists": request.user.todo_lists.all(),

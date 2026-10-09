@@ -132,3 +132,14 @@ class ShareForm(forms.Form):
         if self.todo_list.members.filter(pk=user.pk).exists():
             raise forms.ValidationError(f"{user.username} is already a member.")
         return user
+
+
+class TodoQueryForm(forms.Form):
+    """What the list page shows, read from the address (`request.GET`).
+
+    Only reads, never saves. Today one field: `q`, the search text. Filter and
+    sort add their fields here too. apply_list_query in todos/queries.py uses it.
+    """
+
+    # CharField removes spaces at the start and end (strip=True is the default).
+    q = forms.CharField(required=False, max_length=200)
