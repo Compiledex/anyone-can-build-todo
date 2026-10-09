@@ -677,6 +677,24 @@ class PriorityTests(LoggedInTestCase):
         self.assertFalse(Todo.objects.exists())
         self.assertContains(response, "Select a valid choice.")
         self.assertContains(response, 'value="Pay rent"')
+        # Screen readers hear that the drop-down is wrong, and which error it has.
+        self.assertInHTML(
+            '<select name="priority" aria-label="Priority" aria-invalid="true"'
+            ' aria-describedby="id_priority_error" id="id_priority">'
+            '<option value="1">Low</option><option value="2">Medium</option>'
+            '<option value="3">High</option></select>',
+            response.text,
+        )
+        self.assertContains(response, 'id="id_priority_error"')
+
+    def test_invalid_priority_on_edit_changes_nothing(self):
+        todo, url = self.make_todo(Todo.Priority.LOW)
+        response = self.client.post(url, {"title": "New", "priority": "7"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Select a valid choice.")
+        todo.refresh_from_db()
+        self.assertEqual(todo.title, "Pay rent")
+        self.assertEqual(todo.priority, Todo.Priority.LOW)
 
     def test_list_shows_priority_label(self):
         self.make_todo(Todo.Priority.HIGH)

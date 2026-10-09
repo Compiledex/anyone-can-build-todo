@@ -129,7 +129,23 @@ class ColorSchemeTests(BrowserTestCase):
         page.get_by_label("New to-do").fill("Fix the roof")
         page.get_by_label("Priority").select_option(label="High")
         page.get_by_role("button", name="Add").click()
-        expect(page.locator(".priority-3")).to_be_visible()
+        roof = page.get_by_role("listitem").filter(has_text="Fix the roof")
+        expect(roof.locator(".priority-3")).to_have_text("Priority: High")
+        # "Priority: " is for screen readers: in the page, but not seen. With
+        # display: none it would have no box at all, and screen readers skip it.
+        hidden = roof.locator(".visually-hidden")
+        expect(hidden).to_be_attached()
+        box = hidden.bounding_box()
+        self.assertIsNotNone(box)
+        self.assertLessEqual(box["width"], 1)
+
+        # One done High to-do: its label must be grey like the rest of the row.
+        page.get_by_label("New to-do").fill("Paint the fence")
+        page.get_by_label("Priority").select_option(label="High")
+        page.get_by_role("button", name="Add").click()
+        fence = page.get_by_role("listitem").filter(has_text="Paint the fence")
+        fence.get_by_role("button", name="Done").click()
+        expect(fence).to_have_class(DONE)
 
         for scheme in ["light", "dark"]:
             with self.subTest(scheme=scheme):
@@ -144,7 +160,8 @@ class ColorSchemeTests(BrowserTestCase):
                             done: color("li.done .title", "color"),
                             header: color("header.site", "color"),
                             overdue: color("li.overdue time", "color"),
-                            high: color(".priority-3", "color"),
+                            high: color("li:not(.done) .priority-3", "color"),
+                            doneHigh: color("li.done .priority-3", "color"),
                         };
                     }"""
                 )
@@ -171,6 +188,8 @@ class ColorSchemeTests(BrowserTestCase):
                 )
                 # High must not look like overdue.
                 self.assertNotEqual(colors["high"], colors["overdue"], colors)
+                # A done row is grey, also its priority label.
+                self.assertEqual(colors["doneHigh"], colors["done"], colors)
 
 
 class TwoPeopleTests(BrowserTestCase):
