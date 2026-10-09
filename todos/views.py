@@ -1,6 +1,9 @@
 from django.contrib import messages
+from django.db import transaction
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.defaultfilters import date as format_date
 from django.template.defaultfilters import pluralize
+from django.utils import timezone
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from .forms import ShareForm, TodoForm, TodoListForm
@@ -144,9 +147,25 @@ def todo_add(request, pk):
 
 @require_POST
 def todo_toggle(request, pk):
-    todo = get_visible_todo(request.user, pk)
-    todo.done = not todo.done
-    todo.save()
+    """Done or Undo. Done on a repeating to-do makes its next copy; Undo removes
+    that copy again, unless it is already done or in another list."""
+    # Read the to-do inside the transaction, so a second click at the same time
+    # waits and then sees the new value (see transaction_mode in settings.py).
+    with transaction.atomic():
+        todo = get_visible_todo(request.user, pk)
+        todo.done = not todo.done
+        todo.save()
+        if todo.done:
+            todo.make_next_copy(timezone.localdate())
+        else:
+            copy = todo.get_next_copy()
+            if copy and not copy.done and copy.todo_list_id == todo.todo_list_id:
+                copy.delete()
+                messages.info(
+                    request,
+                    f"The next copy, due {format_date(copy.due_date, 'j M Y')}, "
+                    "was removed.",
+                )
     return redirect(todo.todo_list)
 
 

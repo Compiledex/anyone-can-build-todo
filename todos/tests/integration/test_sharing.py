@@ -12,10 +12,12 @@ Two rules, so that no test can pass while the feature is broken:
 """
 
 import re
+from datetime import timedelta
 
 from django.contrib.messages import get_messages
 from django.test import Client, TestCase
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import escape
 
 from accounts.tests.helpers import make_user
@@ -226,6 +228,56 @@ class MemberCanTests(SharingTestCase):
             response, self.url("list_clear_completed", self.groceries.pk)
         )
 
+    def make_weekly_milk(self):
+        self.milk.repeat = Todo.Repeat.WEEKLY
+        self.milk.due_date = timezone.localdate() + timedelta(days=30)
+        self.milk.save()
+
+    def test_member_can_add_repeating_todo(self):
+        due = timezone.localdate() + timedelta(days=30)
+        response = self.client.post(
+            self.url("todo_add", self.groceries.pk),
+            {"title": "Eggs", "repeat": "weekly", "due_date": f"{due:%Y-%m-%d}"},
+        )
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        eggs = self.groceries.todos.get(title="Eggs")
+        self.assertEqual(eggs.repeat, Todo.Repeat.WEEKLY)
+
+    def test_member_can_set_repeat_on_edit(self):
+        response = self.client.post(
+            self.url("todo_edit", self.milk.pk),
+            {"title": "Milk", "repeat": "daily", "due_date": "2030-01-01"},
+        )
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        self.milk.refresh_from_db()
+        self.assertEqual(self.milk.repeat, Todo.Repeat.DAILY)
+
+    def test_member_done_makes_copy_in_shared_list(self):
+        self.make_weekly_milk()
+        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        copy = Todo.objects.get(repeated_from=self.milk)
+        self.assertEqual(copy.todo_list, self.groceries)
+        self.assertEqual(copy.due_date, self.milk.due_date + timedelta(days=7))
+
+    def test_member_undo_removes_copy(self):
+        self.make_weekly_milk()
+        self.client.post(self.url("todo_toggle", self.milk.pk))
+        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        self.assertEqual(list(self.groceries.todos.all()), [self.milk])
+        self.assertEqual(len(self.messages_of(response)), 1)
+
+    def test_former_member_undo_does_not_touch_list(self):
+        self.make_weekly_milk()
+        self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.groceries.members.remove(self.bob)
+        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.assertEqual(response.status_code, 404)
+        self.milk.refresh_from_db()
+        self.assertTrue(self.milk.done)
+        self.assertTrue(Todo.objects.filter(repeated_from=self.milk).exists())
+
     def test_member_invalid_add_shows_member_page(self):
         response = self.client.post(
             self.url("todo_add", self.groceries.pk), {"title": "x" * 201}
@@ -370,6 +422,43 @@ class StrangerTests(SharingTestCase):
         self.assertEqual(response.status_code, 404)
         self.assertEqual(self.tag_names(self.milk), ["dairy"])
         self.assertEqual(list(Tag.objects.values_list("name", flat=True)), ["dairy"])
+        self.assertStillMilk()
+
+    def test_stranger_cannot_toggle_repeating_todo(self):
+        self.milk.repeat = Todo.Repeat.WEEKLY
+        self.milk.due_date = timezone.localdate() + timedelta(days=30)
+        self.milk.save()
+        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.assertEqual(response.status_code, 404)
+        self.assertStillMilk()
+        self.assertEqual(list(self.groceries.todos.all()), [self.milk])
+
+    def test_stranger_cannot_undo_and_remove_copy(self):
+        self.milk.repeat = Todo.Repeat.WEEKLY
+        self.milk.due_date = timezone.localdate() + timedelta(days=30)
+        self.milk.save()
+        self.client_for(self.alice).post(self.url("todo_toggle", self.milk.pk))
+        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.assertEqual(response.status_code, 404)
+        self.milk.refresh_from_db()
+        self.assertTrue(self.milk.done)
+        self.assertTrue(Todo.objects.filter(repeated_from=self.milk).exists())
+
+    def test_stranger_cannot_set_repeat(self):
+        response = self.client.post(
+            self.url("todo_add", self.groceries.pk),
+            {"title": "Eggs", "repeat": "daily", "due_date": "2030-01-01"},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(list(self.groceries.todos.all()), [self.milk])
+        response = self.client.post(
+            self.url("todo_edit", self.milk.pk),
+            {"title": "Milk", "repeat": "daily", "due_date": "2030-01-01"},
+        )
+        self.assertEqual(response.status_code, 404)
+        self.milk.refresh_from_db()
+        self.assertEqual(self.milk.repeat, Todo.Repeat.NEVER)
+        self.assertIsNone(self.milk.due_date)
         self.assertStillMilk()
 
     def test_stranger_cannot_delete_todo(self):

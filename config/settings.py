@@ -103,6 +103,10 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
+        # A transaction takes the write lock when it starts. Then a second
+        # request at the same time waits, instead of failing with "database is
+        # locked". Django recommends this for SQLite web sites.
+        "OPTIONS": {"transaction_mode": "IMMEDIATE"},
     }
 }
 
