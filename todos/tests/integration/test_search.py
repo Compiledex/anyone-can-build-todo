@@ -7,8 +7,11 @@ broken page cannot pass.
 
 from urllib.parse import quote
 
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+
 from accounts.tests.helpers import LoggedInTestCase
-from todos.models import Todo, TodoList
+from todos.models import Subtask, Todo, TodoList
 
 NO_MATCH = "No to-dos match"
 EMPTY_LIST = "Nothing to do yet"
@@ -185,3 +188,31 @@ class SearchTests(LoggedInTestCase):
 
         response = self.search("dairy", client=bob)
         self.assertEqual(self.shown(response), ["Buy milk"])
+
+    def test_search_keeps_steps_open(self):
+        # ?open= (from a step action) and ?q= work together.
+        milk = self.add("Buy milk")
+        Subtask.objects.create(todo=milk, title="Find a bag")
+        self.add("Call home")
+        url = f"{self.todo_list.get_absolute_url()}?q=milk&open={milk.pk}"
+        response = self.client.get(url)
+        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertContains(response, '<details class="steps" open>', count=1)
+        self.assertContains(response, "Find a bag")
+
+    def test_search_query_count_does_not_grow_with_rows(self):
+        def count_queries():
+            with CaptureQueriesContext(connection) as queries:
+                self.assertEqual(self.search("milk").status_code, 200)
+            return len(queries)
+
+        def add_match(n):
+            todo = self.add(f"Milk {n}")
+            todo.set_tags(["milk", f"tag{n}"])
+            Subtask.objects.create(todo=todo, title=f"Step {n}")
+
+        add_match(0)
+        with_one = count_queries()
+        for n in range(1, 5):
+            add_match(n)
+        self.assertEqual(count_queries(), with_one)
