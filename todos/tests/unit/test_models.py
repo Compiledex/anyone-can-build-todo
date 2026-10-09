@@ -1,6 +1,7 @@
 from datetime import UTC, date, datetime
 from unittest import mock
 
+from django.core.exceptions import ValidationError
 from django.test import SimpleTestCase
 
 from todos.models import Todo
@@ -40,3 +41,18 @@ class PriorityTests(SimpleTestCase):
         # Sorting by -priority must give High first.
         self.assertLess(Todo.Priority.LOW, Todo.Priority.MEDIUM)
         self.assertLess(Todo.Priority.MEDIUM, Todo.Priority.HIGH)
+
+
+class RepeatTests(SimpleTestCase):
+    def test_repeat_without_due_date_is_invalid(self):
+        todo = Todo(title="Water the plants", repeat="weekly")
+        with self.assertRaises(ValidationError) as caught:
+            todo.clean()
+        self.assertEqual(
+            caught.exception.message_dict,
+            {"repeat": ["A repeating to-do needs a due date."]},
+        )
+
+    def test_repeat_with_due_date_is_valid(self):
+        todo = Todo(title="Water the plants", repeat="weekly", due_date=TODAY)
+        todo.clean()  # Does not raise.
