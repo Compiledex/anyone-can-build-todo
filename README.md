@@ -41,6 +41,10 @@ uv sync
 uv run python manage.py migrate
 ```
 
+If your `db.sqlite3` already has to-dos from before accounts existed, `migrate` gives them to the
+oldest admin account. Make one first with `uv run python manage.py createsuperuser`, then run
+`uv run python manage.py migrate` again.
+
 **5. Download the test browser.** Some tests use a real Chromium browser. This downloads it, about
 150 MB, once.
 
@@ -60,7 +64,8 @@ uv run pre-commit install
 uv run python manage.py runserver
 ```
 
-Open <http://127.0.0.1:8000/>. Press `Ctrl+C` in the terminal to stop the server.
+Open <http://127.0.0.1:8000/> and click *Create an account*. Each account sees only its own
+to-dos. Press `Ctrl+C` in the terminal to stop the server.
 
 **8. Run the tests.**
 
@@ -72,8 +77,8 @@ You should see `OK`, and then one line for each layer of tests:
 
 ```
 Test layers
-  CUJ           2 passed
-  Integration  17 passed
+  CUJ           3 passed
+  Integration  42 passed
   Unit         14 passed
 ```
 
@@ -113,11 +118,14 @@ runs the same checks and the tests on every push.
 |---|---|
 | `config/settings.py` | Settings for the whole project |
 | `config/urls.py` | Sends each address to the right app |
-| `todos/models.py` | The `Todo` table in the database |
+| `accounts/` | Sign up, log in and log out, with Django's own accounts |
+| `accounts/templates/registration/` | The login and sign-up pages |
+| `accounts/tests/helpers.py` | Helpers the tests share: test users, and a test that starts logged in |
+| `todos/models.py` | The `Todo` table in the database; each to-do has an owner |
 | `todos/urls.py` | The addresses of the to-do pages |
 | `todos/forms.py` | The form that checks a new to-do |
 | `todos/views.py` | What happens when each address is visited |
-| `todos/templates/base.html` | The frame every page shares: the colors, the style, the messages |
+| `todos/templates/base.html` | The frame every page shares: the colors, the style, who is logged in, the messages |
 | `todos/templates/todos/todo_list.html` | The page you see |
 | `todos/templates/todos/_todo_item.html` | One row of the list |
 | `todos/tests/` | The tests, one folder per layer |
