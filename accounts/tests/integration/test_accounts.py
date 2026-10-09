@@ -10,7 +10,9 @@ LOGOUT_URL = "/accounts/logout/"
 
 
 def is_logged_in(client):
-    return client.get(reverse("todo_list")).status_code == 200
+    # `/` only sends the browser on: to a list when logged in, else to the login page.
+    response = client.get(reverse("todo_list"), follow=True)
+    return "Logged in as" in response.content.decode()
 
 
 class SignupTests(TestCase):
@@ -23,9 +25,10 @@ class SignupTests(TestCase):
                 "password2": TEST_PASSWORD,
             },
         )
-        self.assertTrue(get_user_model().objects.filter(username="carol").exists())
+        carol = get_user_model().objects.get(username="carol")
         self.assertRedirects(response, "/", fetch_redirect_response=False)
         self.assertTrue(is_logged_in(self.client))
+        self.assertEqual([lst.name for lst in carol.todo_lists.all()], ["Inbox"])
 
     def test_signup_with_different_passwords_shows_error(self):
         response = self.client.post(
@@ -155,6 +158,6 @@ class LogoutTests(TestCase):
         self.assertTrue(is_logged_in(self.client))
 
     def test_header_shows_username_and_logout_button(self):
-        response = self.client.get(reverse("todo_list"))
+        response = self.client.get(reverse("todo_list"), follow=True)
         self.assertContains(response, "Logged in as alice")
         self.assertContains(response, f'<form method="post" action="{LOGOUT_URL}"')

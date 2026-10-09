@@ -3,6 +3,7 @@ import re
 from playwright.sync_api import expect
 
 from accounts.tests.helpers import TEST_PASSWORD, make_user
+from todos.models import TodoList
 from todos.tests.cuj.browser import BrowserTestCase
 
 DONE = re.compile(r"\bdone\b")
@@ -35,6 +36,13 @@ def contrast(color_a, color_b):
     return (lighter + 0.05) / (darker + 0.05)
 
 
+def make_user_with_inbox():
+    """A user with an "Inbox" list, like a person who just signed up."""
+    user = make_user()
+    TodoList.objects.create(owner=user, name="Inbox")
+    return user
+
+
 # The first password field only, not "Password confirmation".
 PASSWORD = re.compile(r"^Password:?$")
 
@@ -42,7 +50,7 @@ PASSWORD = re.compile(r"^Password:?$")
 class PlanAndFinishTests(BrowserTestCase):
     def test_plan_and_finish(self):
         page = self.page
-        self.log_in_as(make_user())
+        self.log_in_as(make_user_with_inbox())
         page.goto(self.live_server_url)
 
         for title in ["Buy milk", "Call home"]:
@@ -64,10 +72,38 @@ class PlanAndFinishTests(BrowserTestCase):
         expect(call).to_have_count(0)
 
 
+class SeparateListsTests(BrowserTestCase):
+    def test_separate_lists(self):
+        page = self.page
+        self.log_in_as(make_user_with_inbox())
+        page.goto(self.live_server_url)
+        lists = page.get_by_role("navigation", name="Your lists")
+
+        lists.get_by_role("link", name="New list").click()
+        page.get_by_label("Name").fill("Shopping")
+        page.get_by_role("button", name="Save").click()
+        expect(page.get_by_role("heading", name="Shopping")).to_be_visible()
+        page.get_by_label("New to-do").fill("Buy milk")
+        page.get_by_role("button", name="Add").click()
+        expect(page.get_by_role("listitem").filter(has_text="Buy milk")).to_be_visible()
+
+        lists.get_by_role("link", name="Inbox").click()
+        expect(page.get_by_role("heading", name="Inbox")).to_be_visible()
+        expect(page.get_by_text("Buy milk")).to_have_count(0)
+
+        lists.get_by_role("link", name="Shopping").click()
+        page.get_by_role("link", name="Delete list").click()
+        expect(page.get_by_role("heading", name="Delete")).to_contain_text("1 to-do?")
+        page.get_by_role("button", name="Delete list").click()
+
+        expect(page.get_by_role("heading", name="Inbox")).to_be_visible()
+        expect(lists.get_by_role("link", name="Shopping")).to_have_count(0)
+
+
 class ColorSchemeTests(BrowserTestCase):
     def test_readable_in_light_and_dark(self):
         page = self.page
-        self.log_in_as(make_user())
+        self.log_in_as(make_user_with_inbox())
         page.goto(self.live_server_url)  # Opens the list page.
 
         for title in ["Buy milk", "Call home"]:

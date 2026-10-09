@@ -1,7 +1,20 @@
 {% extends "base.html" %}
 
+{% block title %}{{ the_list.name }}{% endblock %}
+
 {% block content %}
-  <h1>To-do list</h1>
+  <nav class="lists" aria-label="Your lists">
+    {% for a_list in my_lists %}
+      <a href="{{ a_list.get_absolute_url }}"{% if a_list.pk == the_list.pk %} aria-current="page"{% endif %}>{{ a_list.name }}</a>
+    {% endfor %}
+    <a href="{% url 'list_create' %}">+ New list</a>
+  </nav>
+
+  <h1>{{ the_list.name }}</h1>
+  <p class="list-actions">
+    <a href="{% url 'list_rename' the_list.pk %}">Rename</a>
+    <a href="{% url 'list_delete' the_list.pk %}">Delete list</a>
+  </p>
 
   {% if form.errors %}
     <div class="form-errors">
@@ -10,7 +23,7 @@
     </div>
   {% endif %}
 
-  <form class="add" method="post" action="{% url 'todo_add' %}">
+  <form class="add" method="post" action="{% url 'todo_add' the_list.pk %}">
     {% csrf_token %}
     <input name="title" aria-label="New to-do" placeholder="What needs doing?" maxlength="200"
            required autofocus value="{{ form.title.value|default_if_none:'' }}"

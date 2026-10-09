@@ -1,10 +1,39 @@
 from django.conf import settings
 from django.db import models
+from django.db.models.functions import Lower
+from django.urls import reverse
+
+
+class TodoList(models.Model):
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="todo_lists",
+    )
+    name = models.CharField(max_length=100)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "pk"]
+        constraints = [
+            # One person cannot have "Work" and "work". On SQLite this ignores
+            # case only for A-Z, the same as `name__iexact` in TodoListForm.
+            models.UniqueConstraint(
+                Lower("name"), "owner", name="unique_list_name_per_owner"
+            ),
+        ]
+
+    def __str__(self):
+        return self.name
+
+    def get_absolute_url(self):
+        return reverse("list_detail", args=[self.pk])
 
 
 class Todo(models.Model):
-    owner = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    # The owner of a to-do is the owner of its list: todo.todo_list.owner.
+    todo_list = models.ForeignKey(
+        TodoList,
         on_delete=models.CASCADE,
         related_name="todos",
     )

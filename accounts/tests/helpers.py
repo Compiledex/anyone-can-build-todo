@@ -7,6 +7,8 @@ file as tests. Other test files import from it.
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 
+from todos.models import TodoList
+
 # Only for tests. It is not a real password for anything. It passes Django's
 # password rules (it is not in the common-password list).
 TEST_PASSWORD = "correct-horse-battery-staple"
@@ -22,13 +24,19 @@ class LoggedInTestCase(TestCase):
     """A TestCase where self.client is logged in as self.user (alice).
 
     self.other_user (bob) exists too, to check that bob cannot see or
-    change alice's things.
+    change alice's things. self.todo_list is alice's "Inbox" list, and
+    self.other_list is bob's list. The two lists have different names, so a
+    "not shown" test cannot pass by accident.
     """
 
     @classmethod
     def setUpTestData(cls):
         cls.user = make_user("alice")
         cls.other_user = make_user("bob")
+        cls.todo_list = TodoList.objects.create(owner=cls.user, name="Inbox")
+        cls.other_list = TodoList.objects.create(
+            owner=cls.other_user, name="Bob's list"
+        )
 
     def setUp(self):
         self.client.force_login(self.user)
