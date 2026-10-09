@@ -329,6 +329,15 @@ class EditTests(LoggedInTestCase):
         self.todo.refresh_from_db()
         self.assertEqual(self.todo.title, "Buy mlik")
 
+    def test_edit_other_methods_are_405(self):
+        for method in ["put", "patch", "delete"]:
+            with self.subTest(method=method):
+                response = getattr(self.client, method)(self.url)
+                self.assertEqual(response.status_code, 405)
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy mlik")
+        self.assertTrue(Todo.objects.filter(pk=self.todo.pk).exists())
+
     def test_heading_is_fixed_and_title_is_escaped(self):
         self.todo.title = '"><script>x</script>'
         self.todo.save()

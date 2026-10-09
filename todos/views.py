@@ -112,6 +112,7 @@ def todo_delete(request, pk):
     return redirect(the_list)
 
 
+@require_http_methods(["GET", "POST"])
 def todo_edit(request, pk):
     todo = get_object_or_404(Todo, pk=pk, todo_list__owner=request.user)
     if request.method == "POST":
