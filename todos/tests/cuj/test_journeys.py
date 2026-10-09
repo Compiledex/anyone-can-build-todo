@@ -198,9 +198,24 @@ class TwoPeopleTests(BrowserTestCase):
         expect(page.get_by_role("listitem").filter(has_text="Buy milk")).to_be_visible()
 
 
+# One word, wider than a phone screen, with no place to break it.
+LONG_WORD = "x" * 120
+
+# True when the element, or anything around it, has a line through its text.
+# A line-through on a parent also goes through the text of everything inside it.
+LINE_THROUGH_ON_SELF_OR_ANCESTOR = """element => {
+    for (let e = element; e; e = e.parentElement) {
+        if (getComputedStyle(e).textDecorationLine.includes("line-through")) return true;
+    }
+    return false;
+}"""
+
+
 class FixATypoTests(BrowserTestCase):
     def test_fix_a_typo(self):
         page = self.page
+        # Phone width, so the check below sees a long word that does not wrap.
+        page.set_viewport_size({"width": 375, "height": 800})
         self.log_in_as(make_user_with_inbox())
         page.goto(self.live_server_url)
         page.get_by_label("New to-do").fill("Buy mlik")
@@ -209,10 +224,35 @@ class FixATypoTests(BrowserTestCase):
         row = page.get_by_role("listitem").filter(has_text="Buy mlik")
         row.get_by_role("link", name="Edit").click()
         page.get_by_label("Title").fill("Buy milk")
+        page.get_by_label("Notes").fill(
+            "The lactose-free one.\nAlso ask about oat milk.\n" + LONG_WORD
+        )
         page.get_by_role("button", name="Save").click()
 
-        expect(page.get_by_role("listitem").filter(has_text="Buy milk")).to_be_visible()
+        row = page.get_by_role("listitem").filter(has_text="Buy milk")
+        expect(row).to_be_visible()
         expect(page.get_by_text("Buy mlik")).to_have_count(0)
+
+        # The note is closed until the person opens it.
+        note = row.get_by_text("Also ask about oat milk.")
+        expect(note).to_be_hidden()
+        row.get_by_text("Notes").click()
+        expect(row.get_by_text("The lactose-free one.")).to_be_visible()
+        expect(note).to_be_visible()
+
+        # One long word in the note wraps, so the page is not wider than the phone.
+        self.assertLessEqual(
+            page.evaluate("document.documentElement.scrollWidth"),
+            page.evaluate("document.documentElement.clientWidth"),
+        )
+
+        # When the to-do is done, its title is crossed out, but its note is not.
+        row.get_by_role("button", name="Done").click()
+        expect(row).to_have_class(DONE)
+        crossed_out = row.locator("details.notes").evaluate(
+            LINE_THROUGH_ON_SELF_OR_ANCESTOR
+        )
+        self.assertFalse(crossed_out)
 
 
 class ShareAListTests(BrowserTestCase):

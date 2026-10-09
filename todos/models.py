@@ -60,6 +60,8 @@ class Todo(models.Model):
     done = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     due_date = models.DateField(null=True, blank=True)
+    # "Notes" on the page. No note is "", never NULL. The form checks max_length.
+    description = models.TextField(max_length=2000, blank=True, default="")
 
     class Meta:
         ordering = ["created_at"]

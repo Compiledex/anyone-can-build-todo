@@ -1,6 +1,14 @@
 {% with overdue=todo.is_overdue %}
 <li class="{% if todo.done %}done{% elif overdue %}overdue{% endif %}">
-  <span class="title">{{ todo.title }}</span>
+  <div class="main">
+    <span class="title">{{ todo.title }}</span>
+    {% if todo.description %}
+      <details class="notes">
+        <summary aria-label="Notes for {{ todo.title }}">Notes</summary>
+        <p>{{ todo.description|linebreaksbr }}</p>
+      </details>
+    {% endif %}
+  </div>
   {% if todo.due_date %}
     <time datetime="{{ todo.due_date|date:'Y-m-d' }}">Due {{ todo.due_date|date:'j M Y' }}</time>
     {% if overdue %}<span class="overdue-label">Overdue</span>{% endif %}

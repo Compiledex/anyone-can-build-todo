@@ -50,7 +50,9 @@
     .sharing { margin-top: 2rem; }
     ul.todos > li, ul.members > li { display: flex; align-items: center; gap: 0.5rem;
                                      padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
-    li .title { flex: 1; }
+    li .title, li .main { flex: 1; min-width: 0; }
+    .notes { font-size: 0.9rem; color: var(--muted); }
+    .notes p { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
     .overdue time, .overdue-label { color: var(--overdue); }
     li.done .title { text-decoration: line-through; color: var(--muted); }
     details.clear-completed { margin-top: 1.5rem; padding: 0.5rem; border: 1px solid var(--border); }
