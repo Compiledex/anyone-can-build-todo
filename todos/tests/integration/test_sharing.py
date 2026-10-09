@@ -148,6 +148,18 @@ class MemberCanTests(SharingTestCase):
         self.milk.refresh_from_db()
         self.assertEqual(self.milk.title, "Oat milk")
 
+    def test_member_can_edit_notes(self):
+        url = self.url("todo_edit", self.milk.pk)
+        response = self.client.post(
+            url, {"title": "Milk", "description": "The lactose-free one."}
+        )
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        self.milk.refresh_from_db()
+        self.assertEqual(self.milk.description, "The lactose-free one.")
+        self.assertContains(self.client.get(url), "The lactose-free one.")
+        alices_page = self.client_for(self.alice).get(self.groceries.get_absolute_url())
+        self.assertContains(alices_page, "The lactose-free one.")
+
     def test_member_can_delete_todo(self):
         response = self.client.post(self.url("todo_delete", self.milk.pk))
         self.assertRedirects(response, self.groceries.get_absolute_url())
@@ -276,6 +288,19 @@ class StrangerTests(SharingTestCase):
         url = self.url("todo_edit", self.milk.pk)
         self.assertEqual(self.client.get(url).status_code, 404)
         self.assertEqual(self.client.post(url, {"title": "Mine"}).status_code, 404)
+        self.assertStillMilk()
+
+    def test_stranger_cannot_see_or_edit_notes(self):
+        self.milk.description = "Alice's note."
+        self.milk.save()
+        url = self.url("todo_edit", self.milk.pk)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, "note.", status_code=404)
+        response = self.client.post(url, {"title": "Milk", "description": "Mine"})
+        self.assertEqual(response.status_code, 404)
+        self.milk.refresh_from_db()
+        self.assertEqual(self.milk.description, "Alice's note.")
         self.assertStillMilk()
 
     def test_stranger_cannot_delete_todo(self):
