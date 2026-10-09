@@ -33,3 +33,10 @@ class IsOverdueTests(SimpleTestCase):
         todo = Todo(title="Pay rent", due_date=date(2026, 10, 9))
         with mock.patch("django.utils.timezone.now", return_value=now):
             self.assertTrue(todo.is_overdue())
+
+
+class PriorityTests(SimpleTestCase):
+    def test_priority_numbers_go_up_with_importance(self):
+        # Sorting by -priority must give High first.
+        self.assertLess(Todo.Priority.LOW, Todo.Priority.MEDIUM)
+        self.assertLess(Todo.Priority.MEDIUM, Todo.Priority.HIGH)
