@@ -92,6 +92,20 @@ class ListTests(LoggedInTestCase):
         response = self.list_page()
         self.assertContains(response, '<details class="notes">')
         self.assertContains(response, "Line one<br>Line two")
+        self.assertContains(
+            response, '<summary aria-label="Notes for Buy milk">Notes</summary>'
+        )
+
+    def test_note_of_a_done_todo_is_not_inside_the_title(self):
+        # A done title is crossed out, and so is everything inside it.
+        Todo.objects.create(
+            title="Buy milk",
+            todo_list=self.todo_list,
+            description="Oat milk",
+            done=True,
+        )
+        html = self.list_page().content.decode()
+        self.assertRegex(html, r'<span class="title">Buy milk</span>\s*<details')
 
     def test_list_escapes_description(self):
         Todo.objects.create(
@@ -616,4 +630,13 @@ class EditTests(LoggedInTestCase):
             self.url, data=self.edit_data(self.todo, description="Hacked")
         )
         self.todo.refresh_from_db()
+        self.assertEqual(self.todo.description, "Oat milk")
+
+    def test_edit_without_description_keeps_note(self):
+        self.todo.description = "Oat milk"
+        self.todo.save()
+        response = self.client.post(self.url, {"title": "Buy milk", "due_date": ""})
+        self.assertEqual(response.status_code, 302)
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy milk")
         self.assertEqual(self.todo.description, "Oat milk")

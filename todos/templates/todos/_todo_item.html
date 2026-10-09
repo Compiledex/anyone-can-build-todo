@@ -4,7 +4,7 @@
     <span class="title">{{ todo.title }}</span>
     {% if todo.description %}
       <details class="notes">
-        <summary>Notes</summary>
+        <summary aria-label="Notes for {{ todo.title }}">Notes</summary>
         <p>{{ todo.description|linebreaksbr }}</p>
       </details>
     {% endif %}
