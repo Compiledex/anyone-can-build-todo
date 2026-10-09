@@ -213,3 +213,48 @@ class FixATypoTests(BrowserTestCase):
 
         expect(page.get_by_role("listitem").filter(has_text="Buy milk")).to_be_visible()
         expect(page.get_by_text("Buy mlik")).to_have_count(0)
+
+
+class ShareAListTests(BrowserTestCase):
+    def test_share_a_list(self):
+        alice_page = self.page
+        self.log_in_as(make_user_with_inbox())  # alice
+        bob = make_user("bob")
+        TodoList.objects.create(owner=bob, name="Bob's stuff")
+
+        alice_page.goto(self.live_server_url)
+        alice_lists = alice_page.get_by_role("navigation", name="Your lists")
+        alice_lists.get_by_role("link", name="New list").click()
+        alice_page.get_by_label("Name").fill("Groceries")
+        alice_page.get_by_role("button", name="Save").click()
+        expect(alice_page.get_by_role("heading", name="Groceries")).to_be_visible()
+        alice_page.get_by_label("Username to share with").fill("bob")
+        alice_page.get_by_role("button", name="Share").click()
+        expect(alice_page.get_by_text("Shared with bob.")).to_be_visible()
+        sharing = alice_page.get_by_role("region", name="Sharing")
+        expect(sharing.get_by_role("listitem").filter(has_text="bob")).to_be_visible()
+
+        # bob, in a second browser with his own cookies.
+        bob_context = self.new_context()
+        self.log_in_as(bob, context=bob_context)
+        bob_page = bob_context.new_page()
+        bob_page.goto(self.live_server_url)
+        expect(bob_page.get_by_role("heading", name="Bob's stuff")).to_be_visible()
+        bob_lists = bob_page.get_by_role("navigation", name="Your lists")
+        shared = bob_lists.locator("#shared-lists")
+        expect(shared).to_contain_text("Shared with me")
+        shared.get_by_role("link", name="Groceries (alice)").click()
+        expect(bob_page.get_by_text("Shared by alice")).to_be_visible()
+        bob_page.get_by_label("New to-do").fill("Eggs")
+        bob_page.get_by_role("button", name="Add").click()
+        expect(bob_page.get_by_role("listitem").filter(has_text="Eggs")).to_be_visible()
+
+        alice_page.reload()
+        expect(
+            alice_page.get_by_role("listitem").filter(has_text="Eggs")
+        ).to_be_visible()
+
+        bob_page.get_by_role("button", name="Leave this list").click()
+        expect(bob_page.get_by_text("You left the list.")).to_be_visible()
+        expect(bob_page.get_by_role("heading", name="Bob's stuff")).to_be_visible()
+        expect(bob_lists.get_by_role("link", name="Groceries (alice)")).to_have_count(0)
