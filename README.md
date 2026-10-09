@@ -2,6 +2,8 @@
 
 The most basic to-do list in Django: add a to-do, mark it done, delete it.
 
+The pages follow your computer's or phone's light or dark mode.
+
 ## Run it on your laptop
 
 **1. Install uv, once.** uv installs Python and this project's packages for you.
@@ -70,7 +72,7 @@ You should see `OK`, and then one line for each layer of tests:
 
 ```
 Test layers
-  CUJ           1 passed
+  CUJ           2 passed
   Integration  17 passed
   Unit         14 passed
 ```

@@ -3,15 +3,26 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>{% block title %}To-do list{% endblock %}</title>
   <link rel="icon" href="data:,">
   <style>
-    /* Colors. Dark mode (#20) gives these new values; every new color needs a dark value too. */
+    /* Colors. The page follows the system's light or dark mode. Every new color needs a dark
+       value too, with at least 4.5 : 1 contrast on --bg in both modes (WCAG AA). */
     :root {
+      color-scheme: light dark;
       --bg: #ffffff;
       --text: #000000;
       --muted: #666666;
       --border: #dddddd;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121212;
+        --text: #e8e8e8;
+        --muted: #a0a0a0;
+        --border: #3a3a3a;
+      }
     }
     body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem;
            background: var(--bg); color: var(--text); }
