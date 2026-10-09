@@ -1,6 +1,7 @@
 # To-do list
 
-The most basic to-do list in Django: add a to-do, edit it, mark it done, delete it. Keep your to-dos in
+The most basic to-do list in Django: add a to-do, edit it, mark it done, delete it, or clear all the
+done ones at once. Keep your to-dos in
 several lists, like "Work" and "Home".
 
 The pages follow your computer's or phone's light or dark mode.
@@ -79,8 +80,8 @@ You should see `OK`, and then one line for each layer of tests:
 
 ```
 Test layers
-  CUJ           6 passed
-  Integration  147 passed
+  CUJ           7 passed
+  Integration  157 passed
   Unit         20 passed
 ```
 
