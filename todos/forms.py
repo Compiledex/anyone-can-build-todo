@@ -44,10 +44,15 @@ class TodoForm(forms.ModelForm):
 
     class Meta:
         model = Todo
-        fields = ["title", "due_date", "description", "priority"]
+        # "repeat" and "due_date" must both be here: Todo.clean() puts its
+        # error on "repeat", and checks "due_date".
+        fields = ["title", "due_date", "repeat", "description", "priority"]
         field_classes = {"description": NoteField}
         labels = {"description": "Notes"}
-        widgets = {"description": forms.Textarea(attrs={"rows": 4})}
+        widgets = {
+            "description": forms.Textarea(attrs={"rows": 4}),
+            "repeat": forms.Select(attrs={"aria-label": "Repeat"}),
+        }
 
     def clean_priority(self):
         priority = self.cleaned_data["priority"]
