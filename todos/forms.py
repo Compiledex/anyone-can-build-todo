@@ -4,9 +4,17 @@ from .models import Todo, TodoList
 
 
 class TodoForm(forms.ModelForm):
+    # Only YYYY-MM-DD, the format the browser's date picker sends. Other formats,
+    # like 10/12/2026, can mean two different dates.
+    due_date = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
+    )
+
     class Meta:
         model = Todo
-        fields = ["title"]
+        fields = ["title", "due_date"]
 
 
 class TodoListForm(forms.ModelForm):

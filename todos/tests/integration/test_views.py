@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import date, timedelta
 
 from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
@@ -8,6 +8,9 @@ from django.utils import timezone
 from accounts.tests.helpers import LoggedInTestCase, make_user
 from todos.forms import TodoForm
 from todos.models import Todo, TodoList
+
+# What an overdue row shows next to its date.
+OVERDUE_LABEL = '<span class="overdue-label">Overdue</span>'
 
 
 class ListTests(LoggedInTestCase):
@@ -43,6 +46,38 @@ class ListTests(LoggedInTestCase):
         response = self.list_page()
         self.assertContains(response, "&lt;b&gt;x&lt;/b&gt;")
         self.assertNotContains(response, "<b>x</b>")
+
+    def test_list_shows_due_date(self):
+        Todo.objects.create(
+            title="Pay rent", todo_list=self.todo_list, due_date=date(2026, 10, 12)
+        )
+        response = self.list_page()
+        self.assertContains(response, "Due 12 Oct 2026")
+
+    def test_list_marks_overdue_todo(self):
+        Todo.objects.create(
+            title="Pay rent",
+            todo_list=self.todo_list,
+            due_date=timezone.localdate() - timedelta(days=30),
+        )
+        response = self.list_page()
+        self.assertContains(response, OVERDUE_LABEL, html=True)
+
+    def test_list_does_not_mark_todo_that_is_not_late(self):
+        today = timezone.localdate()
+        Todo.objects.create(
+            title="Pay rent",
+            todo_list=self.todo_list,
+            due_date=today + timedelta(days=30),
+        )
+        Todo.objects.create(
+            title="Call home",
+            todo_list=self.todo_list,
+            due_date=today - timedelta(days=30),
+            done=True,
+        )
+        response = self.list_page()
+        self.assertNotContains(response, OVERDUE_LABEL, html=True)
 
 
 class AddTests(LoggedInTestCase):
@@ -105,6 +140,31 @@ class AddTests(LoggedInTestCase):
             response, "Ensure this value has at most 200 characters (it has 201)."
         )
         self.assertContains(response, f'value="{title}"')
+
+    def test_add_a_todo_with_a_due_date(self):
+        self.client.post(
+            self.add_url(), {"title": "Pay rent", "due_date": "2026-10-12"}
+        )
+        self.assertEqual(Todo.objects.get().due_date, date(2026, 10, 12))
+
+    def test_add_a_todo_without_a_due_date(self):
+        self.client.post(self.add_url(), {"title": "Pay rent", "due_date": ""})
+        self.assertIsNone(Todo.objects.get().due_date)
+
+    def test_invalid_due_date_is_not_added(self):
+        response = self.client.post(
+            self.add_url(), {"title": "Pay rent", "due_date": "2026-02-30"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Todo.objects.count(), 0)
+        self.assertContains(response, "Enter a valid date.")
+        self.assertContains(response, 'value="Pay rent"')
+
+    def test_other_date_format_is_not_added(self):
+        self.client.post(
+            self.add_url(), {"title": "Pay rent", "due_date": "10/12/2026"}
+        )
+        self.assertEqual(Todo.objects.count(), 0)
 
     def test_get_does_not_add(self):
         response = self.client.get(self.add_url(), {"title": "Buy milk"})
@@ -247,6 +307,14 @@ class OnlyMyDataTests(LoggedInTestCase):
         self.assertEqual(titles, ["Buy milk"])
         self.assertContains(response, "Buy milk")
         self.assertNotContains(response, "Call home")
+
+    def test_other_users_due_date_is_not_shown(self):
+        Todo.objects.create(
+            title="Call home", todo_list=self.other_list, due_date=date(2026, 10, 12)
+        )
+        response = self.client.get(self.todo_list.get_absolute_url())
+        self.assertNotContains(response, "Call home")
+        self.assertNotContains(response, "Due 12 Oct 2026")
 
     def test_add_sets_me_as_owner(self):
         self.client.post(

@@ -20,6 +20,7 @@
     <div class="form-errors">
       {{ form.non_field_errors }}
       {{ form.title.errors }}
+      {{ form.due_date.errors }}
     </div>
   {% endif %}
 
@@ -28,6 +29,9 @@
     <input name="title" aria-label="New to-do" placeholder="What needs doing?" maxlength="200"
            required autofocus value="{{ form.title.value|default_if_none:'' }}"
            {% if form.title.errors %}aria-invalid="true" aria-describedby="{{ form.title.auto_id }}_error"{% endif %}>
+    <input type="date" name="due_date" aria-label="Due date"
+           value="{{ form.due_date.value|default_if_none:'' }}"
+           {% if form.due_date.errors %}aria-invalid="true" aria-describedby="{{ form.due_date.auto_id }}_error"{% endif %}>
     <button type="submit">Add</button>
   </form>
 
