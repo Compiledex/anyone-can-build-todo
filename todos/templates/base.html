@@ -17,6 +17,8 @@
       --border: #dddddd;
       --overdue: #b00020;
       --priority-high: #a14a00;
+      --tag-bg: #e6eef8;
+      --tag-text: #1d3b5c;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -26,6 +28,8 @@
         --border: #3a3a3a;
         --overdue: #ff6b6b;
         --priority-high: #ffb366;
+        --tag-bg: #233447;
+        --tag-text: #cfe1f5;
       }
     }
     body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem;
@@ -56,6 +60,9 @@
     li .title, li .main { flex: 1; min-width: 0; }
     .notes { font-size: 0.9rem; color: var(--muted); }
     .notes p { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
+    li .tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
+    .tag { font-size: 0.8rem; padding: 0.1rem 0.4rem; border-radius: 0.6rem;
+           background: var(--tag-bg); color: var(--tag-text); white-space: nowrap; }
     .overdue time, .overdue-label { color: var(--overdue); }
     li.done .title { text-decoration: line-through; color: var(--muted); }
     details.clear-completed { margin-top: 1.5rem; padding: 0.5rem; border: 1px solid var(--border); }

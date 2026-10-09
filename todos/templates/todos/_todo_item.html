@@ -8,6 +8,9 @@
         <p>{{ todo.description|linebreaksbr }}</p>
       </details>
     {% endif %}
+    {% if todo.tags.all %}
+      <div class="tags">{% for tag in todo.tags.all %}<span class="tag">#{{ tag.name }}</span>{% endfor %}</div>
+    {% endif %}
   </div>
   <span class="priority priority-{{ todo.priority }}"><span class="visually-hidden">Priority: </span>{{ todo.get_priority_display }}</span>
   {% if todo.due_date %}

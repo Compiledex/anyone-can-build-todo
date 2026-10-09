@@ -19,7 +19,7 @@ from django.urls import reverse
 from django.utils.html import escape
 
 from accounts.tests.helpers import make_user
-from todos.models import Todo, TodoList
+from todos.models import Tag, Todo, TodoList
 
 # The two parts of the menu on the list page.
 MY_LISTS = re.compile(r'<p class="menu" id="my-lists">(.*?)</p>', re.S)
@@ -62,6 +62,9 @@ class SharingTestCase(TestCase):
         self.assertEqual(self.milk.title, "Milk")
         self.assertFalse(self.milk.done)
         self.assertEqual(self.milk.todo_list, self.groceries)
+
+    def tag_names(self, todo):
+        return [tag.name for tag in todo.tags.all()]
 
     def assertBobIsMember(self):
         self.assertTrue(self.groceries.members.filter(pk=self.bob.pk).exists())
@@ -173,6 +176,32 @@ class MemberCanTests(SharingTestCase):
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.milk.refresh_from_db()
         self.assertEqual(self.milk.priority, Todo.Priority.LOW)
+
+    def test_member_tags_go_to_list_owner(self):
+        # bob has his own "work" tag. It must not be used on alice's to-do.
+        bobs_work = Tag.objects.create(owner=self.bob, name="work")
+        response = self.client.post(
+            self.url("todo_edit", self.milk.pk),
+            {"title": "Milk", "tag_names": "work, new"},
+        )
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        self.assertEqual(self.tag_names(self.milk), ["new", "work"])
+        for tag in self.milk.tags.all():
+            self.assertEqual(tag.owner, self.alice)
+        self.assertFalse(bobs_work.todos.exists())
+        self.assertEqual(list(Tag.objects.filter(owner=self.bob)), [bobs_work])
+        alices_page = self.client_for(self.alice).get(self.groceries.get_absolute_url())
+        self.assertContains(alices_page, '<span class="tag">#work</span>')
+
+    def test_member_sees_only_tags_on_shared_todos(self):
+        self.milk.set_tags(["dairy"])
+        alices_inbox = TodoList.objects.create(owner=self.alice, name="Inbox")
+        Todo.objects.create(todo_list=alices_inbox, title="Diary").set_tags(["secret"])
+        list_page = self.client.get(self.groceries.get_absolute_url())
+        edit_page = self.client.get(self.url("todo_edit", self.milk.pk))
+        for page in [list_page, edit_page]:
+            self.assertContains(page, "dairy")
+            self.assertNotContains(page, "secret")
 
     def test_member_can_delete_todo(self):
         response = self.client.post(self.url("todo_delete", self.milk.pk))
@@ -329,6 +358,18 @@ class StrangerTests(SharingTestCase):
         self.assertEqual(response.status_code, 404)
         self.milk.refresh_from_db()
         self.assertEqual(self.milk.priority, Todo.Priority.MEDIUM)
+        self.assertStillMilk()
+
+    def test_stranger_cannot_see_or_set_tags(self):
+        self.milk.set_tags(["dairy"])
+        url = self.url("todo_edit", self.milk.pk)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
+        self.assertNotContains(response, "dairy", status_code=404)
+        response = self.client.post(url, {"title": "Milk", "tag_names": "mine"})
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(self.tag_names(self.milk), ["dairy"])
+        self.assertEqual(list(Tag.objects.values_list("name", flat=True)), ["dairy"])
         self.assertStillMilk()
 
     def test_stranger_cannot_delete_todo(self):

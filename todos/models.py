@@ -5,6 +5,8 @@ from django.db.models.functions import Lower
 from django.urls import reverse
 from django.utils import timezone
 
+from .tags import MAX_TAG_LENGTH
+
 
 class TodoListQuerySet(models.QuerySet):
     def visible_to(self, user):
@@ -49,6 +51,31 @@ class TodoList(models.Model):
         return reverse("list_detail", args=[self.pk])
 
 
+class Tag(models.Model):
+    """A short label on to-dos, like #work. Private to its owner.
+
+    The name is always lower case and has no `#` (see tags.parse_tags).
+    """
+
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="tags",
+    )
+    name = models.CharField(max_length=MAX_TAG_LENGTH)
+
+    class Meta:
+        ordering = ["name"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["owner", "name"], name="unique_tag_name_per_owner"
+            ),
+        ]
+
+    def __str__(self):
+        return f"#{self.name}"
+
+
 class Todo(models.Model):
     # A bigger number is more important, so ordering by -priority gives High first.
     class Priority(models.IntegerChoices):
@@ -71,12 +98,23 @@ class Todo(models.Model):
     priority = models.PositiveSmallIntegerField(
         choices=Priority.choices, default=Priority.MEDIUM
     )
+    tags = models.ManyToManyField(Tag, blank=True, related_name="todos")
 
     class Meta:
         ordering = ["created_at"]
 
     def __str__(self):
         return self.title
+
+    def set_tags(self, names):
+        """Make this to-do's tags exactly these clean names.
+
+        The tags belong to the owner of the list, never to the person who is
+        editing, so tags never leak between users.
+        """
+        owner = self.todo_list.owner
+        tags = [Tag.objects.get_or_create(owner=owner, name=name)[0] for name in names]
+        self.tags.set(tags)
 
     def is_overdue(self, today=None):
         """True when the due date has passed and the to-do is not done.

@@ -147,6 +147,13 @@ class ColorSchemeTests(BrowserTestCase):
         fence.get_by_role("button", name="Done").click()
         expect(fence).to_have_class(DONE)
 
+        # One tag, so its colors are checked too.
+        call = page.get_by_role("listitem").filter(has_text="Call home")
+        call.get_by_role("link", name="Edit").click()
+        page.get_by_label("Tags").fill("home")
+        page.get_by_role("button", name="Save").click()
+        expect(page.locator("li .tag")).to_have_text("#home")
+
         for scheme in ["light", "dark"]:
             with self.subTest(scheme=scheme):
                 page.emulate_media(color_scheme=scheme)
@@ -162,6 +169,8 @@ class ColorSchemeTests(BrowserTestCase):
                             overdue: color("li.overdue time", "color"),
                             high: color("li:not(.done) .priority-3", "color"),
                             doneHigh: color("li.done .priority-3", "color"),
+                            tag: color("li .tag", "color"),
+                            tag_background: color("li .tag", "backgroundColor"),
                         };
                     }"""
                 )
@@ -190,6 +199,11 @@ class ColorSchemeTests(BrowserTestCase):
                 self.assertNotEqual(colors["high"], colors["overdue"], colors)
                 # A done row is grey, also its priority label.
                 self.assertEqual(colors["doneHigh"], colors["done"], colors)
+                self.assertGreaterEqual(
+                    contrast(colors["tag"], colors["tag_background"]), AA_CONTRAST
+                )
+                if scheme == "dark":
+                    self.assertLess(luminance(colors["tag_background"]), 0.1, colors)
 
 
 class TwoPeopleTests(BrowserTestCase):
@@ -258,10 +272,12 @@ class FixATypoTests(BrowserTestCase):
         page.get_by_label("Notes").fill(
             "The lactose-free one.\nAlso ask about oat milk.\n" + LONG_WORD
         )
+        page.get_by_label("Tags").fill("Work, #urgent")
         page.get_by_role("button", name="Save").click()
 
         row = page.get_by_role("listitem").filter(has_text="Buy milk")
         expect(row).to_be_visible()
+        expect(row.locator(".tag")).to_have_text(["#urgent", "#work"])
         expect(page.get_by_text("Buy mlik")).to_have_count(0)
 
         # The note is closed until the person opens it.
