@@ -5,14 +5,17 @@ or `.../tests/cuj/`. The runner refuses tests that break the rules for their
 layer, and prints one line per layer at the end of the run.
 """
 
+import os
 import re
 import sys
 import unittest
+import warnings
 from collections import Counter, defaultdict
 
+from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test import SimpleTestCase, TransactionTestCase
-from django.test.runner import DiscoverRunner
+from django.test.runner import DiscoverRunner, ParallelTestSuite
 from django.test.utils import iter_test_cases
 
 # Top of the pyramid first, the order the summary prints them in.
@@ -133,7 +136,32 @@ def format_summary(layer_counts):
     return "\n".join(lines)
 
 
+def ignore_missing_static_root():
+    """Hide WhiteNoise's warning that the STATIC_ROOT folder does not exist.
+
+    Only `collectstatic` makes that folder, on a live server. The tests do not
+    need it, so the warning only adds noise. A missing folder anywhere else
+    still warns.
+    """
+    folder = os.path.join(settings.STATIC_ROOT, "")  # WhiteNoise ends it with a "/".
+    warnings.filterwarnings(
+        "ignore", message=re.escape(f"No directory at: {folder}") + "$"
+    )
+
+
+class LayeredParallelTestSuite(ParallelTestSuite):
+    # With --parallel on macOS, each test process starts a fresh Python, which
+    # does not keep the warning filters. Django calls this in each process.
+    process_setup = ignore_missing_static_root
+
+
 class LayeredTestRunner(DiscoverRunner):
+    parallel_test_suite = LayeredParallelTestSuite
+
+    def setup_test_environment(self, **kwargs):
+        super().setup_test_environment(**kwargs)
+        ignore_missing_static_root()
+
     def build_suite(self, *args, **kwargs):
         suite = super().build_suite(*args, **kwargs)
         check_layers(iter_test_cases(suite))
