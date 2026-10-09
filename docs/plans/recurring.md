@@ -72,7 +72,7 @@ result; it does not read the database, the clock or the request). It lives in a 
 
 ```python
 def next_due_date(due_date, repeat, today):
-    """The first date after due_date, in steps of `repeat`, that is today or later.
+    """The first date after due_date, in steps of `repeat`, that is after today.
 
     Returns None if that date would be after 31 Dec 9999 (the last date Python can store).
     """
@@ -82,18 +82,23 @@ def next_due_date(due_date, repeat, today):
   stays on Mondays, even if it is done on a Wednesday.
 - **It always moves at least one step.** Done early (due tomorrow, done today): the copy is due one
   step after tomorrow.
-- **It skips dates that are already past.** A daily to-do due 10 days ago, done today, gets a copy
-  due **today**, not 9 days ago. Without this rule, the copy would be overdue the moment it
-  appears, and the person would have to click Done 10 times to catch up. "Due today" is not
-  overdue (see the due date plan), so a copy due today is fine.
+- **The copy is always due after today, never today or before** (decided by the person). A daily
+  to-do due 10 days ago, done today, gets a copy due **tomorrow**, not 9 days ago and not today.
+  Without this rule, the copy would be overdue the moment it appears, and the person would have
+  to click Done 10 times to catch up. A date in the series that lands **exactly on today** moves
+  one more step: a weekly to-do due last Friday, done on Friday, gets a copy due next Friday. The
+  same rule holds for daily, weekly and monthly.
 - **No loop. It computes the number of steps directly.** A date field accepts any year from 1 to
   9999. A loop of "one more step" from a due date in the year 1 would run about 740,000 times for
   daily, in one request. Instead:
   - Daily and weekly: `days = (today - due_date).days`, step = 1 or 7,
-    `steps = max(1, -(-days // step))` (whole numbers only, rounded up), result `due_date + timedelta(days=steps * step)`.
+    `steps = max(1, days // step + 1)` (whole numbers only; `//` rounds down, and `+ 1` takes the
+    first step that is **after** today), result `due_date + timedelta(days=steps * step)`. A due
+    date in the future gives a negative `days`, so `max(1, ...)` makes it one step.
   - Monthly: `months = (today.year - due_date.year) * 12 + (today.month - due_date.month)`,
-    `months = max(1, months)`. If `add_months(due_date, months)` is still before `today`, add one
-    more month. (One extra month is always enough: the first guess is at most one month short.)
+    `months = max(1, months)`. If `add_months(due_date, months)` is still today **or before**
+    (`<= today`), add one more month. (One extra month is always enough: the first guess is in
+    today's month or later, so one more month is always after today.)
 - **The end of the calendar.** A to-do due 31 Dec 9999 has no next date: `due_date + 1 day` is an
   `OverflowError` in Python (and a month after Dec 9999 is a `ValueError`). `next_due_date`
   catches both and returns `None`, and then no copy is made. This is silly data, but without the check a person could crash the page with one click.
@@ -113,7 +118,7 @@ def next_due_date(due_date, repeat, today):
 - **Known limit, on purpose:** the copy only stores its own due date. A to-do due 31 Jan gets a
   copy due 28 Feb. When that copy is done, its copy is due 28 Mar, not 31 Mar. The day "drifts" to
   the 28th. To fix this we would need one more field (the "wanted day of the month"). That is
-  more than this task needs. It is listed under "Open questions".
+  more than this task needs. The person accepted the drift (see "Decided by the person").
 
 ### What is copied
 
@@ -214,7 +219,7 @@ Walk through "toggle twice", and more:
 ## Not part of this task
 
 - More rules: every 2 weeks, weekdays only, yearly, "the last Friday of the month".
-- Fixing the month-end drift (see "Open questions").
+- Fixing the month-end drift (accepted by the person; see "Decided by the person").
 - Copying **subtasks** (#16) and **reminders** (#7). They are in the same wave (4), so this plan
   cannot assume they exist. Whichever is built last adds them to `Todo.make_next_copy`. (The
   subtasks plan suggests: copy the steps, with `done` set back to false.)
@@ -261,23 +266,27 @@ Monday, because the text does not depend on today.)
 
 ### Unit — `todos/tests/unit/test_recurrence.py` (`SimpleTestCase`, no database)
 
+A row with no "today" uses today = Fri 9 Oct 2026. Its due date is today or later, so only the
+month math is tested, not the "after today" rule.
+
 | Test | What it checks |
 |---|---|
 | `test_daily_next_day` | Due 9 Oct, today 9 Oct → 10 Oct. |
 | `test_weekly_same_weekday` | Due Mon 12 Oct, today 9 Oct → Mon 19 Oct. |
-| `test_monthly_same_day` | Due 15 Oct → 15 Nov. |
+| `test_monthly_same_day` | Due 15 Oct 2026 → 15 Nov 2026. |
 | `test_monthly_jan_31_to_feb_28` | Due 31 Jan 2027 → 28 Feb 2027. |
 | `test_monthly_jan_31_to_feb_29_in_leap_year` | Due 31 Jan 2028 → 29 Feb 2028. |
 | `test_monthly_feb_29_to_mar_29` | Due 29 Feb 2028 → 29 Mar 2028. |
-| `test_monthly_mar_31_to_apr_30` | Due 31 Mar → 30 Apr. |
+| `test_monthly_mar_31_to_apr_30` | Due 31 Mar 2027 → 30 Apr 2027. |
 | `test_monthly_dec_to_jan_next_year` | Due 31 Dec 2026 → 31 Jan 2027. |
 | `test_done_early_moves_one_step` | Due 20 Oct (future), today 9 Oct, daily → 21 Oct. |
-| `test_overdue_daily_catches_up_to_today` | Due 30 Sep, today 9 Oct, daily → 9 Oct. |
+| `test_overdue_daily_catches_up_to_tomorrow` | Due 30 Sep, today 9 Oct, daily → 10 Oct (after today, not 9 Oct). |
 | `test_overdue_weekly_catches_up_to_next_weekday` | Due Mon 14 Sep, today Fri 9 Oct → Mon 12 Oct. |
-| `test_overdue_weekly_lands_on_today` | Due Fri 2 Oct, today Fri 9 Oct → 9 Oct (exactly on today, not 16 Oct). |
+| `test_overdue_weekly_never_lands_on_today` | Due Fri 2 Oct, today Fri 9 Oct → Fri 16 Oct (the series lands exactly on today, so it moves one more step). |
 | `test_overdue_monthly_counts_from_original_day` | Due 31 Jan 2026, today 9 Mar 2026 → 31 Mar 2026 (not 28 Mar). |
 | `test_overdue_monthly_needs_one_more_month` | Due 15 Jan 2026, today 20 Mar 2026 → 15 Apr 2026 (the first guess, 15 Mar, is before today). |
-| `test_very_old_due_date_is_fast` | Due 1 Jan 0001, daily, today 9 Oct 2026 → 9 Oct 2026 (this would be ~740,000 loop steps). |
+| `test_overdue_monthly_never_lands_on_today` | Due 9 Aug 2026, today 9 Oct 2026 → 9 Nov 2026 (the first guess, 9 Oct, is exactly today, so it moves one more month). |
+| `test_very_old_due_date_is_fast` | Due 1 Jan 0001, daily, today 9 Oct 2026 → 10 Oct 2026 (this would be ~740,000 loop steps). |
 | `test_last_possible_date_returns_none` | Due 31 Dec 9999, daily → `None`; monthly → `None`. No crash. |
 | `test_never_raises` | `repeat = ""` raises `ValueError`. |
 
@@ -343,14 +352,8 @@ In the pull request, say honestly which tests could not be "shown failing" in a 
 
 ## Open questions
 
-1. **Month-end drift.** Is it OK that 31 Jan → 28 Feb → 28 Mar? The fix is one more field, for
-   example `repeat_day` (the wanted day of the month), copied to every copy. Suggestion: accept
-   the drift now, and fix it only if someone asks.
-2. **Overdue daily to-do, done today: copy due today, or tomorrow?** This plan says "today or
-   later", so a daily to-do due yesterday and done today gets a copy due **today** — the person
-   may feel they already did today's. The other choice is "after today" (copy due tomorrow).
-   Suggestion: keep "today or later", because for weekly and monthly it is clearly right, and one
-   rule for all three is simpler.
+None. Both former questions (month-end drift; a copy due today or after today) are answered in
+"Decided by the person" at the end, and the plan body follows those answers.
 
 ## Review
 
@@ -390,3 +393,15 @@ The plan is **approved**.
 
 - Month-end drift is accepted (31 Jan → 28 Feb → 28 Mar).
 - CHANGE to the plan: the copy is always due strictly AFTER today, for all three rules. A daily to-do that is late and done today gets its copy due tomorrow, not today. The rule becomes: at least one step from the due date, and the first date in the series that is after today. Update `next_due_date` and its unit tests to match (a date that lands exactly on today must move one more step).
+
+## Post-review check
+
+- The body still said "today or later" after the person decided "strictly after today". Changed the
+  `next_due_date` docstring, the rule text, the daily/weekly formula (`max(1, days // step + 1)`,
+  was "rounded up") and the monthly check (`<= today`, was "before today").
+- Unit tests now match the decision: the overdue daily copy is due tomorrow (10 Oct), a weekly
+  series that lands on today moves to 16 Oct, the year-1 case gives 10 Oct; new
+  `test_overdue_monthly_never_lands_on_today`. Each of these fails with the old "today or later" code.
+- Month tests had no year ("Due 31 Mar"): with today 9 Oct 2026, 31 Mar 2026 is past and gives
+  31 Oct, not 30 Apr. Gave every such row a year, and said which `today` they use.
+- "Open questions" emptied and two "see Open questions" links pointed to "Decided by the person".

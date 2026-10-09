@@ -378,8 +378,10 @@ has no "usable password" choice (that is only in the admin's form), checked.
 
 ### 6. The to-do views — `todos/views.py`
 
-Change the four views as in "the pattern". Nothing else changes: add, toggle and delete still
-accept `POST` only.
+Change the four views as in "the pattern". The owner filter for the list goes **inside**
+`render_list_page` (from wave 0), not in `todo_list`: `todo_add` also calls it when the form is
+not valid, so a filter only in `todo_list` would show bob's to-dos on that error page. Nothing
+else changes: add, toggle and delete still accept `POST` only.
 
 ### 7. The templates
 
@@ -567,4 +569,11 @@ of the repo: the migrations, all the tests, and the CUJ with the session cookie)
 The plan is **approved**.
 
 - Sign-up stays open and there is no limit on wrong passwords for now. Before the site is public, close sign-up or add a limit, as its own task.
-- Orchestrator pass: the owner filter goes in wave 0's `render_list_page`, so the page after an invalid add is filtered too; added `test_invalid_add_shows_only_my_todos`.
+
+## Post-review check
+
+- The orchestrator's `render_list_page` note was listed under "Decided by the person", but it was
+  not the person's decision. Moved it here: the owner filter goes in wave 0's `render_list_page`,
+  so the page after an invalid add is filtered too; test `test_invalid_add_shows_only_my_todos`.
+- Step 6 still said only "change the four views". It now says the filter goes inside
+  `render_list_page`, matching the file table.

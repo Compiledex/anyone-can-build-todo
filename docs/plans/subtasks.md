@@ -123,7 +123,7 @@ every existing feature aware of "parent".
 | `todos/models.py` | New model `Subtask`; method `Todo.subtask_progress`. |
 | `todos/migrations/` | One new migration, made by Django. |
 | `todos/forms.py` | New `SubtaskForm`. |
-| `todos/views.py` | Three new views and one helper; `list_detail` prefetches steps; maybe the count in `list_clear_completed` (see Decisions). |
+| `todos/views.py` | Three new views and one helper; `render_list_page` prefetches steps; maybe the count in `list_clear_completed` (see Decisions). |
 | `todos/urls.py` | Three new addresses. |
 | `todos/templates/todos/_todo_item.html` | `id` on the `<li>`; the `<details>` with steps, count and add form. |
 | `todos/templates/base.html` | A little CSS for the steps. (All CSS lives here since wave 0.) |
@@ -243,7 +243,8 @@ def get_visible_subtask(user, pk):
 The `todo__todo_list__in=...` part is what makes another user's step a 404. (`select_related`
 loads the to-do in the same query, because `back_to_steps` needs it.)
 
-`list_detail`: add `.prefetch_related("subtasks")` to its to-do query. If search (#12) is already
+`render_list_page` (#10; it builds the list page for `list_detail` and for an invalid add): add
+`.prefetch_related("subtasks")` to its to-do query. If search (#12) is already
 merged, add it to the queryset that `apply_list_query` returns; a prefetch survives `filter` and
 `order_by`.
 
@@ -382,3 +383,8 @@ What changed in this review, and why:
 The plan is **approved**.
 
 - No open questions.
+
+## Post-review check
+
+- "`list_detail` prefetches steps": the to-do query of the list page is in #10's
+  `render_list_page` (used by `list_detail` and by an invalid add), so the prefetch goes there.

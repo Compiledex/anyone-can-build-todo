@@ -54,7 +54,7 @@ logic does not change.
   {% if done_count %}
     <details class="clear-completed">
       <summary>Clear completed ({{ done_count }})</summary>
-      <form method="post" action="{% url 'list_clear_completed' todo_list.pk %}">
+      <form method="post" action="{% url 'list_clear_completed' the_list.pk %}">
         {% csrf_token %}
         <p>Delete {{ done_count }} done to-do{{ done_count|pluralize }}? This cannot be undone.</p>
         <button type="submit">Yes, delete them</button>
@@ -67,8 +67,9 @@ logic does not change.
   not use a separate confirm page: it would need one more view, one more URL and one more
   template, for the same result.
 - **The block goes below the list**, so it is not the first thing a person clicks.
-- **The button is hidden when nothing is done.** The list view counts the done to-dos of this
-  list: `done_count = todo_list.todos.filter(done=True).count()`. If it is 0, the `<details>` is
+- **The button is hidden when nothing is done.** `render_list_page` (#10, which builds the list
+  page for `list_detail` and for an invalid add) counts the done to-dos of this list:
+  `"done_count": the_list.todos.filter(done=True).count()`. If it is 0, the `<details>` is
   not in the page at all. The number is also in the button, so the person sees what will go.
 - **`done_count` always counts the whole list**, never a searched or filtered part of it. The
   button deletes all done to-dos of the list, so the number must match that. Search (#12) and
@@ -125,7 +126,7 @@ logic does not change.
 | File | Change |
 |---|---|
 | `todos/urls.py` | Add `path("lists/<int:pk>/clear-completed/", views.list_clear_completed, name="list_clear_completed")`. |
-| `todos/views.py` | New view `list_clear_completed` (`@require_POST`; no login decorator, the middleware from #17 does it): get the list or 404, bulk delete its done to-dos, add a message, redirect to the list. In `list_detail`, add `done_count` to the context. |
+| `todos/views.py` | New view `list_clear_completed` (`@require_POST`; no login decorator, the middleware from #17 does it): get the list or 404, bulk delete its done to-dos, add a message, redirect to the list. In `render_list_page` (from #10), add `done_count` to the context. |
 | `todos/templates/todos/todo_list.html` | Add the `<details>` block **below** the list. |
 | `todos/templates/base.html` | Show `messages`, only if no earlier feature has added this yet. |
 | page CSS | A small style for `details.clear-completed`, using only the existing CSS variables, so dark mode (#20) works without extra colors. |
@@ -203,7 +204,7 @@ The order follows `AGENTS.md`: write a test, see it fail, then write the code.
    exist yet, so most fail with `NoReverseMatch`; the template tests fail on their assertions).
    The 404 and login tests also fail now, because the URL does not exist; that is fine.
 3. Add the URL and the view. Run the view tests: they pass.
-4. Add `done_count` to `list_detail` and the `<details>` block to the template. Add the messages
+4. Add `done_count` to `render_list_page` and the `<details>` block to the template. Add the messages
    block to `base.html` if it is not there. The template tests pass.
 5. Add the CSS with the existing CSS variables. Look at it with `make run` in light and dark mode,
    and on a narrow window.
@@ -248,3 +249,11 @@ What the adversarial review changed, and why:
 The plan is **approved**.
 
 - A member of a shared list may clear the completed to-dos of that list, also ones other people added.
+
+## Post-review check
+
+- The template used `todo_list.pk`, but #10's `render_list_page` passes the list as `the_list`
+  (there is no `todo_list` in the page). `{% url %}` with an empty value fails with
+  `NoReverseMatch`. Now `the_list.pk`.
+- `done_count` now goes in `render_list_page`, not only in `list_detail`, as `sharing.md` expects
+  ("keep every key ... `done_count` from #19"). So the page after an invalid add also has it.
