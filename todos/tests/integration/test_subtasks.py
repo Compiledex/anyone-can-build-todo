@@ -62,10 +62,22 @@ class SubtaskTests(LoggedInTestCase):
         self.assertContains(response, ERROR)
 
     def test_long_step_title_is_not_added(self):
-        self.client.post(self.add_url(), {"title": "x" * 201})
+        response = self.client.post(self.add_url(), {"title": "x" * 201}, follow=True)
         self.assertFalse(Subtask.objects.exists())
+        self.assertContains(response, ERROR)
         self.client.post(self.add_url(), {"title": "x" * 200})
         self.assertEqual(Subtask.objects.get().title, "x" * 200)
+
+    def test_step_title_is_escaped(self):
+        self.make_step("<b>x</b>")
+        response = self.client.get(
+            reverse("list_detail", args=[self.todo_list.pk]), {"open": self.todo.pk}
+        )
+        self.assertContains(
+            response, '<span class="step-title">&lt;b&gt;x&lt;/b&gt;</span>'
+        )
+        self.assertContains(response, 'aria-label="Done: &lt;b&gt;x&lt;/b&gt;"')
+        self.assertNotContains(response, "<b>x</b>")
 
     def test_toggle_step_and_back(self):
         step = self.make_step()

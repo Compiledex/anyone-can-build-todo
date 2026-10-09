@@ -413,6 +413,18 @@ class BreakATodoIntoStepsTests(BrowserTestCase):
         expect(van.locator(".step-title")).not_to_have_css(
             "text-decoration-line", "line-through"
         )
-        expect(
-            page.locator("ul.todos > li").filter(has_text="Move house")
-        ).not_to_have_class(DONE)
+        house = page.locator("ul.todos > li").filter(has_text="Move house")
+        expect(house).not_to_have_class(DONE)
+
+        # Finish the to-do. Its steps keep their own look: a not-done step is
+        # not crossed out, a done step still is.
+        house.get_by_role("button", name="Done", exact=True).click()
+        expect(house).to_have_class(DONE)
+        page.get_by_text("Steps: 1 of 2 done").click()
+        expect(van.locator(".step-title")).not_to_have_css(
+            "text-decoration-line", "line-through"
+        )
+        books = page.locator("li.step").filter(has_text="Pack books")
+        expect(books.locator(".step-title")).to_have_css(
+            "text-decoration-line", "line-through"
+        )
