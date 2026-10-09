@@ -10,7 +10,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from accounts.tests.helpers import LoggedInTestCase, make_user
-from todos.models import Todo, TodoList
+from todos.models import Tag, Todo, TodoList
 
 
 class HomeTests(LoggedInTestCase):
@@ -276,6 +276,20 @@ class ClearCompletedTests(LoggedInTestCase):
     def test_clear_shows_message(self):
         response = self.client.post(self.clear_url(self.todo_list), follow=True)
         self.assertContains(response, "Deleted 2 completed to-dos.")
+
+    def test_message_counts_todos_not_tags(self):
+        # delete() also deletes the links between the to-dos and their tags,
+        # and its first number counts those too (here 2 to-dos + 4 links = 6).
+        for todo in self.todo_list.todos.filter(done=True):
+            todo.set_tags(["home", "work"])
+        response = self.client.post(self.clear_url(self.todo_list), follow=True)
+        self.assertContains(response, "Deleted 2 completed to-dos.")
+        self.assertEqual(list(self.todo_list.todos.all()), [self.open_todo])
+        # Tags that are no longer used are kept (see docs/plans/tags.md).
+        self.assertEqual(
+            sorted(Tag.objects.filter(owner=self.user).values_list("name", flat=True)),
+            ["home", "work"],
+        )
 
     def test_list_shows_clear_button_with_count(self):
         response = self.client.get(self.todo_list.get_absolute_url())
