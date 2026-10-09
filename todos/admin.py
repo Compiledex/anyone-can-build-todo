@@ -6,6 +6,7 @@ from .models import Todo, TodoList
 @admin.register(TodoList)
 class TodoListAdmin(admin.ModelAdmin):
     list_display = ["name", "owner", "created_at"]
+    filter_horizontal = ["members"]
 
 
 @admin.register(Todo)

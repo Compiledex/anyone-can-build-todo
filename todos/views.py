@@ -1,13 +1,24 @@
+from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from .forms import TodoForm, TodoListForm
+from .forms import ShareForm, TodoForm, TodoListForm
 from .models import Todo, TodoList
 
-# Every view finds a list or a to-do in one of two ways, and nothing else:
+# A view that reads or changes a list or its to-dos finds the list with
+#   get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
+# or the to-do with get_visible_todo(request.user, pk). That is the person's own
+# lists plus the lists shared with them.
+# Only rename, delete, share and remove-member are for the owner alone. They use
 #   get_object_or_404(TodoList, pk=pk, owner=request.user)
-#   get_object_or_404(Todo, pk=pk, todo_list__owner=request.user)
-# So another person's list or to-do is always 404.
+# so a member gets the same 404 as a stranger.
+
+
+def get_visible_todo(user, pk):
+    """A to-do in a list this user owns or is a member of, or 404."""
+    return get_object_or_404(
+        Todo, pk=pk, todo_list__in=TodoList.objects.visible_to(user)
+    )
 
 
 def render_list_page(request, the_list, form):
@@ -16,6 +27,7 @@ def render_list_page(request, the_list, form):
     The one place that builds the list page. The form is empty, or has the
     errors of a bad add.
     """
+    is_owner = the_list.owner_id == request.user.id
     return render(
         request,
         "todos/todo_list.html",
@@ -24,14 +36,27 @@ def render_list_page(request, the_list, form):
             "todos": the_list.todos.all(),
             "my_lists": request.user.todo_lists.all(),
             "form": form,
+            # Only the owner sees the members and the share form.
+            "is_owner": is_owner,
+            "members": the_list.members.all() if is_owner else None,
+            "share_form": ShareForm(todo_list=the_list) if is_owner else None,
+            # Leaves out the person's own lists, in case the admin made the
+            # owner a member too.
+            "shared_lists": request.user.shared_lists.exclude(
+                owner=request.user
+            ).select_related("owner"),
         },
     )
 
 
 @require_GET
 def todo_list(request):
-    """Only sends the browser on: to the oldest list, or to "New list"."""
-    the_list = request.user.todo_lists.first()
+    """Only sends the browser on: to the oldest own list, else to the oldest
+    list shared with the person, else to "New list"."""
+    the_list = (
+        request.user.todo_lists.first()
+        or TodoList.objects.visible_to(request.user).first()
+    )
     if the_list is None:
         return redirect("list_create")
     return redirect(the_list)
@@ -39,7 +64,7 @@ def todo_list(request):
 
 @require_GET
 def list_detail(request, pk):
-    the_list = get_object_or_404(TodoList, pk=pk, owner=request.user)
+    the_list = get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
     return render_list_page(request, the_list, TodoForm())
 
 
@@ -55,7 +80,7 @@ def list_create(request):
     return render(
         request,
         "todos/list_form.html",
-        {"form": form, "has_lists": request.user.todo_lists.exists()},
+        {"form": form, "has_lists": TodoList.objects.visible_to(request.user).exists()},
     )
 
 
@@ -86,7 +111,7 @@ def list_delete(request, pk):
 
 @require_POST
 def todo_add(request, pk):
-    the_list = get_object_or_404(TodoList, pk=pk, owner=request.user)
+    the_list = get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
     form = TodoForm(request.POST)
     if form.is_valid():
         todo = form.save(commit=False)
@@ -98,7 +123,7 @@ def todo_add(request, pk):
 
 @require_POST
 def todo_toggle(request, pk):
-    todo = get_object_or_404(Todo, pk=pk, todo_list__owner=request.user)
+    todo = get_visible_todo(request.user, pk)
     todo.done = not todo.done
     todo.save()
     return redirect(todo.todo_list)
@@ -106,7 +131,7 @@ def todo_toggle(request, pk):
 
 @require_POST
 def todo_delete(request, pk):
-    todo = get_object_or_404(Todo, pk=pk, todo_list__owner=request.user)
+    todo = get_visible_todo(request.user, pk)
     the_list = todo.todo_list
     todo.delete()
     return redirect(the_list)
@@ -114,7 +139,7 @@ def todo_delete(request, pk):
 
 @require_http_methods(["GET", "POST"])
 def todo_edit(request, pk):
-    todo = get_object_or_404(Todo, pk=pk, todo_list__owner=request.user)
+    todo = get_visible_todo(request.user, pk)
     if request.method == "POST":
         form = TodoForm(request.POST, instance=todo)
         if form.is_valid():
@@ -123,3 +148,35 @@ def todo_edit(request, pk):
     else:
         form = TodoForm(instance=todo)
     return render(request, "todos/todo_edit.html", {"form": form, "todo": todo})
+
+
+@require_POST
+def list_share(request, pk):
+    the_list = get_object_or_404(TodoList, pk=pk, owner=request.user)  # Owner only.
+    form = ShareForm(request.POST, todo_list=the_list)
+    if form.is_valid():
+        user = form.cleaned_data["username"]  # clean_username gives the User.
+        the_list.members.add(user)
+        messages.success(request, f"Shared with {user.username}.")
+    else:
+        messages.error(request, form.errors["username"][0])
+    return redirect(the_list)
+
+
+@require_POST
+def list_member_remove(request, pk, user_id):
+    the_list = get_object_or_404(TodoList, pk=pk, owner=request.user)  # Owner only.
+    # Only a member of THIS list. Never get_object_or_404(User, ...): the answer
+    # must not tell whether a user with that number exists.
+    member = get_object_or_404(the_list.members, pk=user_id)
+    the_list.members.remove(member)
+    messages.success(request, f"{member.username} was removed.")
+    return redirect(the_list)
+
+
+@require_POST
+def list_leave(request, pk):
+    the_list = get_object_or_404(TodoList, pk=pk, members=request.user)  # Members only.
+    the_list.members.remove(request.user)  # The to-dos they added stay.
+    messages.success(request, "You left the list.")
+    return redirect("todo_list")

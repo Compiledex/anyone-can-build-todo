@@ -43,17 +43,25 @@ class BrowserTestCase(StaticLiveServerTestCase):
         self.context.set_default_timeout(TIMEOUT_MS)
         self.page = self.context.new_page()
 
+    def new_context(self):
+        """A second browser with its own cookies, like a second person. Closed after the test."""
+        context = self.browser.new_context()
+        context.set_default_timeout(TIMEOUT_MS)
+        self.addCleanup(context.close)
+        return context
+
     def tearDown(self):
         self.context.close()
 
-    def log_in_as(self, user):
+    def log_in_as(self, user, context=None):
         """Give the browser this user's session cookie, so the test starts logged in.
 
-        Call it before the first page.goto().
+        Call it before the first page.goto(). `context` is for a second person:
+        a context from self.new_context(), with its own cookies.
         """
         client = Client()
         client.force_login(user)
         cookie = client.cookies[settings.SESSION_COOKIE_NAME]
-        self.context.add_cookies(
+        (context or self.context).add_cookies(
             [{"name": cookie.key, "value": cookie.value, "url": self.live_server_url}]
         )

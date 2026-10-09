@@ -7,8 +7,12 @@ change code, say which file changed and why.
 ## What this is
 
 The most basic to-do list, in Django. A person can add a to-do, edit it, mark it done (or undo
-that), and delete it. Each person has an account and sees only their own lists and to-dos. A person can have
-several lists (make, rename and delete a list); each to-do is in exactly one list. The data is kept
+that), and delete it. Each person has an account. A person can have several lists (make, rename
+and delete a list); each to-do is in exactly one list. The owner of a list can share it with other
+users by username. Those users are its *members*: they can see the list and add, edit, mark done
+and delete its to-dos, and they can leave it. Only the owner can rename, delete or share the list,
+see its members, or remove a member. Members do not see each other. A person sees their own lists
+plus the lists shared with them, and nothing else. The data is kept
 in a SQLite database, the file `db.sqlite3`, which is not in git.
 
 ## What each file does
@@ -21,12 +25,12 @@ in a SQLite database, the file `db.sqlite3`, which is not in git.
 | `accounts/urls.py`, `accounts/views.py` | The three addresses (`login`, `logout`, `signup`), and the `signup` view. Sign-up also makes the person's first list, "Inbox". |
 | `accounts/templates/registration/` | The login and sign-up pages. They extend `base.html`. |
 | `accounts/tests/helpers.py` | Test helpers for every feature: `TEST_PASSWORD`, `make_user()`, and `LoggedInTestCase` (logged in as alice, with bob as the other user, alice's list `todo_list` ("Inbox"), bob's list `other_list`, and `assertOtherUserGets404`). `make_user()` makes no list. |
-| `todos/models.py` | The `TodoList` table: `owner` (the user it belongs to), `name` (unique per person, ignoring case), `created_at`. The `Todo` table: `todo_list` (the list it is in), `title`, `done`, `created_at`, `due_date` (optional), and `is_overdue()`. A to-do's owner is `todo.todo_list.owner`. |
-| `todos/urls.py` | The addresses: `/` (only sends the browser to the oldest list, or to "New list"), `/lists/new/`, `/lists/<pk>/` (a list page), `/lists/<pk>/add/`, `/lists/<pk>/rename/`, `/lists/<pk>/delete/`, and `/<pk>/toggle/`, `/<pk>/delete/` and `/<pk>/edit/` for a to-do. |
-| `todos/forms.py` | `TodoForm`, the Django form for a to-do (it checks the title and the optional due date, YYYY-MM-DD only), and `TodoListForm`, for a list's name (it refuses a name the person already has). |
-| `todos/views.py` | One function per address. `render_list_page` is the one place that builds the list page. Every view finds a list with `owner=request.user`, or a to-do with `todo_list__owner=request.user`, so another person's things give 404. Changes are `POST` only; then the browser goes back to the list. An invalid add shows the list page again with the error. Edit shows its form on `GET` and saves on `POST`, then goes back to the to-do's list; an invalid edit shows the edit page again. |
+| `todos/models.py` | The `TodoList` table: `owner` (the user it belongs to), `name` (unique per person, ignoring case), `created_at`, `members` (the users it is shared with; `user.shared_lists` is the other side). `TodoList.objects.visible_to(user)` gives the lists the user owns plus the lists shared with them. The `Todo` table: `todo_list` (the list it is in), `title`, `done`, `created_at`, `due_date` (optional), and `is_overdue()`. A to-do's owner is `todo.todo_list.owner`. |
+| `todos/urls.py` | The addresses: `/` (only sends the browser to the oldest own list, else the oldest list shared with the person, else "New list"), `/lists/new/`, `/lists/<pk>/` (a list page), `/lists/<pk>/add/`, `/lists/<pk>/rename/`, `/lists/<pk>/delete/`, `/lists/<pk>/share/`, `/lists/<pk>/members/<user_id>/remove/`, `/lists/<pk>/leave/`, and `/<pk>/toggle/`, `/<pk>/delete/` and `/<pk>/edit/` for a to-do. |
+| `todos/forms.py` | `TodoForm`, the Django form for a to-do (it checks the title and the optional due date, YYYY-MM-DD only), `TodoListForm`, for a list's name (it refuses a name the person already has), and `ShareForm`, the username to share a list with (it gives the `User`, and refuses an unknown or switched-off user, the owner, and a member). |
+| `todos/views.py` | One function per address. `render_list_page` is the one place that builds the list page. A view that reads or changes a list or its to-dos finds the list with `TodoList.objects.visible_to(request.user)`, or the to-do with `get_visible_todo(request.user, pk)`; only rename, delete, share and remove-member use `owner=request.user`, so a member or a stranger gets 404 there. Share, remove-member and leave are `POST` only and show their result as a message. Changes are `POST` only; then the browser goes back to the list. An invalid add shows the list page again with the error. Edit shows its form on `GET` and saves on `POST`, then goes back to the to-do's list; an invalid edit shows the edit page again. |
 | `todos/templates/base.html` | The shared page frame: the `<head>`, all the CSS (the colors are CSS variables, with dark values that follow the system's light or dark mode), the header ("Logged in as ..." and "Log out"), and the messages. |
-| `todos/templates/todos/todo_list.html` | The list page, which extends `base.html`: the menu of the person's lists, the list's name with "Rename" and "Delete list", the errors, the add form and the to-dos. |
+| `todos/templates/todos/todo_list.html` | The list page, which extends `base.html`: the menu ("My lists", and "Shared with me" with each owner's name), the list's name with "Rename" and "Delete list" (owner) or "Shared by ..." (member), the member list with Remove buttons and the share form (owner only), "Leave this list" (member only), the errors, the add form and the to-dos. |
 | `todos/templates/todos/list_form.html` | The "New list" and "Rename list" page: the name field and its errors. |
 | `todos/templates/todos/list_confirm_delete.html` | "Delete this list and its N to-dos?", with the button that really deletes. |
 | `todos/templates/todos/_todo_item.html` | One row of the list (one `<li>`). |
@@ -75,15 +79,20 @@ Add a package with `uv add <name>`, never with `pip install`. After changing `mo
   before every view) sends a visitor who is not logged in to the login page. Only mark a view
   `@login_not_required` when a stranger must see it, add its name to
   `test_only_login_and_signup_are_open`, and say why in the pull request.
-- **Only my data.** A person sees and changes only their own things:
-  1. A list starts from the user: `Todo.objects.filter(owner=request.user)`. Never
-     `Todo.objects.all()` in a view.
-  2. One thing by its number: `get_object_or_404(Todo, pk=pk, owner=request.user)`. Someone
-     else's thing then gives 404, like a thing that does not exist (not 403, which would tell
-     that it exists).
-  3. Create: set the owner in the view (`form.save(commit=False)`, then `todo.owner =
-     request.user`), never from the form.
-  4. A new model that belongs to a to-do is reached through a to-do the user owns, or gets its own
-     `owner` field and follows rules 1 to 3.
+- **Only my data, plus what is shared with me.** A person sees and changes only their own lists
+  and the lists shared with them:
+  1. A view that reads or changes a list or its to-dos finds the list with
+     `get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)`, or the to-do with
+     `get_visible_todo(request.user, pk)`. The to-dos of a list are `the_list.todos.all()`. Never
+     `Todo.objects.all()` in a view, and never filter to-dos by owner or by
+     `Q(todo_list__owner=...) | Q(todo_list__members=...)` (that gives double rows).
+  2. Only rename, delete, share and remove-member use
+     `get_object_or_404(TodoList, pk=pk, owner=request.user)`: they are for the owner alone.
+     Someone else's thing gives 404, like a thing that does not exist (not 403, which would tell
+     that it exists). A member gets the same 404 as a stranger.
+  3. Create: set the owner or the list in the view (`form.save(commit=False)`, then
+     `todo.todo_list = the_list`), never from the form.
+  4. A new model that belongs to a to-do is reached through a to-do the user can see
+     (`get_visible_todo`), or gets its own `owner` field and follows rules 1 to 3.
   5. Every new view gets a test that another user gets 404 (`assertOtherUserGets404` from
      `accounts/tests/helpers.py`), and that the data did not change.
