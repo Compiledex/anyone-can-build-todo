@@ -442,3 +442,32 @@ class BreakATodoIntoStepsTests(BrowserTestCase):
         expect(books.locator(".step-title")).to_have_css(
             "text-decoration-line", "line-through"
         )
+
+
+class SearchJourneyTests(BrowserTestCase):
+    def test_search_and_show_all(self):
+        page = self.page
+        self.log_in_as(make_user_with_inbox())
+        page.goto(self.live_server_url)  # Opens the list page.
+
+        for title in ["Buy milk", "Call home"]:
+            page.get_by_label("New to-do").fill(title)
+            page.get_by_role("button", name="Add").click()
+            expect(page.get_by_role("listitem").filter(has_text=title)).to_be_visible()
+        rows = page.locator("ul.todos > li")
+        expect(rows).to_have_count(2)
+
+        box = page.get_by_label("Search to-dos")
+        box.fill("milk")
+        box.press("Enter")
+        expect(page).to_have_url(re.compile(r"\?q=milk$"))
+        expect(rows).to_have_count(1)
+        expect(rows).to_contain_text("Buy milk")
+        expect(page.get_by_label("Search to-dos")).to_have_value("milk")
+
+        page.get_by_role("link", name="Show all").click()
+        expect(rows).to_have_count(2)
+        expect(
+            page.get_by_role("listitem").filter(has_text="Call home")
+        ).to_be_visible()
+        expect(page.get_by_label("Search to-dos")).to_have_value("")
