@@ -1,0 +1,11 @@
+<li class="{% if todo.done %}done{% endif %}">
+  <span class="title">{{ todo.title }}</span>
+  <form method="post" action="{% url 'todo_toggle' todo.pk %}">
+    {% csrf_token %}
+    <button type="submit">{% if todo.done %}Undo{% else %}Done{% endif %}</button>
+  </form>
+  <form method="post" action="{% url 'todo_delete' todo.pk %}">
+    {% csrf_token %}
+    <button type="submit">Delete</button>
+  </form>
+</li>

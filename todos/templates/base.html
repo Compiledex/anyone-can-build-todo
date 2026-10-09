@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}To-do list{% endblock %}</title>
+  <link rel="icon" href="data:,">
+  <style>
+    /* Colors. Dark mode (#20) gives these new values; every new color needs a dark value too. */
+    :root {
+      --bg: #ffffff;
+      --text: #000000;
+      --muted: #666666;
+      --border: #dddddd;
+    }
+    body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem;
+           background: var(--bg); color: var(--text); }
+    .messages { margin-bottom: 1rem; }
+    .message { margin: 0 0 0.5rem; padding: 0.5rem; border: 1px solid var(--border); }
+    .errorlist { list-style: none; padding: 0; margin: 0 0 0.5rem; }
+    form.add { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
+    form.add input { flex: 1; padding: 0.5rem; font-size: 1rem; }
+    ul.todos { list-style: none; padding: 0; }
+    ul.todos > li { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0;
+                    border-bottom: 1px solid var(--border); }
+    li .title { flex: 1; }
+    li.done .title { text-decoration: line-through; color: var(--muted); }
+    button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
+  </style>
+</head>
+<body>
+  {% if messages %}
+    <div class="messages" role="status">
+      {% for message in messages %}
+        <p class="message{% if message.tags %} {{ message.tags }}{% endif %}">{{ message }}</p>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  {% block content %}{% endblock %}
+</body>
+</html>

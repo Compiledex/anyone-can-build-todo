@@ -32,6 +32,26 @@ class AddTests(TestCase):
         self.client.post(reverse("todo_add"), {"title": "   "})
         self.assertEqual(Todo.objects.count(), 0)
 
+    def test_empty_title_shows_the_page_again(self):
+        Todo.objects.create(title="Call home")
+        response = self.client.post(reverse("todo_add"), {"title": "   "})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This field is required.")
+        self.assertEqual(Todo.objects.count(), 1)
+        self.assertContains(response, "Call home")
+        self.assertContains(response, 'id="id_title_error"')
+        self.assertContains(response, 'aria-describedby="id_title_error"')
+
+    def test_long_title_is_not_added(self):
+        title = "a" * 201
+        response = self.client.post(reverse("todo_add"), {"title": title})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Todo.objects.count(), 0)
+        self.assertContains(
+            response, "Ensure this value has at most 200 characters (it has 201)."
+        )
+        self.assertContains(response, f'value="{title}"')
+
     def test_get_does_not_add(self):
         response = self.client.get(reverse("todo_add"), {"title": "Buy milk"})
         self.assertEqual(response.status_code, 405)
