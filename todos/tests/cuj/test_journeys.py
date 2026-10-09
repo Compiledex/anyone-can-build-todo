@@ -158,6 +158,7 @@ class ColorSchemeTests(BrowserTestCase):
                 self.assertGreaterEqual(
                     contrast(colors["overdue"], colors["background"]), AA_CONTRAST
                 )
+                self.assertNotEqual(colors["overdue"], colors["text"], colors)
 
 
 class TwoPeopleTests(BrowserTestCase):

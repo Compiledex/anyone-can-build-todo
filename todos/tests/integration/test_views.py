@@ -52,7 +52,11 @@ class ListTests(LoggedInTestCase):
             title="Pay rent", todo_list=self.todo_list, due_date=date(2026, 10, 12)
         )
         response = self.list_page()
-        self.assertContains(response, "Due 12 Oct 2026")
+        self.assertContains(
+            response,
+            '<time datetime="2026-10-12">Due 12 Oct 2026</time>',
+            html=True,
+        )
 
     def test_list_marks_overdue_todo(self):
         Todo.objects.create(
@@ -165,6 +169,20 @@ class AddTests(LoggedInTestCase):
             self.add_url(), {"title": "Pay rent", "due_date": "10/12/2026"}
         )
         self.assertEqual(Todo.objects.count(), 0)
+
+    def test_typed_due_date_is_kept_after_an_error(self):
+        response = self.client.post(
+            self.add_url(), {"title": "", "due_date": "2026-10-12"}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="2026-10-12"')
+
+    def test_typed_due_date_is_escaped_on_the_error_page(self):
+        response = self.client.post(
+            self.add_url(), {"title": "Pay rent", "due_date": '"><b>x</b>'}
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "<b>x</b>")
 
     def test_get_does_not_add(self):
         response = self.client.get(self.add_url(), {"title": "Buy milk"})
@@ -429,6 +447,13 @@ class EditTests(LoggedInTestCase):
         )
         self.todo.refresh_from_db()
         self.assertEqual(self.todo.title, "Buy milk")
+
+    def test_edit_clears_due_date(self):
+        self.todo.due_date = date(2026, 10, 12)
+        self.todo.save()
+        self.client.post(self.url, self.edit_data(self.todo, due_date=""))
+        self.todo.refresh_from_db()
+        self.assertIsNone(self.todo.due_date)
 
     def test_invalid_edit_is_not_saved(self):
         response = self.client.post(self.url, self.edit_data(self.todo, title="   "))

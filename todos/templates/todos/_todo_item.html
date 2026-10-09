@@ -1,8 +1,9 @@
-<li class="{% if todo.done %}done{% elif todo.is_overdue %}overdue{% endif %}">
+{% with overdue=todo.is_overdue %}
+<li class="{% if todo.done %}done{% elif overdue %}overdue{% endif %}">
   <span class="title">{{ todo.title }}</span>
   {% if todo.due_date %}
     <time datetime="{{ todo.due_date|date:'Y-m-d' }}">Due {{ todo.due_date|date:'j M Y' }}</time>
-    {% if todo.is_overdue %}<span class="overdue-label">Overdue</span>{% endif %}
+    {% if overdue %}<span class="overdue-label">Overdue</span>{% endif %}
   {% endif %}
   <a href="{% url 'todo_edit' todo.pk %}" aria-label="Edit {{ todo.title }}">Edit</a>
   <form method="post" action="{% url 'todo_toggle' todo.pk %}">
@@ -14,3 +15,4 @@
     <button type="submit">Delete</button>
   </form>
 </li>
+{% endwith %}
