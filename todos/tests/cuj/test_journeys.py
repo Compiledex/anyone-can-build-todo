@@ -270,3 +270,32 @@ class ShareAListTests(BrowserTestCase):
         expect(bob_page.get_by_text("You left the list.")).to_be_visible()
         expect(bob_page.get_by_role("heading", name="Bob's stuff")).to_be_visible()
         expect(bob_lists.get_by_role("link", name="Groceries (alice)")).to_have_count(0)
+
+
+class ClearCompletedJourneyTests(BrowserTestCase):
+    def test_clear_completed(self):
+        page = self.page
+        self.log_in_as(make_user_with_inbox())
+        page.goto(self.live_server_url)  # Opens the list page.
+
+        for title in ["Buy milk", "Call home", "Pay rent"]:
+            page.get_by_label("New to-do").fill(title)
+            page.get_by_role("button", name="Add").click()
+        for title in ["Buy milk", "Call home"]:
+            row = page.get_by_role("listitem").filter(has_text=title)
+            row.get_by_role("button", name="Done").click()
+            expect(row).to_have_class(DONE)
+
+        # The question is hidden until the first click.
+        yes = page.get_by_role("button", name="Yes, delete them")
+        expect(yes).to_be_hidden()
+        page.get_by_text("Clear completed (2)").click()
+        expect(
+            page.get_by_text("Delete 2 done to-dos? This cannot be undone.")
+        ).to_be_visible()
+        yes.click()
+
+        expect(page.get_by_text("Deleted 2 completed to-dos.")).to_be_visible()
+        expect(page.locator("ul.todos > li")).to_have_count(1)
+        expect(page.get_by_role("listitem").filter(has_text="Pay rent")).to_be_visible()
+        expect(page.get_by_text("Clear completed")).to_have_count(0)
