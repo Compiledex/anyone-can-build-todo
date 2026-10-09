@@ -81,7 +81,7 @@ You should see `OK`, and then one line for each layer of tests:
 ```
 Test layers
   CUJ           9 passed
-  Integration  280 passed
+  Integration  282 passed
   Unit         49 passed
 ```
 
