@@ -1,7 +1,7 @@
 # To-do list
 
 The most basic to-do list in Django: add a to-do, edit it, mark it done, delete it, or clear all the
-done ones at once. Keep your to-dos in
+done ones at once. A to-do can repeat every day, week or month. Keep your to-dos in
 several lists, like "Work" and "Home".
 
 The pages follow your computer's or phone's light or dark mode.
@@ -81,8 +81,8 @@ You should see `OK`, and then one line for each layer of tests:
 ```
 Test layers
   CUJ           7 passed
-  Integration  209 passed
-  Unit         29 passed
+  Integration  237 passed
+  Unit         49 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
@@ -124,8 +124,9 @@ runs the same checks and the tests on every push.
 | `accounts/` | Sign up, log in and log out, with Django's own accounts |
 | `accounts/templates/registration/` | The login and sign-up pages |
 | `accounts/tests/helpers.py` | Helpers the tests share: test users, and a test that starts logged in |
-| `todos/models.py` | The `TodoList` and `Todo` tables in the database; each list has an owner and can be shared with members, each to-do is in a list and has an optional due date, optional notes, a priority (Low, Medium or High) and tags; the `Tag` table holds each person's tags |
+| `todos/models.py` | The `TodoList` and `Todo` tables in the database; each list has an owner and can be shared with members, each to-do is in a list and has an optional due date, optional notes, a priority (Low, Medium or High), tags, and a repeat rule (Never, Daily, Weekly or Monthly); the `Tag` table holds each person's tags |
 | `todos/tags.py` | Cleans the tags a person types, like "work, #Home", and checks their limits |
+| `todos/recurrence.py` | Works out the next due date of a repeating to-do |
 | `todos/urls.py` | The addresses of the list and to-do pages |
 | `todos/forms.py` | The forms that check a to-do (with its tags), a list's name, and the username to share a list with |
 | `todos/views.py` | What happens when each address is visited |
