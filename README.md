@@ -1,6 +1,7 @@
 # To-do list
 
-The most basic to-do list in Django: add a to-do, mark it done, delete it.
+The most basic to-do list in Django: add a to-do, mark it done, delete it. Keep your to-dos in
+several lists, like "Work" and "Home".
 
 The pages follow your computer's or phone's light or dark mode.
 
@@ -65,7 +66,7 @@ uv run python manage.py runserver
 ```
 
 Open <http://127.0.0.1:8000/> and click *Create an account*. Each account sees only its own
-to-dos. Press `Ctrl+C` in the terminal to stop the server.
+lists and to-dos. Press `Ctrl+C` in the terminal to stop the server.
 
 **8. Run the tests.**
 
@@ -77,8 +78,8 @@ You should see `OK`, and then one line for each layer of tests:
 
 ```
 Test layers
-  CUJ           3 passed
-  Integration  46 passed
+  CUJ           4 passed
+  Integration  71 passed
   Unit         14 passed
 ```
 
@@ -121,12 +122,14 @@ runs the same checks and the tests on every push.
 | `accounts/` | Sign up, log in and log out, with Django's own accounts |
 | `accounts/templates/registration/` | The login and sign-up pages |
 | `accounts/tests/helpers.py` | Helpers the tests share: test users, and a test that starts logged in |
-| `todos/models.py` | The `Todo` table in the database; each to-do has an owner |
-| `todos/urls.py` | The addresses of the to-do pages |
-| `todos/forms.py` | The form that checks a new to-do |
+| `todos/models.py` | The `TodoList` and `Todo` tables in the database; each list has an owner, each to-do is in a list |
+| `todos/urls.py` | The addresses of the list and to-do pages |
+| `todos/forms.py` | The forms that check a new to-do and a list's name |
 | `todos/views.py` | What happens when each address is visited |
 | `todos/templates/base.html` | The frame every page shares: the colors, the style, who is logged in, the messages |
-| `todos/templates/todos/todo_list.html` | The page you see |
+| `todos/templates/todos/todo_list.html` | The page you see: one list |
+| `todos/templates/todos/list_form.html` | The page to make or rename a list |
+| `todos/templates/todos/list_confirm_delete.html` | The page that asks before a list is deleted |
 | `todos/templates/todos/_todo_item.html` | One row of the list |
 | `todos/tests/` | The tests, one folder per layer |
 | `config/test_runner.py` | Sorts the tests into layers and counts them |
