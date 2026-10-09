@@ -1,7 +1,8 @@
 from datetime import date, timedelta
+from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.db import connection
+from django.db import IntegrityError, connection
 from django.test import Client, TestCase
 from django.test.utils import CaptureQueriesContext
 from django.urls import URLResolver, get_resolver, reverse
@@ -837,6 +838,25 @@ class TagTests(LoggedInTestCase):
         self.assertEqual(self.todo.title, "Buy milk")
         self.assertEqual(self.tag_names(self.todo), ["work"])
         self.assertFalse(Tag.objects.filter(owner=self.other_user).exists())
+
+    def test_tag_names_are_escaped(self):
+        self.edit(self.todo, "<b>x</b>")
+        response = self.list_page()
+        self.assertContains(response, "#&lt;b&gt;x&lt;/b&gt;")
+        self.assertNotContains(response, "<b>x</b>")
+
+    def test_tag_error_rolls_back_title(self):
+        # If saving the tags fails, the new title must not be saved either.
+        with mock.patch.object(Todo, "set_tags", side_effect=IntegrityError):
+            with self.assertRaises(IntegrityError):
+                self.edit(self.todo, "work", title="A new title")
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy milk")
+
+    def test_unused_tag_is_kept(self):
+        self.edit(self.todo, "work")
+        self.edit(self.todo, "")
+        self.assertTrue(Tag.objects.filter(owner=self.user, name="work").exists())
 
     def test_add_still_works(self):
         response = self.client.post(
