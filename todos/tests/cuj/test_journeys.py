@@ -155,6 +155,7 @@ class ColorSchemeTests(BrowserTestCase):
         page.get_by_label("Priority").select_option(label="High")
         page.get_by_role("button", name="Add").click()
         fence = page.get_by_role("listitem").filter(has_text="Paint the fence")
+        expect(fence).to_be_visible()
         fence.get_by_role("button", name="Done").click()
         expect(fence).to_have_class(DONE)
 
@@ -279,6 +280,7 @@ class FixATypoTests(BrowserTestCase):
         page.get_by_role("button", name="Add").click()
 
         row = page.get_by_role("listitem").filter(has_text="Buy mlik")
+        expect(row).to_be_visible()
         row.get_by_role("link", name="Edit").click()
         page.get_by_label("Title").fill("Buy milk")
         page.get_by_label("Notes").fill(
@@ -410,10 +412,15 @@ class BreakATodoIntoStepsTests(BrowserTestCase):
 
         page.get_by_label("New to-do").fill("Move house")
         page.get_by_role("button", name="Add").click()
+        expect(
+            page.get_by_role("listitem").filter(has_text="Move house")
+        ).to_be_visible()
         page.get_by_text("Add steps").click()
         for title in ["Pack books", "Book a van"]:
             page.get_by_label("New step for Move house").fill(title)
             page.get_by_role("button", name="Add step").click()
+            # The old page has the same "New step" field: wait for the new page.
+            expect(page.locator("li.step").filter(has_text=title)).to_be_visible()
 
         # Full button names: the "Move house" row also contains the steps.
         page.get_by_role("button", name="Done: Pack books").click()
