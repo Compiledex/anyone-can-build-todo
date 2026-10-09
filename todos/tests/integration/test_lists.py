@@ -62,6 +62,13 @@ class NewListTests(LoggedInTestCase):
         self.assertEqual(TodoList.objects.get(name="Work").owner, self.user)
         self.assertFalse(self.other_user.todo_lists.filter(name="Work").exists())
 
+    def test_no_cancel_link_without_lists(self):
+        # `/` would only send the person back to this page.
+        carol = make_user("carol")
+        response = self.client_for(carol).get(reverse("list_create"))
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Cancel")
+
     def test_get_does_not_create(self):
         response = self.client.get(reverse("list_create"), {"name": "Work"})
         self.assertEqual(response.status_code, 200)
@@ -99,12 +106,14 @@ class DeleteListTests(LoggedInTestCase):
     def test_get_shows_confirm_and_deletes_nothing(self):
         for title in ["Buy milk", "Call home"]:
             Todo.objects.create(title=title, todo_list=self.todo_list)
+        work = TodoList.objects.create(owner=self.user, name="Work")
+        Todo.objects.create(title="Send report", todo_list=work)
         response = self.client.get(reverse("list_delete", args=[self.todo_list.pk]))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Inbox")
         self.assertContains(response, "2 to-dos")
         self.assertTrue(TodoList.objects.filter(pk=self.todo_list.pk).exists())
-        self.assertEqual(Todo.objects.count(), 2)
+        self.assertEqual(Todo.objects.count(), 3)
 
     def test_delete_removes_list_and_its_todos(self):
         Todo.objects.create(title="Buy milk", todo_list=self.todo_list)
@@ -124,6 +133,10 @@ class DeleteListTests(LoggedInTestCase):
 
 
 class ListPageTests(LoggedInTestCase):
+    def test_post_to_list_page_is_405(self):
+        response = self.client.post(self.todo_list.get_absolute_url())
+        self.assertEqual(response.status_code, 405)
+
     def test_list_shows_only_its_own_todos(self):
         home = TodoList.objects.create(owner=self.user, name="Home")
         work = TodoList.objects.create(owner=self.user, name="Work")
@@ -146,6 +159,19 @@ class ListPageTests(LoggedInTestCase):
         self.assertContains(
             response, f'href="{work.get_absolute_url()}" aria-current="page">Work<'
         )
+
+
+class ListNameIsEscapedTests(LoggedInTestCase):
+    def test_list_name_is_escaped_on_every_page(self):
+        the_list = TodoList.objects.create(owner=self.user, name="<b>x</b>")
+        for name in ["list_detail", "list_rename", "list_delete"]:
+            with self.subTest(page=name):
+                response = self.client.get(reverse(name, args=[the_list.pk]))
+                self.assertEqual(response.status_code, 200)
+                self.assertNotContains(response, "<b>x</b>")
+                self.assertContains(response, "&lt;b&gt;x&lt;/b&gt;")
+        response = self.client.get(the_list.get_absolute_url())
+        self.assertContains(response, "<title>&lt;b&gt;x&lt;/b&gt;</title>")
 
 
 class PrivacyTests(LoggedInTestCase):

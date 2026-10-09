@@ -72,7 +72,7 @@ class DefaultListsTests(TransactionTestCase):
         ana = User.objects.create(username="ana")
         ben = User.objects.create(username="ben")
         milk = Todo.objects.create(title="Buy milk", owner=ana)
-        call = Todo.objects.create(title="Call home", owner=ana)
+        call = Todo.objects.create(title="Call home", owner=ben)
 
         apps = migrate(LISTS_AFTER)
         TodoList = apps.get_model("todos", "TodoList")
@@ -82,8 +82,8 @@ class DefaultListsTests(TransactionTestCase):
                 TodoList.objects.filter(owner_id=user.pk).values_list("name", flat=True)
             )
             self.assertEqual(names, ["Inbox"])
-        inbox = TodoList.objects.get(owner_id=ana.pk)
-        for todo in [milk, call]:
+        for todo, user in [(milk, ana), (call, ben)]:
+            inbox = TodoList.objects.get(owner_id=user.pk)
             self.assertEqual(Todo.objects.get(pk=todo.pk).todo_list_id, inbox.pk)
 
     def test_migration_back_gives_todos_their_owner(self):
