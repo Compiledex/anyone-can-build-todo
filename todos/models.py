@@ -1,8 +1,20 @@
 from django.conf import settings
 from django.db import models
+from django.db.models import Q
 from django.db.models.functions import Lower
 from django.urls import reverse
 from django.utils import timezone
+
+
+class TodoListQuerySet(models.QuerySet):
+    def visible_to(self, user):
+        """The lists this user owns, plus the lists shared with them.
+
+        `distinct()` is needed: the join with the members table gives the owner
+        one row for each member, and get_object_or_404 would then fail with a
+        500 error.
+        """
+        return self.filter(Q(owner=user) | Q(members=user)).distinct()
 
 
 class TodoList(models.Model):
@@ -13,6 +25,12 @@ class TodoList(models.Model):
     )
     name = models.CharField(max_length=100)
     created_at = models.DateTimeField(auto_now_add=True)
+    # The people the owner shared this list with. The owner is never a member.
+    members = models.ManyToManyField(
+        settings.AUTH_USER_MODEL, related_name="shared_lists", blank=True
+    )
+
+    objects = TodoListQuerySet.as_manager()
 
     class Meta:
         ordering = ["created_at", "pk"]
