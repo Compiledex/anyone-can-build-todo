@@ -87,6 +87,12 @@ class SearchTests(LoggedInTestCase):
         response = self.search("%")
         self.assertEqual(self.shown(response), ["50% off"])
 
+        # `_` is a normal letter too, not "any one letter".
+        self.add("a_b")
+        self.add("axb")
+        response = self.search("_")
+        self.assertEqual(self.shown(response), ["a_b"])
+
     def test_no_match_shows_message(self):
         self.add("Buy milk")
         response = self.search("xyz")
@@ -94,6 +100,24 @@ class SearchTests(LoggedInTestCase):
         self.assertContains(response, f"{NO_MATCH} “xyz”.")
         self.assertContains(response, SHOW_ALL)
         self.assertNotContains(response, EMPTY_LIST)
+
+    def test_show_all_goes_back_to_the_open_list(self):
+        # A newer list, so `/` would send the browser to Inbox, not here.
+        work = TodoList.objects.create(owner=self.user, name="Work")
+        self.add("Buy milk", todo_list=work)
+        response = self.search("xyz", todo_list=work)
+        self.assertContains(
+            response, f'<a href="{work.get_absolute_url()}">Show all</a>', html=True
+        )
+
+    def test_clear_completed_counts_the_whole_list_while_searching(self):
+        # The button deletes every done to-do of the list, so the count must
+        # not shrink to the search results.
+        self.add("Buy milk")
+        self.add("Call home", done=True)
+        response = self.search("milk")
+        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertContains(response, "Clear completed (1)")
 
     def test_search_box_keeps_typed_text(self):
         self.add("Buy milk")
