@@ -386,3 +386,31 @@ class ClearCompletedJourneyTests(BrowserTestCase):
         expect(page.locator("ul.todos > li")).to_have_count(1)
         expect(page.get_by_role("listitem").filter(has_text="Pay rent")).to_be_visible()
         expect(page.get_by_text("Clear completed")).to_have_count(0)
+
+
+class SearchJourneyTests(BrowserTestCase):
+    def test_search_and_show_all(self):
+        page = self.page
+        self.log_in_as(make_user_with_inbox())
+        page.goto(self.live_server_url)  # Opens the list page.
+
+        for title in ["Buy milk", "Call home"]:
+            page.get_by_label("New to-do").fill(title)
+            page.get_by_role("button", name="Add").click()
+        rows = page.locator("ul.todos > li")
+        expect(rows).to_have_count(2)
+
+        box = page.get_by_label("Search to-dos")
+        box.fill("milk")
+        box.press("Enter")
+        expect(page).to_have_url(re.compile(r"\?q=milk$"))
+        expect(rows).to_have_count(1)
+        expect(rows).to_contain_text("Buy milk")
+        expect(page.get_by_label("Search to-dos")).to_have_value("milk")
+
+        page.get_by_role("link", name="Show all").click()
+        expect(rows).to_have_count(2)
+        expect(
+            page.get_by_role("listitem").filter(has_text="Call home")
+        ).to_be_visible()
+        expect(page.get_by_label("Search to-dos")).to_have_value("")
