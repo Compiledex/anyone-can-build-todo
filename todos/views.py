@@ -6,8 +6,11 @@ from .models import Todo
 
 
 def render_list_page(request, form):
-    """The list page, with this add form (empty, or with the errors of a bad add)."""
-    todos = Todo.objects.all()
+    """The list page, with this add form (empty, or with the errors of a bad add).
+
+    Only the to-dos of the person who is logged in.
+    """
+    todos = Todo.objects.filter(owner=request.user)
     return render(request, "todos/todo_list.html", {"todos": todos, "form": form})
 
 
@@ -19,14 +22,16 @@ def todo_list(request):
 def todo_add(request):
     form = TodoForm(request.POST)
     if form.is_valid():
-        form.save()
+        todo = form.save(commit=False)
+        todo.owner = request.user  # Never from the form.
+        todo.save()
         return redirect("todo_list")
     return render_list_page(request, form)
 
 
 @require_POST
 def todo_toggle(request, pk):
-    todo = get_object_or_404(Todo, pk=pk)
+    todo = get_object_or_404(Todo, pk=pk, owner=request.user)
     todo.done = not todo.done
     todo.save()
     return redirect("todo_list")
@@ -34,6 +39,6 @@ def todo_toggle(request, pk):
 
 @require_POST
 def todo_delete(request, pk):
-    todo = get_object_or_404(Todo, pk=pk)
+    todo = get_object_or_404(Todo, pk=pk, owner=request.user)
     todo.delete()
     return redirect("todo_list")

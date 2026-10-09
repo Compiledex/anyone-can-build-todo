@@ -7,7 +7,7 @@ change code, say which file changed and why.
 ## What this is
 
 The most basic to-do list, in Django. A person can add a to-do, mark it done (or undo that), and
-delete it. There are no accounts: everyone who opens the site sees the same list. The data is kept
+delete it. Each person has an account and sees only their own to-dos. The data is kept
 in a SQLite database, the file `db.sqlite3`, which is not in git.
 
 ## What each file does
@@ -15,12 +15,16 @@ in a SQLite database, the file `db.sqlite3`, which is not in git.
 | File | Its one job |
 |---|---|
 | `config/settings.py` | Settings for the whole project. The secret key, debug and allowed hosts come from environment variables on a live server, with defaults for a laptop. |
-| `config/urls.py` | Sends `/admin/` to Django's admin, and everything else to `todos/urls.py`. |
-| `todos/models.py` | The `Todo` table: `title`, `done`, `created_at`. |
+| `config/urls.py` | Sends `/admin/` to Django's admin, `/accounts/` to `accounts/urls.py`, and everything else to `todos/urls.py`. |
+| `accounts/` | The accounts app: sign up, log in, log out. It uses Django's own `User`, `LoginView`, `LogoutView` and `UserCreationForm`. It has no models. |
+| `accounts/urls.py`, `accounts/views.py` | The three addresses (`login`, `logout`, `signup`), and the `signup` view. |
+| `accounts/templates/registration/` | The login and sign-up pages. They extend `base.html`. |
+| `accounts/tests/helpers.py` | Test helpers for every feature: `TEST_PASSWORD`, `make_user()`, and `LoggedInTestCase` (logged in as alice, with bob as the other user, and `assertOtherUserGets404`). |
+| `todos/models.py` | The `Todo` table: `owner` (the user it belongs to), `title`, `done`, `created_at`. |
 | `todos/urls.py` | The four addresses: the list, add, toggle, delete. |
 | `todos/forms.py` | `TodoForm`, the Django form for a to-do. It checks the title. |
 | `todos/views.py` | One function per address. Add, toggle and delete accept `POST` only, then send the browser back to the list. An invalid add shows the page again with the error. |
-| `todos/templates/base.html` | The shared page frame: the `<head>`, all the CSS (the colors are CSS variables, with dark values that follow the system's light or dark mode), and the messages. |
+| `todos/templates/base.html` | The shared page frame: the `<head>`, all the CSS (the colors are CSS variables, with dark values that follow the system's light or dark mode), the header ("Logged in as ..." and "Log out"), and the messages. |
 | `todos/templates/todos/todo_list.html` | The list page, which extends `base.html`: the errors, the add form and the list. |
 | `todos/templates/todos/_todo_item.html` | One row of the list (one `<li>`). |
 | `todos/tests/unit/` | Unit tests: one method on its own, no requests, no database. |
@@ -28,7 +32,7 @@ in a SQLite database, the file `db.sqlite3`, which is not in git.
 | `todos/tests/cuj/` | CUJ tests (critical user journeys): a real Chromium browser, driven by Playwright. |
 | `config/test_runner.py` | Finds each test's layer from its folder, checks the layer rules, and prints one line per layer after a run. |
 | `config/tests/unit/` | The tests for the test runner. |
-| `todos/migrations/` | Made by Django from `models.py`. Never edit these by hand. |
+| `todos/migrations/` | Made by Django from `models.py`. Never edit these by hand. One exception: a data migration (one that changes rows, like `0003_give_old_todos_an_owner.py`) is meant to be written. |
 | `pyproject.toml`, `uv.lock` | The packages this project uses, and their exact versions. |
 | `.pre-commit-config.yaml` | The checks that run on every `git commit`. |
 | `Makefile` | Short commands. `make help` lists them. |
@@ -63,3 +67,19 @@ Add a package with `uv add <name>`, never with `pip install`. After changing `mo
   would notice it. A unit test must be a `SimpleTestCase` (no database). A CUJ test must extend
   `BrowserTestCase` from `todos/tests/cuj/browser.py`. The test runner stops if a test breaks
   these rules.
+- **Every page needs a login, by default.** Django's `LoginRequiredMiddleware` (code that runs
+  before every view) sends a visitor who is not logged in to the login page. Only mark a view
+  `@login_not_required` when a stranger must see it, add its name to
+  `test_only_login_and_signup_are_open`, and say why in the pull request.
+- **Only my data.** A person sees and changes only their own things:
+  1. A list starts from the user: `Todo.objects.filter(owner=request.user)`. Never
+     `Todo.objects.all()` in a view.
+  2. One thing by its number: `get_object_or_404(Todo, pk=pk, owner=request.user)`. Someone
+     else's thing then gives 404, like a thing that does not exist (not 403, which would tell
+     that it exists).
+  3. Create: set the owner in the view (`form.save(commit=False)`, then `todo.owner =
+     request.user`), never from the form.
+  4. A new model that belongs to a to-do is reached through a to-do the user owns, or gets its own
+     `owner` field and follows rules 1 to 3.
+  5. Every new view gets a test that another user gets 404 (`assertOtherUserGets404` from
+     `accounts/tests/helpers.py`), and that the data did not change.

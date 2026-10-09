@@ -29,6 +29,12 @@
     .messages { margin-bottom: 1rem; }
     .message { margin: 0 0 0.5rem; padding: 0.5rem; border: 1px solid var(--border); }
     .errorlist { list-style: none; padding: 0; margin: 0 0 0.5rem; }
+    header.site { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
+                  padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); color: var(--muted); }
+    form.account div { margin-bottom: 0.75rem; }
+    form.account label { display: block; margin-bottom: 0.25rem; }
+    form.account input { box-sizing: border-box; width: 100%; padding: 0.5rem; font-size: 1rem; }
+    form.account .helptext, form.account .helptext ul { color: var(--muted); font-size: 0.85rem; }
     form.add { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; }
     form.add input { flex: 1; padding: 0.5rem; font-size: 1rem; }
     ul.todos { list-style: none; padding: 0; }
@@ -40,6 +46,16 @@
   </style>
 </head>
 <body>
+  {% if user.is_authenticated %}
+    <header class="site">
+      <span>Logged in as {{ user.username }}</span>
+      <form method="post" action="{% url 'logout' %}">
+        {% csrf_token %}
+        <button type="submit">Log out</button>
+      </form>
+    </header>
+  {% endif %}
+
   {% if messages %}
     <div class="messages" role="status">
       {% for message in messages %}
