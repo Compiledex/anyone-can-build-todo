@@ -48,6 +48,11 @@ def make_user_with_inbox():
 # The first password field only, not "Password confirmation".
 PASSWORD = re.compile(r"^Password:?$")
 
+# A click on a link or a form button only *starts* loading the next page. Before
+# the next step, wait with expect() for something that is only on the new page.
+# Otherwise the next step can act on the old page, or page.reload() can fail with
+# "Not attached to an active page" while the browser swaps the pages.
+
 
 class PlanAndFinishTests(BrowserTestCase):
     def test_plan_and_finish(self):
@@ -58,19 +63,22 @@ class PlanAndFinishTests(BrowserTestCase):
         page.get_by_label("New to-do").fill("Buy milk")
         page.get_by_label("Due date").fill("2030-01-15")
         page.get_by_role("button", name="Add").click()
-        page.get_by_label("New to-do").fill("Call home")
-        page.get_by_role("button", name="Add").click()
-
         milk = page.get_by_role("listitem").filter(has_text="Buy milk")
         expect(milk).to_contain_text("Due 15 Jan 2030")
+        page.get_by_label("New to-do").fill("Call home")
+        page.get_by_role("button", name="Add").click()
+        call = page.get_by_role("listitem").filter(has_text="Call home")
+        expect(call).to_be_visible()
+
         milk.get_by_role("button", name="Done").click()
         expect(milk).to_have_class(DONE)
         milk.get_by_role("button", name="Undo").click()
         expect(milk).not_to_have_class(DONE)
 
-        call = page.get_by_role("listitem").filter(has_text="Call home")
         call.get_by_role("button", name="Delete").click()
+        expect(call).to_have_count(0)
 
+        # Load the page again: the change is really saved.
         page.reload()
         expect(page.get_by_role("listitem")).to_have_count(1)
         expect(milk).to_be_visible()
@@ -85,6 +93,7 @@ class SeparateListsTests(BrowserTestCase):
         lists = page.get_by_role("navigation", name="Your lists")
 
         lists.get_by_role("link", name="New list").click()
+        expect(page.get_by_role("heading", name="New list")).to_be_visible()
         page.get_by_label("Name").fill("Shopping")
         page.get_by_role("button", name="Save").click()
         expect(page.get_by_role("heading", name="Shopping")).to_be_visible()
@@ -97,6 +106,7 @@ class SeparateListsTests(BrowserTestCase):
         expect(page.get_by_text("Buy milk")).to_have_count(0)
 
         lists.get_by_role("link", name="Shopping").click()
+        expect(page.get_by_role("heading", name="Shopping")).to_be_visible()
         page.get_by_role("link", name="Delete list").click()
         expect(page.get_by_role("heading", name="Delete")).to_contain_text("1 to-do?")
         page.get_by_role("button", name="Delete list").click()
@@ -114,6 +124,7 @@ class ColorSchemeTests(BrowserTestCase):
         for title in ["Buy milk", "Call home"]:
             page.get_by_label("New to-do").fill(title)
             page.get_by_role("button", name="Add").click()
+            expect(page.get_by_role("listitem").filter(has_text=title)).to_be_visible()
         milk = page.get_by_role("listitem").filter(has_text="Buy milk")
         milk.get_by_role("button", name="Done").click()
         expect(milk).to_have_class(DONE)
@@ -210,6 +221,7 @@ class TwoPeopleTests(BrowserTestCase):
     def sign_up(self, username):
         page = self.page
         page.get_by_role("link", name="Create an account").click()
+        expect(page.get_by_role("heading", name="Create an account")).to_be_visible()
         page.get_by_label("Username").fill(username)
         page.get_by_label(PASSWORD).fill(TEST_PASSWORD)
         page.get_by_label("Password confirmation").fill(TEST_PASSWORD)
@@ -313,6 +325,7 @@ class ShareAListTests(BrowserTestCase):
         alice_page.goto(self.live_server_url)
         alice_lists = alice_page.get_by_role("navigation", name="Your lists")
         alice_lists.get_by_role("link", name="New list").click()
+        expect(alice_page.get_by_role("heading", name="New list")).to_be_visible()
         alice_page.get_by_label("Name").fill("Groceries")
         alice_page.get_by_role("button", name="Save").click()
         expect(alice_page.get_by_role("heading", name="Groceries")).to_be_visible()
@@ -368,6 +381,7 @@ class ClearCompletedJourneyTests(BrowserTestCase):
         for title in ["Buy milk", "Call home", "Pay rent"]:
             page.get_by_label("New to-do").fill(title)
             page.get_by_role("button", name="Add").click()
+            expect(page.get_by_role("listitem").filter(has_text=title)).to_be_visible()
         for title in ["Buy milk", "Call home"]:
             row = page.get_by_role("listitem").filter(has_text=title)
             row.get_by_role("button", name="Done").click()
