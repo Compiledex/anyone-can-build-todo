@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+from django.contrib.auth import get_user_model
 from django.test import Client, TestCase
 from django.urls import URLResolver, get_resolver, reverse
 from django.utils import timezone
@@ -43,7 +44,9 @@ class ListTests(LoggedInTestCase):
 class AddTests(LoggedInTestCase):
     def test_add_a_todo(self):
         response = self.client.post(reverse("todo_add"), {"title": "Buy milk"})
-        self.assertRedirects(response, reverse("todo_list"))
+        self.assertRedirects(
+            response, reverse("todo_list"), fetch_redirect_response=False
+        )
         self.assertEqual(Todo.objects.get().title, "Buy milk")
 
     def test_add_ignores_done(self):
@@ -235,3 +238,19 @@ class OnlyMyDataTests(LoggedInTestCase):
         response = client.post(reverse("todo_add"), {"title": "Buy milk"})
         self.assertEqual(response.status_code, 403)
         self.assertEqual(Todo.objects.count(), 0)
+
+
+class AdminTests(TestCase):
+    def test_admin_list_shows_the_owner(self):
+        admin = get_user_model().objects.create_user(
+            username="staffer",
+            password="unused-in-this-test",
+            is_staff=True,
+            is_superuser=True,
+        )
+        Todo.objects.create(title="Buy milk", owner=make_user("carol"))
+        self.client.force_login(admin)
+        response = self.client.get("/admin/todos/todo/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Buy milk")
+        self.assertContains(response, "carol")

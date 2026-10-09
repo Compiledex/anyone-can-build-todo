@@ -88,6 +88,7 @@ class ColorSchemeTests(BrowserTestCase):
                             background: color("body", "backgroundColor"),
                             text: color("li:not(.done) .title", "color"),
                             done: color("li.done .title", "color"),
+                            header: color("header.site", "color"),
                         };
                     }"""
                 )
@@ -101,6 +102,9 @@ class ColorSchemeTests(BrowserTestCase):
                 )
                 self.assertGreaterEqual(
                     contrast(colors["done"], colors["background"]), AA_CONTRAST
+                )
+                self.assertGreaterEqual(
+                    contrast(colors["header"], colors["background"]), AA_CONTRAST
                 )
 
 

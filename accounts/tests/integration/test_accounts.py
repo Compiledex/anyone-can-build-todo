@@ -55,6 +55,18 @@ class SignupTests(TestCase):
         self.assertContains(response, "A user with that username already exists.")
         self.assertEqual(get_user_model().objects.count(), 1)
 
+    def test_signup_ignores_next(self):
+        response = self.client.post(
+            SIGNUP_URL + "?next=https://evil.example/",
+            {
+                "username": "carol",
+                "password1": TEST_PASSWORD,
+                "password2": TEST_PASSWORD,
+                "next": "https://evil.example/",
+            },
+        )
+        self.assertRedirects(response, "/", fetch_redirect_response=False)
+
 
 class LoginTests(TestCase):
     @classmethod
@@ -97,6 +109,17 @@ class LoginTests(TestCase):
             with self.subTest(url=url):
                 response = self.client.get(url)
                 self.assertRedirects(response, "/", fetch_redirect_response=False)
+
+    def test_login_page_keeps_next(self):
+        response = self.client.get(LOGIN_URL + "?next=/add/")
+        self.assertContains(response, 'name="next" value="/add/"')
+
+    def test_anonymous_pages_have_no_header(self):
+        for url in [LOGIN_URL, SIGNUP_URL]:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertEqual(response.status_code, 200)
+                self.assertNotContains(response, "Logged in as")
 
     def test_login_page_has_csrf_token(self):
         for url in [LOGIN_URL, SIGNUP_URL]:
