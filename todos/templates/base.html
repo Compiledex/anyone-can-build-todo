@@ -26,6 +26,10 @@
     }
     body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem;
            background: var(--bg); color: var(--text); }
+    a { color: var(--text); }
+    nav.lists { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 1rem 0; }
+    nav.lists a[aria-current="page"] { font-weight: bold; text-decoration: none; }
+    .list-actions { display: flex; gap: 1rem; margin-top: -0.5rem; }
     .messages { margin-bottom: 1rem; }
     .message { margin: 0 0 0.5rem; padding: 0.5rem; border: 1px solid var(--border); }
     .errorlist { list-style: none; padding: 0; margin: 0 0 0.5rem; }

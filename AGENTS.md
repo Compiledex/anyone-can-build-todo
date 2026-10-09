@@ -7,7 +7,8 @@ change code, say which file changed and why.
 ## What this is
 
 The most basic to-do list, in Django. A person can add a to-do, mark it done (or undo that), and
-delete it. Each person has an account and sees only their own to-dos. The data is kept
+delete it. Each person has an account and sees only their own lists and to-dos. A person can have
+several lists (make, rename and delete a list); each to-do is in exactly one list. The data is kept
 in a SQLite database, the file `db.sqlite3`, which is not in git.
 
 ## What each file does
@@ -17,22 +18,24 @@ in a SQLite database, the file `db.sqlite3`, which is not in git.
 | `config/settings.py` | Settings for the whole project. The secret key, debug and allowed hosts come from environment variables on a live server, with defaults for a laptop. |
 | `config/urls.py` | Sends `/admin/` to Django's admin, `/accounts/` to `accounts/urls.py`, and everything else to `todos/urls.py`. |
 | `accounts/` | The accounts app: sign up, log in, log out. It uses Django's own `User`, `LoginView`, `LogoutView` and `UserCreationForm`. It has no models. |
-| `accounts/urls.py`, `accounts/views.py` | The three addresses (`login`, `logout`, `signup`), and the `signup` view. |
+| `accounts/urls.py`, `accounts/views.py` | The three addresses (`login`, `logout`, `signup`), and the `signup` view. Sign-up also makes the person's first list, "Inbox". |
 | `accounts/templates/registration/` | The login and sign-up pages. They extend `base.html`. |
-| `accounts/tests/helpers.py` | Test helpers for every feature: `TEST_PASSWORD`, `make_user()`, and `LoggedInTestCase` (logged in as alice, with bob as the other user, and `assertOtherUserGets404`). |
-| `todos/models.py` | The `Todo` table: `owner` (the user it belongs to), `title`, `done`, `created_at`. |
-| `todos/urls.py` | The four addresses: the list, add, toggle, delete. |
-| `todos/forms.py` | `TodoForm`, the Django form for a to-do. It checks the title. |
-| `todos/views.py` | One function per address. Add, toggle and delete accept `POST` only, then send the browser back to the list. An invalid add shows the page again with the error. |
+| `accounts/tests/helpers.py` | Test helpers for every feature: `TEST_PASSWORD`, `make_user()`, and `LoggedInTestCase` (logged in as alice, with bob as the other user, alice's list `todo_list` ("Inbox"), bob's list `other_list`, and `assertOtherUserGets404`). `make_user()` makes no list. |
+| `todos/models.py` | The `TodoList` table: `owner` (the user it belongs to), `name` (unique per person, ignoring case), `created_at`. The `Todo` table: `todo_list` (the list it is in), `title`, `done`, `created_at`. A to-do's owner is `todo.todo_list.owner`. |
+| `todos/urls.py` | The addresses: `/` (only sends the browser to the oldest list, or to "New list"), `/lists/new/`, `/lists/<pk>/` (a list page), `/lists/<pk>/add/`, `/lists/<pk>/rename/`, `/lists/<pk>/delete/`, and `/<pk>/toggle/` and `/<pk>/delete/` for a to-do. |
+| `todos/forms.py` | `TodoForm`, the Django form for a to-do (it checks the title), and `TodoListForm`, for a list's name (it refuses a name the person already has). |
+| `todos/views.py` | One function per address. `render_list_page` is the one place that builds the list page. Every view finds a list with `owner=request.user`, or a to-do with `todo_list__owner=request.user`, so another person's things give 404. Changes are `POST` only; then the browser goes back to the list. An invalid add shows the list page again with the error. |
 | `todos/templates/base.html` | The shared page frame: the `<head>`, all the CSS (the colors are CSS variables, with dark values that follow the system's light or dark mode), the header ("Logged in as ..." and "Log out"), and the messages. |
-| `todos/templates/todos/todo_list.html` | The list page, which extends `base.html`: the errors, the add form and the list. |
+| `todos/templates/todos/todo_list.html` | The list page, which extends `base.html`: the menu of the person's lists, the list's name with "Rename" and "Delete list", the errors, the add form and the to-dos. |
+| `todos/templates/todos/list_form.html` | The "New list" and "Rename list" page: the name field and its errors. |
+| `todos/templates/todos/list_confirm_delete.html` | "Delete this list and its N to-dos?", with the button that really deletes. |
 | `todos/templates/todos/_todo_item.html` | One row of the list (one `<li>`). |
 | `todos/tests/unit/` | Unit tests: one method on its own, no requests, no database. |
 | `todos/tests/integration/` | Integration tests: Django's test client, from the address to the database. |
 | `todos/tests/cuj/` | CUJ tests (critical user journeys): a real Chromium browser, driven by Playwright. |
 | `config/test_runner.py` | Finds each test's layer from its folder, checks the layer rules, and prints one line per layer after a run. |
 | `config/tests/unit/` | The tests for the test runner. |
-| `todos/migrations/` | Made by Django from `models.py`. Never edit these by hand. One exception: a data migration (one that changes rows, like `0003_give_old_todos_an_owner.py`) is meant to be written. |
+| `todos/migrations/` | Made by Django from `models.py`. Never edit these by hand. One exception: a data migration (one that changes rows, like `0003_give_old_todos_an_owner.py` and `0006_default_lists.py`) is meant to be written. |
 | `pyproject.toml`, `uv.lock` | The packages this project uses, and their exact versions. |
 | `.pre-commit-config.yaml` | The checks that run on every `git commit`. |
 | `Makefile` | Short commands. `make help` lists them. |

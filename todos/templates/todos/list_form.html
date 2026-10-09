@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block title %}{% if the_list %}Rename list{% else %}New list{% endif %}{% endblock %}
+
+{% block content %}
+  {% if the_list %}
+    <h1>Rename “{{ the_list.name }}”</h1>
+    <form class="account" method="post" action="{% url 'list_rename' the_list.pk %}">
+  {% else %}
+    <h1>New list</h1>
+    <form class="account" method="post" action="{% url 'list_create' %}">
+  {% endif %}
+    {% csrf_token %}
+    {{ form.as_div }}
+    <button type="submit">Save</button>
+    {% if the_list %}
+      <a href="{{ the_list.get_absolute_url }}">Cancel</a>
+    {% elif has_lists %}
+      {# With no lists, `/` would only send the person back to this page. #}
+      <a href="{% url 'todo_list' %}">Cancel</a>
+    {% endif %}
+  </form>
+{% endblock %}
