@@ -1,20 +1,35 @@
 # To-do list: short commands for this project. Type `make help` to see them.
 
-.PHONY: help setup run test lint format check reset worktree
+.PHONY: help setup run test unit integration cuj lint format check reset worktree
+
+# How many processes run the tests. 1 is fastest while there are few tests:
+# each extra process has to start Python and Django again. Try PARALLEL=auto
+# (one per CPU core) when the tests get slower, for example: make test PARALLEL=auto
+PARALLEL ?= 1
+TEST = uv run python manage.py test --parallel $(PARALLEL)
+
+# The test folders for one layer, for example `layer_dirs,unit` gives
+# config/tests/unit todos/tests/unit. Stops with an error if there are none,
+# because `manage.py test` with no folders would run every test.
+layer_dirs = $(or $(wildcard */tests/$(1)),$(error No */tests/$(1) folders))
 
 help:
 	@echo "make setup            install Python and the packages, create the database, turn on the commit checks"
 	@echo "make run              start the server, then open http://127.0.0.1:8000"
-	@echo "make test             run the tests in todos/tests.py"
+	@echo "make test             run every test, then show how many passed in each layer"
+	@echo "make unit             run only the unit tests (tests/unit/ folders)"
+	@echo "make integration      run only the integration tests (tests/integration/ folders)"
+	@echo "make cuj              run only the CUJ tests, in a real browser (tests/cuj/ folders)"
 	@echo "make lint             look for mistakes and style problems (ruff check)"
 	@echo "make format           rewrite the code in the standard style (ruff format)"
-	@echo "make check            everything the commit checks run, on every file, plus the tests"
+	@echo "make check            the commit checks on every file, the migration check, the tests"
 	@echo "make reset            delete db.sqlite3 and create it again, empty"
 	@echo "make worktree BRANCH=name"
 	@echo "                      give a branch its own folder, .claude/worktrees/name"
 
 setup:
 	uv sync
+	uv run playwright install chromium
 	uv run python manage.py migrate
 	uv run pre-commit install
 
@@ -22,7 +37,16 @@ run:
 	uv run python manage.py runserver
 
 test:
-	uv run python manage.py test
+	$(TEST)
+
+unit:
+	$(TEST) $(call layer_dirs,unit)
+
+integration:
+	$(TEST) $(call layer_dirs,integration)
+
+cuj:
+	$(TEST) $(call layer_dirs,cuj)
 
 lint:
 	uv run ruff check
@@ -32,7 +56,8 @@ format:
 
 check:
 	uv run pre-commit run --all-files
-	uv run python manage.py test
+	uv run python manage.py makemigrations --check --dry-run
+	$(TEST)
 
 reset:
 	rm -f db.sqlite3

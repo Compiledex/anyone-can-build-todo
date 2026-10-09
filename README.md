@@ -39,13 +39,20 @@ uv sync
 uv run python manage.py migrate
 ```
 
-**5. Turn on the commit checks.** From now on, every `git commit` checks your code first.
+**5. Download the test browser.** Some tests use a real Chromium browser. This downloads it, about
+150 MB, once.
+
+```bash
+uv run playwright install chromium
+```
+
+**6. Turn on the commit checks.** From now on, every `git commit` checks your code first.
 
 ```bash
 uv run pre-commit install
 ```
 
-**6. Start the server.**
+**7. Start the server.**
 
 ```bash
 uv run python manage.py runserver
@@ -53,16 +60,38 @@ uv run python manage.py runserver
 
 Open <http://127.0.0.1:8000/>. Press `Ctrl+C` in the terminal to stop the server.
 
-**7. Run the tests.**
+**8. Run the tests.**
 
 ```bash
 uv run python manage.py test
 ```
 
-You should see `Ran 5 tests` and `OK`.
+You should see `OK`, and then one line for each layer of tests:
 
-On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 5, `make run` is step 6,
-`make test` is step 7. `make help` lists the rest.
+```
+Test layers
+  CUJ           1 passed
+  Integration  11 passed
+  Unit         11 passed
+```
+
+On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
+`make test` is step 8. `make help` lists the rest.
+
+## Tests
+
+The tests are sorted into three layers. The folder a test is in is its layer.
+
+| Layer | Folder | What it tests | Command |
+|---|---|---|---|
+| CUJ | `tests/cuj/` | A whole task, like "add a to-do, finish it, delete it", in a real browser | `make cuj` |
+| Integration | `tests/integration/` | One address, from the request to the database, with Django's test client | `make integration` |
+| Unit | `tests/unit/` | One method on its own, with no requests and no database | `make unit` |
+
+CUJ means "critical user journey": an important task a person does from start to finish.
+
+The tests run in one process. To use every CPU core instead, run `make test PARALLEL=auto`. With
+as few tests as this project has, one process is faster.
 
 ## Checks
 
@@ -86,7 +115,8 @@ runs the same checks and the tests on every push.
 | `todos/urls.py` | The addresses of the to-do pages |
 | `todos/views.py` | What happens when each address is visited |
 | `todos/templates/todos/todo_list.html` | The page you see |
-| `todos/tests.py` | The tests |
+| `todos/tests/` | The tests, one folder per layer |
+| `config/test_runner.py` | Sorts the tests into layers and counts them |
 | `AGENTS.md` | Instructions for the AI assistant (Codex reads it; `CLAUDE.md` points Claude to it) |
 
 ## Put it on the internet

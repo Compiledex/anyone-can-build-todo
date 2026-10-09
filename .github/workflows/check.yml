@@ -1,14 +1,27 @@
 # Runs the commit checks and the tests on every push and every pull request.
+# The two jobs run at the same time, so the checks do not wait for the browser download.
 name: check
 
 on: [push, pull_request]
 
 jobs:
-  check:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
       - uses: astral-sh/setup-uv@v10.2.0
       - run: uv sync --locked
       - run: uv run pre-commit run --all-files --show-diff-on-failure
+      # Fails if models.py changed with no migration. Writes no files.
+      - run: uv run python manage.py makemigrations --check --dry-run
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v10.2.0
+      - run: uv sync --locked
+      # The CUJ tests need a real browser. --with-deps also installs the system
+      # libraries Chromium needs on Linux.
+      - run: uv run playwright install --with-deps chromium
       - run: uv run python manage.py test
