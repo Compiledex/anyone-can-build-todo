@@ -66,7 +66,7 @@ uv run python manage.py runserver
 ```
 
 Open <http://127.0.0.1:8000/> and click *Create an account*. Each account sees only its own
-lists and to-dos. Press `Ctrl+C` in the terminal to stop the server.
+lists and to-dos, plus the lists other people share with it. Press `Ctrl+C` in the terminal to stop the server.
 
 **8. Run the tests.**
 
@@ -78,8 +78,8 @@ You should see `OK`, and then one line for each layer of tests:
 
 ```
 Test layers
-  CUJ           5 passed
-  Integration  97 passed
+  CUJ           6 passed
+  Integration  145 passed
   Unit         20 passed
 ```
 
@@ -122,9 +122,9 @@ runs the same checks and the tests on every push.
 | `accounts/` | Sign up, log in and log out, with Django's own accounts |
 | `accounts/templates/registration/` | The login and sign-up pages |
 | `accounts/tests/helpers.py` | Helpers the tests share: test users, and a test that starts logged in |
-| `todos/models.py` | The `TodoList` and `Todo` tables in the database; each list has an owner, each to-do is in a list and has an optional due date |
+| `todos/models.py` | The `TodoList` and `Todo` tables in the database; each list has an owner and can be shared with members, each to-do is in a list and has an optional due date |
 | `todos/urls.py` | The addresses of the list and to-do pages |
-| `todos/forms.py` | The forms that check a new to-do and a list's name |
+| `todos/forms.py` | The forms that check a new to-do, a list's name, and the username to share a list with |
 | `todos/views.py` | What happens when each address is visited |
 | `todos/templates/base.html` | The frame every page shares: the colors, the style, who is logged in, the messages |
 | `todos/templates/todos/todo_list.html` | The page you see: one list |
