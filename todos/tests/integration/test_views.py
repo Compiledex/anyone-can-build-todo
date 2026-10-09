@@ -11,7 +11,7 @@ from django.utils import dateformat, timezone
 
 from accounts.tests.helpers import LoggedInTestCase, make_user
 from todos.forms import TodoForm
-from todos.models import Tag, Todo, TodoList
+from todos.models import Subtask, Tag, Todo, TodoList
 
 # What an overdue row shows next to its date.
 OVERDUE_LABEL = '<span class="overdue-label">Overdue</span>'
@@ -993,6 +993,42 @@ class RecurringTests(LoggedInTestCase):
         )
         self.toggle(todo)
         self.assertEqual(self.copies_of(todo).get().todo_list, middle)
+
+    def test_copy_has_the_steps_not_done(self):
+        for title, done in [("Pack", True), ("Load", False), ("Drive", True)]:
+            Subtask.objects.create(todo=self.weekly, title=title, done=done)
+        self.toggle(self.weekly)
+        copy = self.copies_of(self.weekly).get()
+        self.assertEqual(
+            [(step.title, step.done) for step in copy.subtasks.all()],
+            [("Pack", False), ("Load", False), ("Drive", False)],
+        )
+        # The original keeps its own steps, as they were.
+        self.assertEqual(
+            [(step.title, step.done) for step in self.weekly.subtasks.all()],
+            [("Pack", True), ("Load", False), ("Drive", True)],
+        )
+
+    def test_list_query_count_does_not_grow_with_repeating_todos(self):
+        def count_queries():
+            with CaptureQueriesContext(connection) as queries:
+                self.assertEqual(
+                    self.client.get(self.todo_list.get_absolute_url()).status_code,
+                    200,
+                )
+            return len(queries)
+
+        self.toggle(self.weekly)  # The original and its copy.
+        before = count_queries()
+        for n in range(3):
+            todo = Todo.objects.create(
+                title=f"Todo {n}",
+                todo_list=self.todo_list,
+                repeat="daily",
+                due_date=self.due,
+            )
+            self.toggle(todo)
+        self.assertEqual(count_queries(), before)
 
     def test_copy_stays_in_owners_list_when_member_clicks_done(self):
         carol = make_user("carol")

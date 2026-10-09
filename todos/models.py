@@ -204,6 +204,10 @@ class Todo(models.Model):
         )
         # The same Tag rows; they already belong to the list owner.
         copy.tags.set(self.tags.all())
+        # The same steps, in the same order, none of them done yet.
+        Subtask.objects.bulk_create(
+            Subtask(todo=copy, title=step.title) for step in self.subtasks.all()
+        )
         return copy
 
 
