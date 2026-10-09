@@ -59,6 +59,17 @@
     {% endfor %}
   </ul>
 
+  {% if done_count %}
+    <details class="clear-completed">
+      <summary>Clear completed ({{ done_count }})</summary>
+      <form method="post" action="{% url 'list_clear_completed' the_list.pk %}">
+        {% csrf_token %}
+        <p>Delete {{ done_count }} done to-do{{ done_count|pluralize }}? This cannot be undone.</p>
+        <button type="submit">Yes, delete them</button>
+      </form>
+    </details>
+  {% endif %}
+
   {% if is_owner %}
     <section class="sharing" aria-labelledby="sharing-heading">
       <h2 id="sharing-heading">Sharing</h2>

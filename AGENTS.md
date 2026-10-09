@@ -7,13 +7,13 @@ change code, say which file changed and why.
 ## What this is
 
 The most basic to-do list, in Django. A person can add a to-do, edit it, mark it done (or undo
-that), and delete it. Each person has an account. A person can have several lists (make, rename
-and delete a list); each to-do is in exactly one list. The owner of a list can share it with other
-users by username. Those users are its *members*: they can see the list and add, edit, mark done
-and delete its to-dos, and they can leave it. Only the owner can rename, delete or share the list,
-see its members, or remove a member. Members do not see each other. A person sees their own lists
-plus the lists shared with them, and nothing else. The data is kept
-in a SQLite database, the file `db.sqlite3`, which is not in git.
+that), delete it, and clear all the done to-dos of a list at once. Each person has an account. A
+person can have several lists (make, rename and delete a list); each to-do is in exactly one list.
+The owner of a list can share it with other users by username. Those users are its *members*: they
+can see the list and add, edit, mark done and delete its to-dos, clear its done to-dos, and they can
+leave it. Only the owner can rename, delete or share the list, see its members, or remove a member.
+Members do not see each other. A person sees their own lists plus the lists shared with them, and
+nothing else. The data is kept in a SQLite database, the file `db.sqlite3`, which is not in git.
 
 ## What each file does
 
@@ -26,11 +26,11 @@ in a SQLite database, the file `db.sqlite3`, which is not in git.
 | `accounts/templates/registration/` | The login and sign-up pages. They extend `base.html`. |
 | `accounts/tests/helpers.py` | Test helpers for every feature: `TEST_PASSWORD`, `make_user()`, and `LoggedInTestCase` (logged in as alice, with bob as the other user, alice's list `todo_list` ("Inbox"), bob's list `other_list`, and `assertOtherUserGets404`). `make_user()` makes no list. |
 | `todos/models.py` | The `TodoList` table: `owner` (the user it belongs to), `name` (unique per person, ignoring case), `created_at`, `members` (the users it is shared with; `user.shared_lists` is the other side). `TodoList.objects.visible_to(user)` gives the lists the user owns plus the lists shared with them. The `Todo` table: `todo_list` (the list it is in), `title`, `done`, `created_at`, `due_date` (optional), and `is_overdue()`. A to-do's owner is `todo.todo_list.owner`. |
-| `todos/urls.py` | The addresses: `/` (only sends the browser to the oldest own list, else the oldest list shared with the person, else "New list"), `/lists/new/`, `/lists/<pk>/` (a list page), `/lists/<pk>/add/`, `/lists/<pk>/rename/`, `/lists/<pk>/delete/`, `/lists/<pk>/share/`, `/lists/<pk>/members/<user_id>/remove/`, `/lists/<pk>/leave/`, and `/<pk>/toggle/`, `/<pk>/delete/` and `/<pk>/edit/` for a to-do. |
+| `todos/urls.py` | The addresses: `/` (only sends the browser to the oldest own list, else the oldest list shared with the person, else "New list"), `/lists/new/`, `/lists/<pk>/` (a list page), `/lists/<pk>/add/`, `/lists/<pk>/rename/`, `/lists/<pk>/delete/`, `/lists/<pk>/share/`, `/lists/<pk>/members/<user_id>/remove/`, `/lists/<pk>/leave/`, `/lists/<pk>/clear-completed/` (deletes the done to-dos of that list), and `/<pk>/toggle/`, `/<pk>/delete/` and `/<pk>/edit/` for a to-do. |
 | `todos/forms.py` | `TodoForm`, the Django form for a to-do (it checks the title and the optional due date, YYYY-MM-DD only), `TodoListForm`, for a list's name (it refuses a name the person already has), and `ShareForm`, the username to share a list with (it gives the `User`, and refuses an unknown or switched-off user, the owner, and a member). |
-| `todos/views.py` | One function per address. `render_list_page` is the one place that builds the list page. A view that reads or changes a list or its to-dos finds the list with `TodoList.objects.visible_to(request.user)`, or the to-do with `get_visible_todo(request.user, pk)`; only rename, delete, share and remove-member use `owner=request.user`, so a member or a stranger gets 404 there. Share, remove-member and leave are `POST` only and show their result as a message. Changes are `POST` only; then the browser goes back to the list. An invalid add shows the list page again with the error. Edit shows its form on `GET` and saves on `POST`, then goes back to the to-do's list; an invalid edit shows the edit page again. |
+| `todos/views.py` | One function per address. `render_list_page` is the one place that builds the list page. A view that reads or changes a list or its to-dos finds the list with `TodoList.objects.visible_to(request.user)`, or the to-do with `get_visible_todo(request.user, pk)`; only rename, delete, share and remove-member use `owner=request.user`, so a member or a stranger gets 404 there. Share, remove-member and leave are `POST` only and show their result as a message. Changes are `POST` only; then the browser goes back to the list. An invalid add shows the list page again with the error. Clear completed (`list_clear_completed`, owner and members) deletes only `done=True` to-dos of the one list in the address, and its message counts only the `todos.Todo` rows from `QuerySet.delete()`. Edit shows its form on `GET` and saves on `POST`, then goes back to the to-do's list; an invalid edit shows the edit page again. |
 | `todos/templates/base.html` | The shared page frame: the `<head>`, all the CSS (the colors are CSS variables, with dark values that follow the system's light or dark mode), the header ("Logged in as ..." and "Log out"), and the messages. |
-| `todos/templates/todos/todo_list.html` | The list page, which extends `base.html`: the menu ("My lists", and "Shared with me" with each owner's name), the list's name with "Rename" and "Delete list" (owner) or "Shared by ..." (member), the member list with Remove buttons and the share form (owner only), "Leave this list" (member only), the errors, the add form and the to-dos. |
+| `todos/templates/todos/todo_list.html` | The list page, which extends `base.html`: the menu ("My lists", and "Shared with me" with each owner's name), the list's name with "Rename" and "Delete list" (owner) or "Shared by ..." (member), the member list with Remove buttons and the share form (owner only), "Leave this list" (member only), the errors, the add form, the to-dos, and below them "Clear completed (N)" (a `<details>` box that asks once more; hidden when nothing is done; owner and members see it). |
 | `todos/templates/todos/list_form.html` | The "New list" and "Rename list" page: the name field and its errors. |
 | `todos/templates/todos/list_confirm_delete.html` | "Delete this list and its N to-dos?", with the button that really deletes. |
 | `todos/templates/todos/_todo_item.html` | One row of the list (one `<li>`). |

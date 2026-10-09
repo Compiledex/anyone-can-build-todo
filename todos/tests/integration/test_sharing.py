@@ -153,6 +153,24 @@ class MemberCanTests(SharingTestCase):
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.assertFalse(Todo.objects.filter(pk=self.milk.pk).exists())
 
+    def test_member_can_clear_shared_list(self):
+        eggs = Todo.objects.create(todo_list=self.groceries, title="Eggs", done=True)
+        bread = Todo.objects.create(todo_list=self.groceries, title="Bread", done=True)
+        response = self.client.post(self.url("list_clear_completed", self.groceries.pk))
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        self.assertFalse(Todo.objects.filter(pk__in=[eggs.pk, bread.pk]).exists())
+        self.assertStillMilk()
+        self.assertIn("Deleted 2 completed to-dos.", self.messages_of(response))
+
+    def test_member_sees_clear_button(self):
+        Todo.objects.create(todo_list=self.groceries, title="Eggs", done=True)
+        response = self.client.get(self.groceries.get_absolute_url())
+        self.assertContains(response, "Shared by alice")
+        self.assertContains(response, "Clear completed (1)")
+        self.assertContains(
+            response, self.url("list_clear_completed", self.groceries.pk)
+        )
+
     def test_member_invalid_add_shows_member_page(self):
         response = self.client.post(
             self.url("todo_add", self.groceries.pk), {"title": "x" * 201}
@@ -283,6 +301,13 @@ class StrangerTests(SharingTestCase):
         )
         self.assertEqual(response.status_code, 404)
         self.assertBobIsMember()
+
+    def test_stranger_cannot_clear(self):
+        eggs = Todo.objects.create(todo_list=self.groceries, title="Eggs", done=True)
+        response = self.client.post(self.url("list_clear_completed", self.groceries.pk))
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Todo.objects.filter(pk=eggs.pk).exists())
+        self.assertStillMilk()
 
 
 class ShareTests(SharingTestCase):

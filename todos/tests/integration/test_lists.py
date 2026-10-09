@@ -203,3 +203,96 @@ class PrivacyTests(LoggedInTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Bob")
         self.assertNotContains(response, self.other_list.get_absolute_url())
+
+
+class ClearCompletedTests(LoggedInTestCase):
+    """Clear completed: delete the done to-dos of one list, in one POST.
+
+    alice's Inbox (A1) has 2 done and 1 not done, her "Work" list (A2) has
+    1 done, and bob's list (B1) has 1 done. The numbers differ on purpose:
+    a view that counts or deletes in the wrong list gives a wrong number.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.work_list = TodoList.objects.create(owner=cls.user, name="Work")
+        for title in ["Buy milk", "Call home"]:
+            Todo.objects.create(title=title, done=True, todo_list=cls.todo_list)
+        cls.open_todo = Todo.objects.create(title="Pay rent", todo_list=cls.todo_list)
+        cls.work_done = Todo.objects.create(
+            title="Send report", done=True, todo_list=cls.work_list
+        )
+        cls.bob_done = Todo.objects.create(
+            title="Bob's done", done=True, todo_list=cls.other_list
+        )
+
+    def clear_url(self, the_list):
+        return reverse("list_clear_completed", args=[the_list.pk])
+
+    def test_clear_deletes_done_todos_of_this_list(self):
+        response = self.client.post(self.clear_url(self.todo_list))
+        self.assertRedirects(response, self.todo_list.get_absolute_url())
+        self.assertFalse(self.todo_list.todos.filter(done=True).exists())
+        self.assertEqual(list(self.todo_list.todos.all()), [self.open_todo])
+
+    def test_clear_keeps_other_lists(self):
+        self.client.post(self.clear_url(self.todo_list))
+        self.assertTrue(Todo.objects.filter(pk=self.work_done.pk).exists())
+        self.assertTrue(Todo.objects.filter(pk=self.bob_done.pk).exists())
+
+    def test_clear_other_users_list_is_404(self):
+        response = self.client.post(self.clear_url(self.other_list))
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Todo.objects.filter(pk=self.bob_done.pk).exists())
+
+    def test_clear_unknown_list_is_404(self):
+        response = self.client.post(
+            reverse("list_clear_completed", args=[TodoList.objects.count() + 100])
+        )
+        self.assertEqual(response.status_code, 404)
+
+    def test_get_does_not_clear(self):
+        response = self.client.get(self.clear_url(self.todo_list))
+        self.assertEqual(response.status_code, 405)
+        self.assertEqual(self.todo_list.todos.filter(done=True).count(), 2)
+
+    def test_clear_needs_login(self):
+        self.client.logout()
+        url = self.clear_url(self.todo_list)
+        response = self.client.post(url)
+        self.assertRedirects(response, f"{reverse('login')}?next={url}")
+        self.assertEqual(self.todo_list.todos.filter(done=True).count(), 2)
+
+    def test_clear_with_nothing_done(self):
+        home = TodoList.objects.create(owner=self.user, name="Home")
+        Todo.objects.create(title="Water plants", todo_list=home)
+        response = self.client.post(self.clear_url(home), follow=True)
+        self.assertRedirects(response, home.get_absolute_url())
+        self.assertEqual(home.todos.count(), 1)
+        self.assertEqual(Todo.objects.count(), 6)
+        self.assertContains(response, "No completed to-dos to delete.")
+
+    def test_clear_shows_message(self):
+        response = self.client.post(self.clear_url(self.todo_list), follow=True)
+        self.assertContains(response, "Deleted 2 completed to-dos.")
+
+    def test_list_shows_clear_button_with_count(self):
+        response = self.client.get(self.todo_list.get_absolute_url())
+        self.assertContains(response, "Clear completed (2)")
+        self.assertContains(response, self.clear_url(self.todo_list))
+
+    def test_list_hides_clear_button_when_nothing_done(self):
+        home = TodoList.objects.create(owner=self.user, name="Home")
+        Todo.objects.create(title="Water plants", todo_list=home)
+        response = self.client.get(home.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Clear completed")
+        self.assertNotContains(response, self.clear_url(home))
+
+    def test_one_done_todo_uses_singular_words(self):
+        response = self.client.get(self.work_list.get_absolute_url())
+        self.assertContains(response, "Clear completed (1)")
+        self.assertContains(response, "Delete 1 done to-do? This cannot be undone.")
+        response = self.client.post(self.clear_url(self.work_list), follow=True)
+        self.assertContains(response, "Deleted 1 completed to-do.")

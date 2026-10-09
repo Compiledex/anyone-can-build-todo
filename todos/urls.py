@@ -16,6 +16,11 @@ urlpatterns = [
         name="list_member_remove",
     ),
     path("lists/<int:pk>/leave/", views.list_leave, name="list_leave"),
+    path(
+        "lists/<int:pk>/clear-completed/",
+        views.list_clear_completed,
+        name="list_clear_completed",
+    ),
     path("<int:pk>/toggle/", views.todo_toggle, name="todo_toggle"),
     path("<int:pk>/delete/", views.todo_delete, name="todo_delete"),
     path("<int:pk>/edit/", views.todo_edit, name="todo_edit"),

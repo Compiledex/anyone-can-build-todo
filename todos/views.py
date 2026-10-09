@@ -1,5 +1,6 @@
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
+from django.template.defaultfilters import pluralize
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from .forms import ShareForm, TodoForm, TodoListForm
@@ -34,6 +35,8 @@ def render_list_page(request, the_list, form):
         {
             "the_list": the_list,
             "todos": the_list.todos.all(),
+            # Always the whole list: "Clear completed" deletes all of these.
+            "done_count": the_list.todos.filter(done=True).count(),
             "my_lists": request.user.todo_lists.all(),
             "form": form,
             # Only the owner sees the members and the share form.
@@ -107,6 +110,23 @@ def list_delete(request, pk):
         "todos/list_confirm_delete.html",
         {"the_list": the_list, "todo_count": the_list.todos.count()},
     )
+
+
+@require_POST
+def list_clear_completed(request, pk):
+    """Delete every done to-do of this one list. Never reads to-do ids from the form."""
+    # The owner and the members may clear; a stranger gets 404.
+    the_list = get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
+    # delete() also counts rows deleted with each to-do, so use the Todo number only.
+    _, per_model = the_list.todos.filter(done=True).delete()
+    deleted = per_model.get("todos.Todo", 0)
+    if deleted:
+        messages.success(
+            request, f"Deleted {deleted} completed to-do{pluralize(deleted)}."
+        )
+    else:
+        messages.info(request, "No completed to-dos to delete.")
+    return redirect(the_list)
 
 
 @require_POST
