@@ -386,3 +386,33 @@ class ClearCompletedJourneyTests(BrowserTestCase):
         expect(page.locator("ul.todos > li")).to_have_count(1)
         expect(page.get_by_role("listitem").filter(has_text="Pay rent")).to_be_visible()
         expect(page.get_by_text("Clear completed")).to_have_count(0)
+
+
+class BreakATodoIntoStepsTests(BrowserTestCase):
+    def test_break_a_todo_into_steps(self):
+        page = self.page
+        self.log_in_as(make_user_with_inbox())
+        page.goto(self.live_server_url)  # Opens the list page.
+
+        page.get_by_label("New to-do").fill("Move house")
+        page.get_by_role("button", name="Add").click()
+        page.get_by_text("Add steps").click()
+        for title in ["Pack books", "Book a van"]:
+            page.get_by_label("New step for Move house").fill(title)
+            page.get_by_role("button", name="Add step").click()
+
+        # Full button names: the "Move house" row also contains the steps.
+        page.get_by_role("button", name="Done: Pack books").click()
+        expect(page.get_by_text("Steps: 1 of 2 done")).to_be_visible()
+
+        # The steps are still open after the click, and only the step is done.
+        expect(page.get_by_role("button", name="Undo: Pack books")).to_be_visible()
+        van = page.locator("li.step").filter(has_text="Book a van")
+        expect(van).to_be_visible()
+        expect(van).not_to_have_class(DONE)
+        expect(van.locator(".step-title")).not_to_have_css(
+            "text-decoration-line", "line-through"
+        )
+        expect(
+            page.locator("ul.todos > li").filter(has_text="Move house")
+        ).not_to_have_class(DONE)
