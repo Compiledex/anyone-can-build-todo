@@ -126,7 +126,7 @@ class ListTests(LoggedInTestCase):
         )
         Todo.objects.create(title="Call home", todo_list=self.todo_list)
         response = self.list_page()
-        self.assertContains(response, "<details", count=1)
+        self.assertContains(response, '<details class="notes"', count=1)
 
     def test_other_user_cannot_see_description(self):
         Todo.objects.create(

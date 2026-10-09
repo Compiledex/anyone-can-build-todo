@@ -1,14 +1,16 @@
 from django.contrib import messages
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.defaultfilters import pluralize
+from django.urls import reverse
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
-from .forms import ShareForm, TodoForm, TodoListForm
-from .models import Todo, TodoList
+from .forms import ShareForm, SubtaskForm, TodoForm, TodoListForm
+from .models import Subtask, Todo, TodoList
 
 # A view that reads or changes a list or its to-dos finds the list with
 #   get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
-# or the to-do with get_visible_todo(request.user, pk). That is the person's own
+# or the to-do with get_visible_todo(request.user, pk), or a step with
+# get_visible_subtask(request.user, pk). That is the person's own
 # lists plus the lists shared with them.
 # Only rename, delete, share and remove-member are for the owner alone. They use
 #   get_object_or_404(TodoList, pk=pk, owner=request.user)
@@ -20,6 +22,28 @@ def get_visible_todo(user, pk):
     return get_object_or_404(
         Todo, pk=pk, todo_list__in=TodoList.objects.visible_to(user)
     )
+
+
+def get_visible_subtask(user, pk):
+    """A step of a to-do in a list this user owns or is a member of, or 404.
+
+    select_related loads the to-do in the same query: back_to_steps needs it.
+    """
+    return get_object_or_404(
+        Subtask.objects.select_related("todo"),
+        pk=pk,
+        todo__todo_list__in=TodoList.objects.visible_to(user),
+    )
+
+
+def back_to_steps(todo):
+    """Back to the to-do's list, with this to-do's steps open.
+
+    Built only from numbers in the database, never from the request, so it can
+    never send the browser to another website.
+    """
+    url = reverse("list_detail", args=[todo.todo_list_id])
+    return redirect(f"{url}?open={todo.pk}#todo-{todo.pk}")
 
 
 def render_list_page(request, the_list, form):
@@ -34,8 +58,8 @@ def render_list_page(request, the_list, form):
         "todos/todo_list.html",
         {
             "the_list": the_list,
-            # All tags in one query, not one query per row.
-            "todos": the_list.todos.prefetch_related("tags"),
+            # All tags and all steps in one query each, not one query per row.
+            "todos": the_list.todos.prefetch_related("tags", "subtasks"),
             # Always the whole list: "Clear completed" deletes all of these.
             "done_count": the_list.todos.filter(done=True).count(),
             "my_lists": request.user.todo_lists.all(),
@@ -201,3 +225,31 @@ def list_leave(request, pk):
     the_list.members.remove(request.user)  # The to-dos they added stay.
     messages.success(request, "You left the list.")
     return redirect("todo_list")
+
+
+@require_POST
+def subtask_add(request, todo_pk):
+    todo = get_visible_todo(request.user, todo_pk)
+    form = SubtaskForm(request.POST)
+    if form.is_valid():
+        subtask = form.save(commit=False)
+        subtask.todo = todo  # Only from the address, never from the form.
+        subtask.save()
+    else:
+        messages.error(request, "A step needs a title of 1 to 200 characters.")
+    return back_to_steps(todo)
+
+
+@require_POST
+def subtask_toggle(request, pk):
+    subtask = get_visible_subtask(request.user, pk)
+    subtask.done = not subtask.done
+    subtask.save()  # The to-do itself does not change.
+    return back_to_steps(subtask.todo)
+
+
+@require_POST
+def subtask_delete(request, pk):
+    subtask = get_visible_subtask(request.user, pk)
+    subtask.delete()
+    return back_to_steps(subtask.todo)

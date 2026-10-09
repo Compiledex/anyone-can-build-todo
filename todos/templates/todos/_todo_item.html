@@ -1,5 +1,5 @@
 {% with overdue=todo.is_overdue %}
-<li class="{% if todo.done %}done{% elif overdue %}overdue{% endif %}">
+<li id="todo-{{ todo.pk }}" class="{% if todo.done %}done{% elif overdue %}overdue{% endif %}">
   <div class="main">
     <span class="title">{{ todo.title }}</span>
     {% if todo.description %}
@@ -26,5 +26,38 @@
     {% csrf_token %}
     <button type="submit">Delete</button>
   </form>
+  {# The steps of one to-do, inside its <li>. Opens and closes with no JavaScript. #}
+  {# `open` from the address is only compared with the id, never printed. #}
+  {% with progress=todo.subtask_progress %}
+  <details class="steps"{% if request.GET.open == todo.pk|stringformat:"d" %} open{% endif %}>
+    <summary>{% if progress.1 %}Steps: {{ progress.0 }} of {{ progress.1 }} done{% else %}Add steps{% endif %}</summary>
+    {% if progress.1 %}
+      <ul class="steps">
+        {% for step in todo.subtasks.all %}
+          <li class="step{% if step.done %} done{% endif %}">
+            <span class="step-title">{{ step.title }}</span>
+            <form method="post" action="{% url 'subtask_toggle' step.pk %}">
+              {% csrf_token %}
+              {% if step.done %}
+                <button type="submit" aria-label="Undo: {{ step.title }}">Undo</button>
+              {% else %}
+                <button type="submit" aria-label="Done: {{ step.title }}">Done</button>
+              {% endif %}
+            </form>
+            <form method="post" action="{% url 'subtask_delete' step.pk %}">
+              {% csrf_token %}
+              <button type="submit" aria-label="Delete step: {{ step.title }}">Delete</button>
+            </form>
+          </li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    <form class="add-step" method="post" action="{% url 'subtask_add' todo.pk %}">
+      {% csrf_token %}
+      <input name="title" aria-label="New step for {{ todo.title }}" maxlength="200" required>
+      <button type="submit">Add step</button>
+    </form>
+  </details>
+  {% endwith %}
 </li>
 {% endwith %}

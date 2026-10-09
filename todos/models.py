@@ -116,6 +116,15 @@ class Todo(models.Model):
         tags = [Tag.objects.get_or_create(owner=owner, name=name)[0] for name in names]
         self.tags.set(tags)
 
+    def subtask_progress(self):
+        """(number done, number of steps). Uses the prefetched steps, so no new query.
+
+        Never self.subtasks.filter(...).count(): that skips the prefetch and asks
+        the database again for every to-do.
+        """
+        steps = self.subtasks.all()
+        return sum(1 for step in steps if step.done), len(steps)
+
     def is_overdue(self, today=None):
         """True when the due date has passed and the to-do is not done.
 
@@ -126,3 +135,22 @@ class Todo(models.Model):
         if today is None:
             today = timezone.localdate()
         return self.due_date < today
+
+
+class Subtask(models.Model):
+    """A small step inside a to-do, like "Pack books" in "Move house".
+
+    It has no owner and no list: whoever may see or change its to-do may see or
+    change its steps. A step has no steps (one level only).
+    """
+
+    todo = models.ForeignKey(Todo, on_delete=models.CASCADE, related_name="subtasks")
+    title = models.CharField(max_length=200)
+    done = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["created_at", "id"]
+
+    def __str__(self):
+        return self.title
