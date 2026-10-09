@@ -22,11 +22,38 @@ class ListTests(TestCase):
         response = self.client.get(reverse("todo_list"))
         self.assertEqual(list(response.context["todos"]), [older, newer])
 
+    def test_add_input_keeps_its_browser_checks(self):
+        response = self.client.get(reverse("todo_list"))
+        page = response.content.decode()
+        start = page.index('<input name="title"')
+        tag = page[start : page.index(">", start)].split()
+        self.assertIn('maxlength="200"', tag)
+        self.assertIn("required", tag)
+        self.assertIn("autofocus", tag)
+        self.assertIn('placeholder="What', tag)
+
+    def test_stored_title_is_escaped(self):
+        Todo.objects.create(title="<b>x</b>")
+        response = self.client.get(reverse("todo_list"))
+        self.assertContains(response, "&lt;b&gt;x&lt;/b&gt;")
+        self.assertNotContains(response, "<b>x</b>")
+
 
 class AddTests(TestCase):
     def test_add_a_todo(self):
-        self.client.post(reverse("todo_add"), {"title": "Buy milk"})
+        response = self.client.post(reverse("todo_add"), {"title": "Buy milk"})
+        self.assertRedirects(response, reverse("todo_list"))
         self.assertEqual(Todo.objects.get().title, "Buy milk")
+
+    def test_add_ignores_done(self):
+        self.client.post(reverse("todo_add"), {"title": "x", "done": "on"})
+        self.assertFalse(Todo.objects.get().done)
+
+    def test_typed_title_is_escaped_on_the_error_page(self):
+        title = '"><b>x' + "a" * 200
+        response = self.client.post(reverse("todo_add"), {"title": title})
+        self.assertContains(response, 'value="&quot;&gt;&lt;b&gt;x')
+        self.assertNotContains(response, '"><b>x')
 
     def test_empty_title_is_not_added(self):
         self.client.post(reverse("todo_add"), {"title": "   "})
@@ -41,6 +68,7 @@ class AddTests(TestCase):
         self.assertContains(response, "Call home")
         self.assertContains(response, 'id="id_title_error"')
         self.assertContains(response, 'aria-describedby="id_title_error"')
+        self.assertContains(response, 'aria-invalid="true"')
 
     def test_long_title_is_not_added(self):
         title = "a" * 201
