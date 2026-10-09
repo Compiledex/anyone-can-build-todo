@@ -2,7 +2,7 @@ from django import forms
 from django.contrib.auth import get_user_model
 from django.db import transaction
 
-from .models import Todo, TodoList
+from .models import Subtask, Todo, TodoList
 from .tags import parse_tags
 
 
@@ -74,6 +74,14 @@ class TodoForm(forms.ModelForm):
             todo = super().save()
             todo.set_tags(self.cleaned_data["tag_names"])
         return todo
+
+
+class SubtaskForm(forms.ModelForm):
+    """The title of a new step. The view sets the to-do, never the form."""
+
+    class Meta:
+        model = Subtask
+        fields = ["title"]
 
 
 class TodoListForm(forms.ModelForm):

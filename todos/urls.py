@@ -24,4 +24,7 @@ urlpatterns = [
     path("<int:pk>/toggle/", views.todo_toggle, name="todo_toggle"),
     path("<int:pk>/delete/", views.todo_delete, name="todo_delete"),
     path("<int:pk>/edit/", views.todo_edit, name="todo_edit"),
+    path("<int:todo_pk>/subtasks/add/", views.subtask_add, name="subtask_add"),
+    path("subtasks/<int:pk>/toggle/", views.subtask_toggle, name="subtask_toggle"),
+    path("subtasks/<int:pk>/delete/", views.subtask_delete, name="subtask_delete"),
 ]
