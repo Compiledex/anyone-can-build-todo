@@ -4,17 +4,33 @@
 
 {% block content %}
   <nav class="lists" aria-label="Your lists">
-    {% for a_list in my_lists %}
-      <a href="{{ a_list.get_absolute_url }}"{% if a_list.pk == the_list.pk %} aria-current="page"{% endif %}>{{ a_list.name }}</a>
-    {% endfor %}
-    <a href="{% url 'list_create' %}">+ New list</a>
+    <p class="menu" id="my-lists">
+      <span class="menu-label">My lists:</span>
+      {% for a_list in my_lists %}
+        <a href="{{ a_list.get_absolute_url }}"{% if a_list.pk == the_list.pk %} aria-current="page"{% endif %}>{{ a_list.name }}</a>
+      {% endfor %}
+      <a href="{% url 'list_create' %}">+ New list</a>
+    </p>
+    {% if shared_lists %}
+      <p class="menu" id="shared-lists">
+        <span class="menu-label">Shared with me:</span>
+        {% for a_list in shared_lists %}
+          <a href="{{ a_list.get_absolute_url }}"{% if a_list.pk == the_list.pk %} aria-current="page"{% endif %}>{{ a_list.name }} ({{ a_list.owner.username }})</a>
+        {% endfor %}
+      </p>
+    {% endif %}
   </nav>
 
   <h1>{{ the_list.name }}</h1>
-  <p class="list-actions">
-    <a href="{% url 'list_rename' the_list.pk %}">Rename</a>
-    <a href="{% url 'list_delete' the_list.pk %}">Delete list</a>
-  </p>
+  {# Only for a clean page. The views check who may do what. #}
+  {% if is_owner %}
+    <p class="list-actions">
+      <a href="{% url 'list_rename' the_list.pk %}">Rename</a>
+      <a href="{% url 'list_delete' the_list.pk %}">Delete list</a>
+    </p>
+  {% else %}
+    <p class="list-actions">Shared by {{ the_list.owner.username }}</p>
+  {% endif %}
 
   {% if form.errors %}
     <div class="form-errors">
@@ -42,4 +58,36 @@
       <li>Nothing to do yet. Add something above.</li>
     {% endfor %}
   </ul>
+
+  {% if is_owner %}
+    <section class="sharing" aria-labelledby="sharing-heading">
+      <h2 id="sharing-heading">Sharing</h2>
+      {% if members %}
+        <ul class="members">
+          {% for member in members %}
+            <li>
+              <span class="title">{{ member.username }}</span>
+              <form method="post" action="{% url 'list_member_remove' the_list.pk member.pk %}">
+                {% csrf_token %}
+                <button type="submit" aria-label="Remove {{ member.username }}">Remove</button>
+              </form>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <p class="muted">Only you can see this list.</p>
+      {% endif %}
+      <form class="add" method="post" action="{% url 'list_share' the_list.pk %}">
+        {% csrf_token %}
+        <input name="username" aria-label="Username to share with" placeholder="Username"
+               maxlength="150" required autocomplete="off">
+        <button type="submit">Share</button>
+      </form>
+    </section>
+  {% else %}
+    <form class="leave" method="post" action="{% url 'list_leave' the_list.pk %}">
+      {% csrf_token %}
+      <button type="submit">Leave this list</button>
+    </form>
+  {% endif %}
 {% endblock %}

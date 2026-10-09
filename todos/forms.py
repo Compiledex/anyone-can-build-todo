@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth import get_user_model
 
 from .models import Todo, TodoList
 
@@ -37,3 +38,30 @@ class TodoListForm(forms.ModelForm):
         if others.exists():
             raise forms.ValidationError(f"You already have a list called “{name}”.")
         return name
+
+
+class ShareForm(forms.Form):
+    """The username of the person the owner shares a list with.
+
+    A valid form gives the User in cleaned_data["username"].
+    """
+
+    username = forms.CharField(max_length=150)
+
+    def __init__(self, *args, todo_list, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.todo_list = todo_list
+
+    def clean_username(self):
+        name = self.cleaned_data["username"]
+        User = get_user_model()
+        try:
+            # Exact, like the login page. A switched-off user is "no user".
+            user = User.objects.get(username=name, is_active=True)
+        except User.DoesNotExist:
+            raise forms.ValidationError("No user with that username.") from None
+        if user == self.todo_list.owner:
+            raise forms.ValidationError("You already own this list.")
+        if self.todo_list.members.filter(pk=user.pk).exists():
+            raise forms.ValidationError(f"{user.username} is already a member.")
+        return user

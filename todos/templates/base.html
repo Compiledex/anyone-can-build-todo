@@ -29,7 +29,9 @@
     body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem;
            background: var(--bg); color: var(--text); }
     a { color: var(--text); }
-    nav.lists { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 1rem 0; }
+    nav.lists { margin: 1rem 0; }
+    nav.lists .menu { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 0 0 0.5rem; }
+    .menu-label, .muted { color: var(--muted); }
     nav.lists a[aria-current="page"] { font-weight: bold; text-decoration: none; }
     .list-actions { display: flex; gap: 1rem; margin-top: -0.5rem; }
     .messages { margin-bottom: 1rem; }
@@ -44,8 +46,9 @@
     form.add { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
     form.add input { flex: 1; padding: 0.5rem; font-size: 1rem; }
     form.add input[type=date] { flex: 0 0 auto; }
-    ul.todos { list-style: none; padding: 0; }
-    ul.todos > li { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0;
+    ul.todos, ul.members { list-style: none; padding: 0; }
+    .sharing { margin-top: 2rem; }
+    ul.todos > li, ul.members > li { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0;
                     border-bottom: 1px solid var(--border); }
     li .title { flex: 1; }
     .overdue time, .overdue-label { color: var(--overdue); }
