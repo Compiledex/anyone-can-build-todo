@@ -183,8 +183,12 @@ q = query_form.cleaned_data.get("q", "")  # filled by is_valid() inside apply_li
 - Pass `todos`, `query_form`, `q` and `searching = bool(q)` to the template. Everything else in
   the view stays the same.
 - If another view also shows the list page (for example the add view, when the add form is not
-  valid, renders the list again with the error), it must pass the same things. If there is a
-  helper that builds the list page context, put these lines in that helper, once. Do not copy them.
+  valid, renders the list again with the error), it must pass the same things. That helper
+  exists: #10's `render_list_page(request, the_list, form)` builds the page for `list_detail` and
+  for an invalid add (#18 adds its keys there too). Put these lines **inside it**, once, with
+  `the_list` as the list and `the_list.todos.all()` as the start. On the invalid-add page
+  `request.GET` is empty, so it simply shows the whole list. #13, #14 and #15 add their lines there
+  too. Do not copy them.
 
 ### 5. The page — the list template
 
@@ -291,3 +295,8 @@ What the review changed, and why:
 The plan is **approved**.
 
 - Upper/lower case for æ, ø, å is NOT part of this task. Accept the SQLite limit; it is a small task later.
+
+## Post-review check
+
+- The orchestrator pass made `render_list_page` (#10, extended by #18) the one place that builds
+  the list page. Named it here as the place for the search lines, so #13–#15 follow.

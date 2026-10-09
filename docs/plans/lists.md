@@ -168,7 +168,7 @@ added to a table that has rows, so it must be allowed to be empty at that moment
 Checked, case by case:
 
 - **Empty database** (a new laptop, the tests): no users, so the data step does nothing.
-- **Database with users and to-dos**: every user gets a "Inbox" list; every to-do goes into its
+- **Database with users and to-dos**: every user gets an "Inbox" list; every to-do goes into its
   owner's list. Each user has one list, so there is no name clash.
 - **Backwards** (`migrate todos 0004`): file 3 adds `owner` back (empty allowed) and makes
   `todo_list` optional; file 2 copies `todo.todo_list.owner` into `todo.owner`; file 1 makes
@@ -421,7 +421,9 @@ site, so it also checks the new ones.
   or delete alice's to-do: 404) stay, and now check the lookup through the list.
   `test_add_sets_me_as_owner` checks `todo.todo_list.owner`; `test_add_ignores_owner_in_the_form`
   is replaced by the `todo_list` check in `test_add_a_todo` above; `test_list_shows_only_my_todos`
-  opens alice's list page, not `/`.
+  opens alice's list page, not `/`. `test_invalid_add_shows_only_my_todos` posts to
+  `reverse("todo_add", args=[self.todo_list.pk])` (with no number it fails with
+  `NoReverseMatch`); bob's to-do is in `self.other_list`, so it must still not be on the page.
 
 **Integration, migrations** — in #17's `todos/tests/integration/test_migrations.py`
 (`TransactionTestCase`, Django's `MigrationExecutor`). Create rows only with the **old models**
@@ -481,7 +483,7 @@ The order follows the rule in `AGENTS.md`: write a test, see it fail, then write
 11. **Docs.** `AGENTS.md` and `README.md`: the file table and the addresses.
 12. **Before the commit.** Run `make check` (commit checks, the migration check, all tests).
     Then `make run`, and try it by hand on a copy of a real `db.sqlite3` with to-dos in it: each
-    to-do should be in a "Inbox" list after `migrate`. Then `migrate todos 0004` and `migrate`
+    to-do should be in an "Inbox" list after `migrate`. Then `migrate todos 0004` and `migrate`
     again on the same copy: no error. Look at the page in a narrow window too.
 
 ## Open questions
@@ -544,3 +546,10 @@ What the second review changed, and why:
 The plan is **approved**.
 
 - The default list is called "Inbox" (for new people and in the migration).
+
+## Post-review check
+
+- #17's new `test_invalid_add_shows_only_my_todos` (added by the orchestrator pass) posts to
+  `reverse("todo_add")` with no list number. Added it to "changed tests from #17": after this
+  plan it posts to alice's list, or it fails with `NoReverseMatch`.
+- Grammar after the rename: "a "Inbox" list" became "an "Inbox" list" (two places).

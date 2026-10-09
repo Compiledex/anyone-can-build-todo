@@ -1,7 +1,7 @@
 # Plan: a due date on a to-do (feature #6)
 
 Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
-fixes from two adversarial reviews, and fits the build order (wave 2).
+This version includes the fixes from two adversarial reviews, and fits the build order (wave 2).
 
 **Builds on:**
 
@@ -363,3 +363,7 @@ Changes made by the second adversarial review:
 The plan is **approved**.
 
 - Time zone: keep `TIME_ZONE = "Asia/Tokyo"`, the same as the person's computer.
+
+## Post-review check
+
+- The status edit left half a sentence ("fixes from two adversarial reviews, ...") on its own line. Restored it as a full sentence.

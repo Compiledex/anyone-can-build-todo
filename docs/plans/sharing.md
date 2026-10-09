@@ -362,7 +362,7 @@ Two rules for every test here, so that a test cannot pass while the feature is b
 | `test_member_can_toggle` | Bob toggles "Milk": it is done; the browser goes back to Groceries. |
 | `test_member_can_edit` | Bob's `GET` on edit "Milk" is 200; his `POST` "Oat milk" is saved. |
 | `test_member_can_delete_todo` | Bob deletes "Milk": it is gone. |
-| `test_member_invalid_add_shows_member_page` | Only if `todo_add` shows the page again on an invalid form. Bob posts a title of 201 characters to Groceries: 200, the page has "Shared by alice" and the Leave button, and has no share form and no Remove button. Nothing was added. |
+| `test_member_invalid_add_shows_member_page` | Bob posts a title of 201 characters to Groceries: 200, the page has "Shared by alice" and the Leave button, and has no share form and no Remove button. Nothing was added. |
 | `test_member_tags_go_to_list_owner` | Only if #11 is merged: bob sets tag "fresh" on "Milk": the tag's owner is alice, and bob has no tag. |
 
 If #19 is already merged, also add the two sharing tests from `docs/plans/clear-completed.md`.
@@ -503,8 +503,7 @@ Races (two requests at the same moment), checked by reading Django's code:
 
 ### Count
 
-Integration: 47 new tests (plus 1 if `todo_add` shows the page again on an invalid form, plus 1 if
-#11 is merged, plus 2 if #19 is merged). CUJ: 1 new. No new unit tests. Update the numbers in `README.md` after counting the real tests.
+Integration: 48 new tests (plus 1 if #11 is merged, plus 2 if #19 is merged). CUJ: 1 new. No new unit tests. Update the numbers in `README.md` after counting the real tests.
 
 ## Steps
 
@@ -614,3 +613,9 @@ What the second review changed, and why (checked by running the queries on Djang
 The plan is **approved**.
 
 - Members do not see each other. Only the owner sees the member list.
+
+## Post-review check
+
+- `test_member_invalid_add_shows_member_page` was still "only if `todo_add` shows the page again".
+  After the orchestrator pass #10 always does this through `render_list_page`, so the test is
+  always written. Count: 48 integration tests (was 47 plus that one).

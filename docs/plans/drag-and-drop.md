@@ -68,8 +68,9 @@ menu as "Manual". The address is `?sort=manual`.
     else. A missing id, an extra id, an id from another list (also another user's list), a
     repeated id, or text that is not a number: **400 Bad Request**, and nothing is saved. Because
     the check compares with the ids **in this list**, an id from someone else's list can never be
-    written. A subtask's id is a number from the `Subtask` table, not a to-do id in this list, so
-    it is refused by the same check. This also covers the case where someone else added or deleted a to-do in a shared
+    written. Every posted number is read as a **to-do** id, never as a `Subtask` id. A subtask's
+    number is just a number: if it is not the id of a to-do in this list, the same check refuses
+    it; if it happens to be one, it only names that to-do. This also covers the case where someone else added or deleted a to-do in a shared
     list a second ago: the page is out of date, so we refuse, and the page reloads.
   - The check and the save happen **inside the same transaction**, so a to-do added between the
     check and the save cannot be missed.
@@ -150,7 +151,7 @@ menu as "Manual". The address is `?sort=manual`.
 | `todos/migrations/00NN_fill_todo_position.py` | Made with `makemigrations --empty`, then the one `RunPython` function written in it (see step 3). This is the one migration we write code into; Django makes the file, we fill in the function. |
 | `todos/ordering.py` (new) | `parse_ids(values)`: turns the posted strings into a list of whole numbers, or raises `ValueError` for text or repeats. Pure Python, so it can be unit tested. `save_order(todo_list, ids)`: checks and saves an order (see step 5). |
 | `todos/queries.py` | One entry in `SORT_OPTIONS`: `"manual": ("Manual", ("position", "created_at", "pk"))`. Use `"pk"`, not `"id"`, so #14's tie-breaker unit test keeps passing. The `sort` choices of `TodoQueryForm` are built from `SORT_OPTIONS`, so `forms.py` does not change. A small function `can_reorder(form)`: `True` only when `chosen_sort(form)` is `manual` and there is no `q` and no `status`. |
-| `todos/views.py` | New views `todo_reorder` and `todo_move`. `list_detail` passes `can_reorder` to the template. |
+| `todos/views.py` | New views `todo_reorder` and `todo_move`. `render_list_page` passes `can_reorder` to the template. |
 | `todos/urls.py` | `lists/<int:pk>/reorder/` (name `todo_reorder`) and `<int:pk>/move/` (name `todo_move`), the same prefix as the other to-do addresses. |
 | `todos/templates/todos/todo_list.html` | `{% load static %}`. The `<ul>` gets `data-reorder-url` when `can_reorder`. The hidden form with `{% csrf_token %}`. `<script src="{% static 'todos/reorder.js' %}" defer>`. The "Clear the filter to change the order." line. |
 | `todos/templates/todos/_todo_item.html` | When `can_reorder`: `data-id` on the `<li>`, the handle `<span class="handle" draggable="true" aria-hidden="true">⠿</span>`, and the two Move forms. |
@@ -241,7 +242,8 @@ recurring copy (#8) is made: if it uses `pk = None` and then `save()`, this work
   Read `direction`; not `up` or `down` → 400. Get the ids of the list's to-dos in manual
   order (`position`, `created_at`, `pk`). If the to-do has a neighbour in that direction, swap the
   two ids and call `save_order`. Redirect to the list page with `?sort=manual#todo-<pk>`.
-- `list_detail`: pass `can_reorder = can_reorder(form)` to the template.
+- The list page (#10's `render_list_page`, where #12 put the query form): pass
+  `can_reorder = can_reorder(query_form)` to the template.
 
 ### 7. The page
 
@@ -249,8 +251,8 @@ recurring copy (#8) is made: if it uses `pk = None` and then `save()`, this work
   from `SORT_OPTIONS` (#14). The menu is #14's own small GET form with hidden `q` and `status`
   inputs, so choosing "Manual" keeps the search and the filter (and then the "Clear the filter"
   line shows). Nothing to change in that form.
-- When `can_reorder`, the `<ul>` gets `data-reorder-url="{% url 'todo_reorder' todo_list.pk %}"`
-  (use the name the list view already passes to the template), and each row (in
+- When `can_reorder`, the `<ul>` gets `data-reorder-url="{% url 'todo_reorder' the_list.pk %}"`
+  (`the_list` is the name #10's `render_list_page` gives the list in the template), and each row (in
   `_todo_item.html`) gets `data-id`, the handle, and two small forms:
   `<button name="direction" value="up" aria-label="Move up: {{ todo.title }}" title="Move up: {{ todo.title }}">↑</button>`
   and the same for down. The `aria-label` says which to-do moves, because a screen reader would
@@ -323,7 +325,7 @@ otherwise.
 | `test_reorder_needs_csrf_token` | With `Client(enforce_csrf_checks=True)`, logged in, no token: 403, nothing saved. |
 | `test_reorder_other_users_list_is_404` | User B posts to user A's list (with A's ids): 404, A's order unchanged. |
 | `test_reorder_with_other_users_id_is_400` | A posts the ids of A's list, but with one id **replaced** by the id of a to-do in user B's list (same number of ids): 400, nothing saved in either list. |
-| `test_reorder_with_missing_id_is_400` | Only two of three ids: 400, nothing saved. (A subtask's pk is also just "an id not in this list", so it needs no test of its own: the other-user test above covers that case.) |
+| `test_reorder_with_missing_id_is_400` | Only two of three ids: 400, nothing saved. (A subtask's pk is read as a to-do id like any other number, so it needs no test of its own: the missing-id and other-user tests cover it.) |
 | `test_reorder_with_bad_id_is_400` | One id is `abc`: 400 (checks the view uses `parse_ids`). |
 | `test_shared_member_can_reorder` | A user the list is shared with can reorder it: 204, and the owner sees the new order. |
 | `test_move_up_swaps_with_neighbour` | Move the second to-do up: it becomes first. Redirects to `?sort=manual#todo-<pk>`. |
@@ -401,3 +403,13 @@ What the review changed, and why:
 The plan is **approved**.
 
 - "Manual" is NOT the default sort. The default stays "created".
+
+## Post-review check
+
+- The orchestrator pass said a subtask's id "is refused by the same check". Not always: `Subtask`
+  and `Todo` number their rows separately, so a subtask's number can equal a to-do id in this list.
+  Reworded: every posted number is read as a to-do id, so nothing about subtasks can be written.
+- The template used `todo_list.pk`; the list page has the list as `the_list` (#10's
+  `render_list_page`). Now `the_list.pk`.
+- `can_reorder` was passed in `list_detail`; the list page context is built in #10's
+  `render_list_page`, where #12 put `query_form`, so it goes there.

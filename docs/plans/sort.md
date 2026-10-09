@@ -122,9 +122,9 @@ We do **not** build it now. But the design leaves one clear place for it:
 |---|---|
 | `todos/queries.py` | `DEFAULT_SORT`, `SORT_OPTIONS`, `chosen_sort(form)`, and one sort line at the end of `apply_list_query`. |
 | `todos/forms.py` | `TodoQueryForm` gets the field `sort` (a `ChoiceField` built from `SORT_OPTIONS`). |
-| `todos/views.py` | The list view passes `current_sort` to the template (one line). |
-| The link helper from #13 | The filter links and "Show all" keep `sort`. |
-| `todos/templates/todos/todo_list.html` | The "Sort by" form; a hidden `sort` input in the search form. |
+| `todos/views.py` | The list view passes `current_sort` and `show_all_query` to the template (two lines). |
+| The link helper from #13 | No change: `list_query` already keeps `sort` in the filter links. |
+| `todos/templates/todos/todo_list.html` | The "Sort by" form; a hidden `sort` input in the search form; the "Show all" link keeps `sort`. |
 | `todos/tests/unit/test_sort.py` (new) | Unit tests for the `sort` field and `SORT_OPTIONS`. |
 | `todos/tests/integration/test_sort.py` (new) | Integration tests for the order on the page. |
 | `AGENTS.md`, `README.md` | A rule about `order_by`; new test numbers. |
@@ -206,7 +206,8 @@ class TodoQueryForm(forms.Form):
 ### 5. The view — `todos/views.py`
 
 In the list view, after `apply_list_query(...)` (from #12), pass one more value to the template:
-`current_sort = chosen_sort(query_form)`. Nothing else in the view changes. Who may see which
+`current_sort = chosen_sort(query_form)`, and one for the "Show all" link (see step 6):
+`show_all_query = list_query(query_form.cleaned_data, q="", status="")`. Nothing else in the view changes. Who may see which
 list is still checked first, so a list that is not the person's is still a 404, with or without
 `sort`.
 
@@ -237,8 +238,13 @@ Write `DEFAULT_SORT` into the template context instead of `"created"` if you pre
 
 **The filter links and "Show all"** (from #13): #13's helper `list_query(data, **changes)` already
 copies every cleaned `TodoQueryForm` field, so it keeps `sort` with no change to the helper. Do not
-add a `sort` argument. Only check that it really does (the test below), and that a missing or
-invalid `sort` is cleaned to `""` and left out of the address, so links stay short.
+add a `sort` argument. A missing or invalid `sort` is not in `cleaned_data` (and an empty one is
+`""`), so it is left out of the address.
+
+**But "Show all" is not built by the helper.** #12 and #13 write it as `{{ request.path }}`, which
+drops `sort`. Change it to `{{ request.path }}{{ show_all_query }}` (the view line in step 5), so
+"Show all" clears the search and the filter but keeps the order. The test
+`test_filter_links_and_show_all_keep_sort` checks both.
 
 Colors come from the CSS variables on `:root` (wave 0), so dark mode (#20) works. No new color is
 needed.
@@ -255,7 +261,6 @@ checked without a database.
 | `test_allowed_sort_keys_are_kept` | `TodoQueryForm({"sort": key})`, then `form.is_valid()` (it fills `cleaned_data`), for each of `created`, `due`, `priority`, `title`: `chosen_sort` gives the same key. |
 | `test_bad_sort_key_gives_default` | `"bogus"`, `"-created_at"`, `"todo_list__owner__password"`, `"TITLE"`, `""` and no `sort` at all each give `"created"`. |
 | `test_every_option_ends_with_tie_breakers` | The order of every entry in `SORT_OPTIONS` ends with `"created_at", "pk"`. This also guards the future `manual` option. |
-| `test_link_helper_keeps_sort` | #13's `list_query` with cleaned data that has `sort="title"` keeps `sort=title` in the link it builds, with no change to the helper. |
 
 **Integration** — `todos/tests/integration/test_sort.py`, Django test client, class `SortTests`.
 Each test logs in as user A and opens A's list. Order is checked with
@@ -272,6 +277,7 @@ sort does nothing.
 | `test_bad_sort_shows_default_order` | `?sort=-created_at` gives status 200 and the oldest-first order (if the text reached `order_by`, it would be newest first). |
 | `test_sort_menu_shows_current_choice` | With `?sort=due`, the "Due date" `<option>` has `selected` (checked with `assertContains(..., html=True)`). |
 | `test_sort_combines_with_search_and_filter` | `?q=milk&status=open&sort=title` shows only the open to-dos that match "milk", in title order. |
+| `test_filter_links_and_show_all_keep_sort` | With `?q=xyz&sort=title` (nothing matches): every filter link and the "Show all" link contain `sort=title`, and "Show all" has no `q`. (#13's unit test `test_list_query_keeps_unknown_future_fields` already checks the helper itself; this checks the page passes `sort` to it, and the "Show all" change.) |
 | `test_forms_keep_each_other` | With `?q=milk&status=open&sort=title`: the sort form has hidden `q=milk` and `status=open`, and the search form has hidden `sort=title`. |
 | `test_other_users_list_with_sort_is_404` | User B opens user A's list with `?sort=due`: 404. |
 
@@ -330,3 +336,13 @@ What the review changed, and why:
 The plan is **approved**.
 
 - Title order for æ, ø, å on SQLite is accepted for now; fixing it is a small task later.
+
+## Post-review check
+
+- The orchestrator pass said `list_query` keeps `sort`, so nothing else changes. True for the filter
+  links, but "Show all" is `{{ request.path }}` in #12/#13 and does not use the helper, so it would
+  drop the order, against this plan's own decision. Added `show_all_query` in the view and the
+  changed link.
+- `test_link_helper_keeps_sort` only repeated #13's `test_list_query_keeps_unknown_future_fields`
+  (the same rule, tested twice, and it could not fail after #13). Replaced it with the integration
+  test `test_filter_links_and_show_all_keep_sort`, which fails if the page drops `sort`.
