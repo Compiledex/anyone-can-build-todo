@@ -314,12 +314,34 @@ class EditTests(LoggedInTestCase):
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'value="Buy mlik"')
+        self.assertContains(
+            response, f'<a href="{self.todo_list.get_absolute_url()}">Cancel</a>'
+        )
 
     def test_edit_page_shows_every_form_field(self):
         response = self.client.get(self.url)
         for name in response.context["form"].fields:
             with self.subTest(field=name):
                 self.assertContains(response, f'name="{name}"')
+
+    def test_get_does_not_change_data(self):
+        self.client.get(self.url, {"title": "Hacked"})
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy mlik")
+
+    def test_heading_is_fixed_and_title_is_escaped(self):
+        self.todo.title = '"><script>x</script>'
+        self.todo.save()
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "<script>x")
+        self.assertContains(response, "<h1>Edit to-do</h1>")
+
+    def test_edit_ignores_next(self):
+        response = self.client.post(
+            self.url + "?next=https://evil.com",
+            self.edit_data(self.todo, title="Buy milk", next="https://evil.com"),
+        )
+        self.assertEqual(response["Location"], self.todo_list.get_absolute_url())
 
     def test_edit_saves_new_title(self):
         response = self.client.post(
