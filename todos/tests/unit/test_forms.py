@@ -2,7 +2,7 @@ from datetime import date
 
 from django.test import SimpleTestCase
 
-from todos.forms import TodoForm
+from todos.forms import NoteField, TodoForm
 from todos.models import Todo
 
 
@@ -12,3 +12,6 @@ class TodoFormTests(SimpleTestCase):
         html = str(TodoForm(instance=todo)["due_date"])
         self.assertIn('type="date"', html)
         self.assertIn('value="2030-01-15"', html)
+
+    def test_note_field_turns_crlf_into_lf(self):
+        self.assertEqual(NoteField().clean("a\r\nb"), "a\nb")

@@ -209,10 +209,21 @@ class FixATypoTests(BrowserTestCase):
         row = page.get_by_role("listitem").filter(has_text="Buy mlik")
         row.get_by_role("link", name="Edit").click()
         page.get_by_label("Title").fill("Buy milk")
+        page.get_by_label("Notes").fill(
+            "The lactose-free one.\nAlso ask about oat milk."
+        )
         page.get_by_role("button", name="Save").click()
 
-        expect(page.get_by_role("listitem").filter(has_text="Buy milk")).to_be_visible()
+        row = page.get_by_role("listitem").filter(has_text="Buy milk")
+        expect(row).to_be_visible()
         expect(page.get_by_text("Buy mlik")).to_have_count(0)
+
+        # The note is closed until the person opens it.
+        note = row.get_by_text("Also ask about oat milk.")
+        expect(note).to_be_hidden()
+        row.get_by_text("Notes").click()
+        expect(row.get_by_text("The lactose-free one.")).to_be_visible()
+        expect(note).to_be_visible()
 
 
 class ShareAListTests(BrowserTestCase):

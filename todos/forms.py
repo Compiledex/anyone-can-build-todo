@@ -4,6 +4,13 @@ from django.contrib.auth import get_user_model
 from .models import Todo, TodoList
 
 
+class NoteField(forms.CharField):
+    """A text field that counts a line break as one character, as the browser does."""
+
+    def to_python(self, value):
+        return super().to_python(value).replace("\r\n", "\n")
+
+
 class TodoForm(forms.ModelForm):
     # Only YYYY-MM-DD, the format the browser's date picker sends. Other formats,
     # like 10/12/2026, can mean two different dates.
@@ -15,7 +22,10 @@ class TodoForm(forms.ModelForm):
 
     class Meta:
         model = Todo
-        fields = ["title", "due_date"]
+        fields = ["title", "due_date", "description"]
+        field_classes = {"description": NoteField}
+        labels = {"description": "Notes"}
+        widgets = {"description": forms.Textarea(attrs={"rows": 4})}
 
 
 class TodoListForm(forms.ModelForm):

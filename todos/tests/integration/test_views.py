@@ -83,6 +83,44 @@ class ListTests(LoggedInTestCase):
         response = self.list_page()
         self.assertNotContains(response, OVERDUE_LABEL, html=True)
 
+    def test_list_shows_description_with_line_breaks(self):
+        Todo.objects.create(
+            title="Buy milk",
+            todo_list=self.todo_list,
+            description="Line one\nLine two",
+        )
+        response = self.list_page()
+        self.assertContains(response, '<details class="notes">')
+        self.assertContains(response, "Line one<br>Line two")
+
+    def test_list_escapes_description(self):
+        Todo.objects.create(
+            title="Buy milk",
+            todo_list=self.todo_list,
+            description="<script>alert(1)</script>",
+        )
+        response = self.list_page()
+        self.assertContains(response, "&lt;script&gt;alert(1)&lt;/script&gt;")
+        self.assertNotContains(response, "<script>alert(1)")
+
+    def test_details_only_for_todos_with_a_note(self):
+        Todo.objects.create(
+            title="Buy milk", todo_list=self.todo_list, description="Oat milk"
+        )
+        Todo.objects.create(title="Call home", todo_list=self.todo_list)
+        response = self.list_page()
+        self.assertContains(response, "<details", count=1)
+
+    def test_other_user_cannot_see_description(self):
+        Todo.objects.create(
+            title="Buy milk", todo_list=self.todo_list, description="Secret note"
+        )
+        self.assertContains(self.list_page(), "Secret note")
+        other = self.client_for(self.other_user)
+        response = other.get(self.other_list.get_absolute_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, "Secret note")
+
 
 class AddTests(LoggedInTestCase):
     def add_url(self):
@@ -144,6 +182,11 @@ class AddTests(LoggedInTestCase):
             response, "Ensure this value has at most 200 characters (it has 201)."
         )
         self.assertContains(response, f'value="{title}"')
+
+    def test_add_still_works_without_description(self):
+        response = self.client.post(self.add_url(), {"title": "Buy milk"})
+        self.assertRedirects(response, self.todo_list.get_absolute_url())
+        self.assertEqual(Todo.objects.get().description, "")
 
     def test_add_a_todo_with_a_due_date(self):
         self.client.post(
@@ -504,3 +547,73 @@ class EditTests(LoggedInTestCase):
     def test_list_has_edit_link(self):
         response = self.client.get(self.todo_list.get_absolute_url())
         self.assertContains(response, f'href="{self.url}"')
+
+    def test_edit_page_shows_notes_field(self):
+        self.todo.description = "Oat milk"
+        self.todo.save()
+        response = self.client.get(self.url)
+        self.assertContains(response, "Notes:</label>")
+        self.assertContains(response, '<textarea name="description"')
+        self.assertContains(response, 'maxlength="2000"')
+        self.assertContains(response, ">\nOat milk</textarea>")
+
+    def test_edit_saves_description(self):
+        self.client.post(self.url, self.edit_data(self.todo, description="Oat milk"))
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.description, "Oat milk")
+
+    def test_edit_saves_line_breaks_as_one_character(self):
+        self.client.post(
+            self.url, self.edit_data(self.todo, description="Line one\r\nLine two")
+        )
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.description, "Line one\nLine two")
+
+    def test_edit_can_clear_description(self):
+        self.todo.description = "Oat milk"
+        self.todo.save()
+        self.client.post(self.url, self.edit_data(self.todo, description=""))
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.description, "")
+
+    def test_description_only_spaces_is_empty(self):
+        self.client.post(self.url, self.edit_data(self.todo, description="  \r\n  "))
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.description, "")
+
+    def test_description_of_2000_characters_is_saved(self):
+        self.client.post(self.url, self.edit_data(self.todo, description="a" * 2000))
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.description, "a" * 2000)
+
+    def test_long_description_is_not_saved(self):
+        too_long = "b" * 2001
+        response = self.client.post(
+            self.url, self.edit_data(self.todo, title="Buy milk", description=too_long)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Ensure this value has at most 2000 characters")
+        self.assertContains(response, too_long)
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy mlik")
+        self.assertEqual(self.todo.description, "")
+
+    def test_many_lines_near_the_limit_are_saved(self):
+        # The browser counts this as 1999 characters (1000 "a" + 999 line
+        # breaks), but it sends 2998, because each line break is "\r\n".
+        note = "\r\n".join(["a"] * 1000)
+        response = self.client.post(
+            self.url, self.edit_data(self.todo, description=note)
+        )
+        self.assertEqual(response.status_code, 302)
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.description, "\n".join(["a"] * 1000))
+
+    def test_other_user_cannot_edit_description(self):
+        self.todo.description = "Oat milk"
+        self.todo.save()
+        self.assertOtherUserGets404(
+            self.url, data=self.edit_data(self.todo, description="Hacked")
+        )
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.description, "Oat milk")
