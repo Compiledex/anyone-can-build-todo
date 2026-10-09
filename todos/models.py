@@ -50,6 +50,12 @@ class TodoList(models.Model):
 
 
 class Todo(models.Model):
+    # A bigger number is more important, so ordering by -priority gives High first.
+    class Priority(models.IntegerChoices):
+        LOW = 1, "Low"
+        MEDIUM = 2, "Medium"
+        HIGH = 3, "High"
+
     # The owner of a to-do is the owner of its list: todo.todo_list.owner.
     todo_list = models.ForeignKey(
         TodoList,
@@ -62,6 +68,9 @@ class Todo(models.Model):
     due_date = models.DateField(null=True, blank=True)
     # "Notes" on the page. No note is "", never NULL. The form checks max_length.
     description = models.TextField(max_length=2000, blank=True, default="")
+    priority = models.PositiveSmallIntegerField(
+        choices=Priority.choices, default=Priority.MEDIUM
+    )
 
     class Meta:
         ordering = ["created_at"]
