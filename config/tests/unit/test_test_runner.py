@@ -1,13 +1,18 @@
 import io
+import warnings
 
+from django.conf import settings
 from django.contrib.staticfiles.testing import StaticLiveServerTestCase
 from django.test import SimpleTestCase, TestCase
+from whitenoise.base import WhiteNoise
 
 from config.test_runner import (
     LayeredTestResult,
+    LayeredTestRunner,
     TestLayerError,
     check_layers,
     format_summary,
+    ignore_missing_static_root,
     layer_of,
 )
 
@@ -108,3 +113,32 @@ class FormatSummaryTests(SimpleTestCase):
     def test_tests_without_a_layer_get_their_own_line(self):
         summary = format_summary({None: {"errors": 1}})
         self.assertIn("  No layer      0 passed, 1 error", summary)
+
+
+class IgnoreMissingStaticRootTests(SimpleTestCase):
+    def warnings_from_whitenoise(self, folder):
+        """The warnings WhiteNoise gives for `folder`, after ignore_missing_static_root."""
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            ignore_missing_static_root()
+            WhiteNoise(None).add_files(folder)
+        return [str(warning.message) for warning in caught]
+
+    def test_no_warning_for_missing_static_root(self):
+        if settings.STATIC_ROOT.is_dir():
+            self.skipTest(
+                "STATIC_ROOT exists, so WhiteNoise has nothing to warn about."
+            )
+        self.assertEqual(self.warnings_from_whitenoise(settings.STATIC_ROOT), [])
+
+    def test_other_missing_folder_still_warns(self):
+        folder = settings.BASE_DIR / "no-such-folder"
+        self.assertEqual(
+            self.warnings_from_whitenoise(folder), [f"No directory at: {folder}/"]
+        )
+
+    def test_parallel_test_processes_ignore_it_too(self):
+        self.assertIs(
+            LayeredTestRunner.parallel_test_suite.process_setup,
+            ignore_missing_static_root,
+        )
