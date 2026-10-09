@@ -81,8 +81,8 @@ You should see `OK`, and then one line for each layer of tests:
 ```
 Test layers
   CUJ           7 passed
-  Integration  179 passed
-  Unit         21 passed
+  Integration  188 passed
+  Unit         22 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
@@ -124,7 +124,7 @@ runs the same checks and the tests on every push.
 | `accounts/` | Sign up, log in and log out, with Django's own accounts |
 | `accounts/templates/registration/` | The login and sign-up pages |
 | `accounts/tests/helpers.py` | Helpers the tests share: test users, and a test that starts logged in |
-| `todos/models.py` | The `TodoList` and `Todo` tables in the database; each list has an owner and can be shared with members, each to-do is in a list and has an optional due date and optional notes |
+| `todos/models.py` | The `TodoList` and `Todo` tables in the database; each list has an owner and can be shared with members, each to-do is in a list and has an optional due date, optional notes and a priority (Low, Medium or High) |
 | `todos/urls.py` | The addresses of the list and to-do pages |
 | `todos/forms.py` | The forms that check a new to-do, a list's name, and the username to share a list with |
 | `todos/views.py` | What happens when each address is visited |
