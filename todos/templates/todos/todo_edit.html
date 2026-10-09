@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+
+{% block title %}Edit to-do{% endblock %}
+
+{% block content %}
+  <h1>Edit to-do</h1>
+  <form class="edit" method="post" action="{% url 'todo_edit' todo.pk %}">
+    {% csrf_token %}
+    {{ form.as_div }}
+    <button type="submit">Save</button>
+    <a href="{{ todo.todo_list.get_absolute_url }}">Cancel</a>
+  </form>
+{% endblock %}

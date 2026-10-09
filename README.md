@@ -1,6 +1,6 @@
 # To-do list
 
-The most basic to-do list in Django: add a to-do, mark it done, delete it. Keep your to-dos in
+The most basic to-do list in Django: add a to-do, edit it, mark it done, delete it. Keep your to-dos in
 several lists, like "Work" and "Home".
 
 The pages follow your computer's or phone's light or dark mode.
@@ -78,8 +78,8 @@ You should see `OK`, and then one line for each layer of tests:
 
 ```
 Test layers
-  CUJ           4 passed
-  Integration  74 passed
+  CUJ           5 passed
+  Integration  86 passed
   Unit         14 passed
 ```
 
@@ -131,6 +131,7 @@ runs the same checks and the tests on every push.
 | `todos/templates/todos/list_form.html` | The page to make or rename a list |
 | `todos/templates/todos/list_confirm_delete.html` | The page that asks before a list is deleted |
 | `todos/templates/todos/_todo_item.html` | One row of the list |
+| `todos/templates/todos/todo_edit.html` | The page to edit one to-do |
 | `todos/tests/` | The tests, one folder per layer |
 | `config/test_runner.py` | Sorts the tests into layers and counts them |
 | `AGENTS.md` | Instructions for the AI assistant (Codex reads it; `CLAUDE.md` points Claude to it) |

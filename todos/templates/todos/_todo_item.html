@@ -1,5 +1,6 @@
 <li class="{% if todo.done %}done{% endif %}">
   <span class="title">{{ todo.title }}</span>
+  <a href="{% url 'todo_edit' todo.pk %}" aria-label="Edit {{ todo.title }}">Edit</a>
   <form method="post" action="{% url 'todo_toggle' todo.pk %}">
     {% csrf_token %}
     <button type="submit">{% if todo.done %}Undo{% else %}Done{% endif %}</button>

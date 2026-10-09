@@ -6,6 +6,7 @@ from django.urls import URLResolver, get_resolver, reverse
 from django.utils import timezone
 
 from accounts.tests.helpers import LoggedInTestCase, make_user
+from todos.forms import TodoForm
 from todos.models import Todo, TodoList
 
 
@@ -293,3 +294,120 @@ class AdminTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Errands")
         self.assertContains(response, "carol")
+
+
+class EditTests(LoggedInTestCase):
+    def setUp(self):
+        super().setUp()
+        self.todo = Todo.objects.create(title="Buy mlik", todo_list=self.todo_list)
+        self.url = reverse("todo_edit", args=[self.todo.pk])
+
+    def edit_data(self, todo, **changes):
+        """What the edit form sends, with the current values, plus the changes."""
+        form = TodoForm(instance=todo)
+        data = {name: form[name].value() for name in form.fields}
+        data = {name: "" if value is None else value for name, value in data.items()}
+        data.update(changes)
+        return data
+
+    def test_edit_page_shows_current_title(self):
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="Buy mlik"')
+        self.assertContains(
+            response, f'<a href="{self.todo_list.get_absolute_url()}">Cancel</a>'
+        )
+
+    def test_edit_page_shows_every_form_field(self):
+        response = self.client.get(self.url)
+        for name in response.context["form"].fields:
+            with self.subTest(field=name):
+                self.assertContains(response, f'name="{name}"')
+
+    def test_get_does_not_change_data(self):
+        self.client.get(self.url, {"title": "Hacked"})
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy mlik")
+
+    def test_edit_other_methods_are_405(self):
+        for method in ["put", "patch", "delete"]:
+            with self.subTest(method=method):
+                response = getattr(self.client, method)(self.url)
+                self.assertEqual(response.status_code, 405)
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy mlik")
+        self.assertTrue(Todo.objects.filter(pk=self.todo.pk).exists())
+
+    def test_heading_is_fixed_and_title_is_escaped(self):
+        self.todo.title = '"><script>x</script>'
+        self.todo.save()
+        response = self.client.get(self.url)
+        self.assertNotContains(response, "<script>x")
+        self.assertContains(response, "<h1>Edit to-do</h1>")
+
+    def test_edit_ignores_next(self):
+        response = self.client.post(
+            self.url + "?next=https://evil.com",
+            self.edit_data(self.todo, title="Buy milk", next="https://evil.com"),
+        )
+        self.assertEqual(response["Location"], self.todo_list.get_absolute_url())
+
+    def test_edit_saves_new_title(self):
+        response = self.client.post(
+            self.url, self.edit_data(self.todo, title="Buy milk")
+        )
+        self.assertRedirects(
+            response, self.todo_list.get_absolute_url(), fetch_redirect_response=False
+        )
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy milk")
+
+    def test_invalid_edit_is_not_saved(self):
+        response = self.client.post(self.url, self.edit_data(self.todo, title="   "))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This field is required.")
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy mlik")
+
+    def test_edit_does_not_change_done_or_owner(self):
+        Todo.objects.filter(pk=self.todo.pk).update(done=True)
+        self.client.post(
+            self.url,
+            self.edit_data(
+                self.todo,
+                title="New",
+                done="",
+                owner=self.other_user.pk,
+                todo_list=self.other_list.pk,
+            ),
+        )
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "New")
+        self.assertTrue(self.todo.done)
+        self.assertEqual(self.todo.todo_list, self.todo_list)
+
+    def test_other_user_gets_404(self):
+        self.assertOtherUserGets404(self.url, method="get")
+        self.assertOtherUserGets404(
+            self.url, data=self.edit_data(self.todo, title="Hacked")
+        )
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy mlik")
+
+    def test_logged_out_user_is_sent_to_login(self):
+        client = Client()
+        for response in [
+            client.get(self.url),
+            client.post(self.url, self.edit_data(self.todo, title="Sneaky")),
+        ]:
+            self.assertRedirects(
+                response,
+                f"/accounts/login/?next={self.url}",
+                fetch_redirect_response=False,
+            )
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy mlik")
+
+    def test_list_has_edit_link(self):
+        response = self.client.get(self.todo_list.get_absolute_url())
+        self.assertContains(response, f'href="{self.url}"')
