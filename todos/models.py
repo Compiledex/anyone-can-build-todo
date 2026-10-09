@@ -154,7 +154,13 @@ class Todo(models.Model):
     def clean(self):
         # Runs in a ModelForm's is_valid(), never in save() or create().
         if self.repeat and self.due_date is None:
-            raise ValidationError({"repeat": "A repeating to-do needs a due date."})
+            raise ValidationError(
+                {
+                    "repeat": ValidationError(
+                        "A repeating to-do needs a due date.", code="needs_due_date"
+                    )
+                }
+            )
 
     def get_next_copy(self):
         """The copy made from this to-do, or None."""

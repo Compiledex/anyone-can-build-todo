@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -907,6 +907,16 @@ class RecurringTests(LoggedInTestCase):
         self.assertContains(response, '<option value="" selected>Never</option>')
         self.assertNotContains(response, "---------")
 
+    def test_add_repeat_with_bad_date_shows_only_the_date_error(self):
+        response = self.client.post(
+            reverse("todo_add", args=[self.todo_list.pk]),
+            {"title": "Pay rent", "repeat": "weekly", "due_date": "2026-13-01"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Enter a valid date.")
+        self.assertNotContains(response, "A repeating to-do needs a due date.")
+        self.assertFalse(Todo.objects.filter(title="Pay rent").exists())
+
     def test_add_repeat_without_due_date_shows_error(self):
         response = self.client.post(
             reverse("todo_add", args=[self.todo_list.pk]),
@@ -960,6 +970,29 @@ class RecurringTests(LoggedInTestCase):
         self.assertEqual(list(copy.tags.all()), list(self.weekly.tags.all()))
         self.assertEqual([t.name for t in self.weekly.tags.all()], ["home", "plants"])
         self.assertEqual(Tag.objects.count(), 2)  # The same tags, no new ones.
+
+    def test_copy_uses_today_in_tokyo(self):
+        # 16:00 on 9 Oct in UTC is already 01:00 on 10 Oct in Tokyo. A copy
+        # counted from the UTC date would be due 10 Oct (after 9 Oct).
+        todo = Todo.objects.create(
+            title="Stretch",
+            todo_list=self.todo_list,
+            repeat="daily",
+            due_date=date(2026, 10, 9),
+        )
+        moment = datetime(2026, 10, 9, 16, 0, tzinfo=UTC)
+        with mock.patch("django.utils.timezone.now", return_value=moment):
+            self.toggle(todo)
+        self.assertEqual(self.copies_of(todo).get().due_date, date(2026, 10, 11))
+
+    def test_copy_stays_in_the_same_list_of_several(self):
+        middle = TodoList.objects.create(owner=self.user, name="Middle")
+        TodoList.objects.create(owner=self.user, name="Last")
+        todo = Todo.objects.create(
+            title="Stand-up", todo_list=middle, repeat="daily", due_date=self.due
+        )
+        self.toggle(todo)
+        self.assertEqual(self.copies_of(todo).get().todo_list, middle)
 
     def test_copy_stays_in_owners_list_when_member_clicks_done(self):
         carol = make_user("carol")
