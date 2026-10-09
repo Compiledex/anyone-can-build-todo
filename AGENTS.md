@@ -7,14 +7,15 @@ change code, say which file changed and why.
 ## What this is
 
 The most basic to-do list, in Django. A person can add a to-do, edit it, mark it done (or undo
-that), delete it, and clear all the done to-dos of a list at once. A to-do can repeat (daily,
-weekly or monthly): marking it done makes its next copy, and "Undo" removes that copy again. Each person has an account. A
-person can have several lists (make, rename and delete a list); each to-do is in exactly one list.
-The owner of a list can share it with other users by username. Those users are its *members*: they
-can see the list and add, edit, mark done and delete its to-dos, clear its done to-dos, and they can
-leave it. Only the owner can rename, delete or share the list, see its members, or remove a member.
-Members do not see each other. A person sees their own lists plus the lists shared with them, and
-nothing else. The data is kept in a SQLite database, the file `db.sqlite3`, which is not in git.
+that), delete it, and clear all the done to-dos of a list at once. A to-do can repeat (daily, weekly
+or monthly): marking it done makes its next copy, and "Undo" removes that copy again. Each person
+has an account. A person can have several lists (make, rename and delete a list); each to-do is in
+exactly one list. The owner of a list can share it with other users by username. Those users are its
+*members*: they can see the list and add, edit, mark done and delete its to-dos, clear its done
+to-dos, and they can leave it. Only the owner can rename, delete or share the list, see its members,
+or remove a member. Members do not see each other. A person sees their own lists plus the lists
+shared with them, and nothing else. The data is kept in a SQLite database, the file `db.sqlite3`,
+which is not in git.
 
 ## What each file does
 
@@ -30,7 +31,7 @@ nothing else. The data is kept in a SQLite database, the file `db.sqlite3`, whic
 | `todos/tags.py` | `parse_tags(text)`: turns the typed "work, #Home" into clean tag names (lower case, no `#`, no repeats), and checks the limits (30 characters, 10 tags). No database. |
 | `todos/recurrence.py` | `next_due_date(due_date, repeat, today)`: the first date after the due date, in steps of a day, a week or a month, that is after today (`None` after 31 Dec 9999). `add_months` keeps the day of the month, or the last day of a shorter month. No loop and no Django, so a very old date is fast. |
 | `todos/urls.py` | The addresses: `/` (only sends the browser to the oldest own list, else the oldest list shared with the person, else "New list"), `/lists/new/`, `/lists/<pk>/` (a list page), `/lists/<pk>/add/`, `/lists/<pk>/rename/`, `/lists/<pk>/delete/`, `/lists/<pk>/share/`, `/lists/<pk>/members/<user_id>/remove/`, `/lists/<pk>/leave/`, `/lists/<pk>/clear-completed/` (deletes the done to-dos of that list), and `/<pk>/toggle/`, `/<pk>/delete/` and `/<pk>/edit/` for a to-do. |
-| `todos/forms.py` | `TodoForm`, the Django form for a to-do (it checks the title, the optional due date, YYYY-MM-DD only, the optional notes, shown as "Notes" on the edit page, the priority; a missing or empty priority keeps the to-do's own priority, Medium for a new to-do; the `repeat` select; and a `tag_names` text field that `save()` turns into tags), `NoteField`, a text field that counts a line break as one character, as the browser does, `TodoListForm`, for a list's name (it refuses a name the person already has), and `ShareForm`, the username to share a list with (it gives the `User`, and refuses an unknown or switched-off user, the owner, and a member). |
+| `todos/forms.py` | `TodoForm`, the Django form for a to-do (it checks the title, the optional due date, YYYY-MM-DD only, the optional notes, shown as "Notes" on the edit page, the priority; a missing or empty priority keeps the to-do's own priority, Medium for a new to-do; the `repeat` select (when the typed due date is not valid, only the date error shows, not also "A repeating to-do needs a due date"); and a `tag_names` text field that `save()` turns into tags), `NoteField`, a text field that counts a line break as one character, as the browser does, `TodoListForm`, for a list's name (it refuses a name the person already has), and `ShareForm`, the username to share a list with (it gives the `User`, and refuses an unknown or switched-off user, the owner, and a member). |
 | `todos/views.py` | One function per address. `render_list_page` is the one place that builds the list page (it loads all tags in one query with `prefetch_related`). A view that reads or changes a list or its to-dos finds the list with `TodoList.objects.visible_to(request.user)`, or the to-do with `get_visible_todo(request.user, pk)`; only rename, delete, share and remove-member use `owner=request.user`, so a member or a stranger gets 404 there. Share, remove-member and leave are `POST` only and show their result as a message. Changes are `POST` only; then the browser goes back to the list. An invalid add shows the list page again with the error. Clear completed (`list_clear_completed`, owner and members) deletes only `done=True` to-dos of the one list in the address, and its message counts only the `todos.Todo` rows from `QuerySet.delete()`. Edit shows its form on `GET` and saves on `POST`, then goes back to the to-do's list; an invalid edit shows the edit page again. Toggle runs in one `transaction.atomic()` and reads the to-do inside it: Done calls `make_next_copy(timezone.localdate())`; Undo deletes the copy if it is not done and still in the same list, with a message. |
 | `todos/templates/base.html` | The shared page frame: the `<head>`, all the CSS (the colors are CSS variables, with dark values that follow the system's light or dark mode), the header ("Logged in as ..." and "Log out"), and the messages. |
 | `todos/templates/todos/todo_list.html` | The list page, which extends `base.html`: the menu ("My lists", and "Shared with me" with each owner's name), the list's name with "Rename" and "Delete list" (owner) or "Shared by ..." (member), the member list with Remove buttons and the share form (owner only), "Leave this list" (member only), the errors, the add form, the to-dos, and below them "Clear completed (N)" (a `<details>` box that asks once more; hidden when nothing is done; owner and members see it). |
