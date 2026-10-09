@@ -125,6 +125,12 @@ class ColorSchemeTests(BrowserTestCase):
         page.get_by_role("button", name="Add").click()
         expect(page.locator("li.overdue time")).to_be_visible()
 
+        # One High to-do, so its colored priority label is checked too.
+        page.get_by_label("New to-do").fill("Fix the roof")
+        page.get_by_label("Priority").select_option(label="High")
+        page.get_by_role("button", name="Add").click()
+        expect(page.locator(".priority-3")).to_be_visible()
+
         for scheme in ["light", "dark"]:
             with self.subTest(scheme=scheme):
                 page.emulate_media(color_scheme=scheme)
@@ -138,6 +144,7 @@ class ColorSchemeTests(BrowserTestCase):
                             done: color("li.done .title", "color"),
                             header: color("header.site", "color"),
                             overdue: color("li.overdue time", "color"),
+                            high: color(".priority-3", "color"),
                         };
                     }"""
                 )
@@ -159,6 +166,11 @@ class ColorSchemeTests(BrowserTestCase):
                     contrast(colors["overdue"], colors["background"]), AA_CONTRAST
                 )
                 self.assertNotEqual(colors["overdue"], colors["text"], colors)
+                self.assertGreaterEqual(
+                    contrast(colors["high"], colors["background"]), AA_CONTRAST
+                )
+                # High must not look like overdue.
+                self.assertNotEqual(colors["high"], colors["overdue"], colors)
 
 
 class TwoPeopleTests(BrowserTestCase):

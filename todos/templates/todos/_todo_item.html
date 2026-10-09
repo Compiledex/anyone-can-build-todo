@@ -9,6 +9,7 @@
       </details>
     {% endif %}
   </div>
+  <span class="priority priority-{{ todo.priority }}"><span class="visually-hidden">Priority: </span>{{ todo.get_priority_display }}</span>
   {% if todo.due_date %}
     <time datetime="{{ todo.due_date|date:'Y-m-d' }}">Due {{ todo.due_date|date:'j M Y' }}</time>
     {% if overdue %}<span class="overdue-label">Overdue</span>{% endif %}

@@ -16,6 +16,7 @@
       --muted: #666666;
       --border: #dddddd;
       --overdue: #b00020;
+      --priority-high: #a14a00;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -24,6 +25,7 @@
         --muted: #a0a0a0;
         --border: #3a3a3a;
         --overdue: #ff6b6b;
+        --priority-high: #ffb366;
       }
     }
     body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem;
@@ -58,6 +60,15 @@
     details.clear-completed { margin-top: 1.5rem; padding: 0.5rem; border: 1px solid var(--border); }
     details.clear-completed summary { cursor: pointer; color: var(--muted); }
     details.clear-completed p { margin: 0.5rem 0; }
+    /* The priority label. Medium uses the normal text color. */
+    .priority { color: var(--text); border: 1px solid currentColor; border-radius: 0.25rem;
+                padding: 0 0.3rem; font-size: 0.8rem; white-space: nowrap; }
+    .priority-3 { color: var(--priority-high); font-weight: bold; } /* 3 is High */
+    .priority-1 { color: var(--muted); } /* 1 is Low */
+    li.done .priority { color: var(--muted); }
+    /* Hidden on the screen, but read by screen readers. */
+    .visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+                       border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
   </style>
 </head>

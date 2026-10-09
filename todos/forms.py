@@ -20,12 +20,30 @@ class TodoForm(forms.ModelForm):
         widget=forms.DateInput(attrs={"type": "date"}, format="%Y-%m-%d"),
     )
 
+    # A missing or empty priority is not an error: clean_priority keeps the
+    # to-do's own priority (Medium for a new to-do). 7 or "urgent" is an error.
+    priority = forms.TypedChoiceField(
+        choices=Todo.Priority.choices,
+        coerce=int,
+        required=False,
+        empty_value=None,
+        initial=Todo.Priority.MEDIUM,
+        widget=forms.Select(attrs={"aria-label": "Priority"}),
+    )
+
     class Meta:
         model = Todo
-        fields = ["title", "due_date", "description"]
+        fields = ["title", "due_date", "description", "priority"]
         field_classes = {"description": NoteField}
         labels = {"description": "Notes"}
         widgets = {"description": forms.Textarea(attrs={"rows": 4})}
+
+    def clean_priority(self):
+        priority = self.cleaned_data["priority"]
+        if priority is None:
+            # No priority was sent: keep the one the to-do has.
+            return self.instance.priority
+        return priority
 
 
 class TodoListForm(forms.ModelForm):
