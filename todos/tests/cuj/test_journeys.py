@@ -179,3 +179,20 @@ class TwoPeopleTests(BrowserTestCase):
         page.get_by_role("button", name="Log in").click()
         expect(page.get_by_text("Logged in as alice")).to_be_visible()
         expect(page.get_by_role("listitem").filter(has_text="Buy milk")).to_be_visible()
+
+
+class FixATypoTests(BrowserTestCase):
+    def test_fix_a_typo(self):
+        page = self.page
+        self.log_in_as(make_user_with_inbox())
+        page.goto(self.live_server_url)
+        page.get_by_label("New to-do").fill("Buy mlik")
+        page.get_by_role("button", name="Add").click()
+
+        row = page.get_by_role("listitem").filter(has_text="Buy mlik")
+        row.get_by_role("link", name="Edit").click()
+        page.get_by_label("Title").fill("Buy milk")
+        page.get_by_role("button", name="Save").click()
+
+        expect(page.get_by_role("listitem").filter(has_text="Buy milk")).to_be_visible()
+        expect(page.get_by_text("Buy mlik")).to_have_count(0)

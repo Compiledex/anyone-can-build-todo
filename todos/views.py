@@ -110,3 +110,15 @@ def todo_delete(request, pk):
     the_list = todo.todo_list
     todo.delete()
     return redirect(the_list)
+
+
+def todo_edit(request, pk):
+    todo = get_object_or_404(Todo, pk=pk, todo_list__owner=request.user)
+    if request.method == "POST":
+        form = TodoForm(request.POST, instance=todo)
+        if form.is_valid():
+            form.save()
+            return redirect(todo.todo_list)
+    else:
+        form = TodoForm(instance=todo)
+    return render(request, "todos/todo_edit.html", {"form": form, "todo": todo})
