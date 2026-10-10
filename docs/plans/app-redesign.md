@@ -1,11 +1,10 @@
 # Plan: redesign of the app pages
 
-Status: **draft**, for the person to review. Not started.
+Status: **approved with changes** (review below). Not started.
 
-Starts after: **(1)** the fix for the to-do row layout (another session is working on it now: a
-long title runs over the priority label, and "Repeats every …" pushes Done and Delete onto a new
-line) is merged, and **(2)** the landing page (`feature/landing`) is merged. Step 1 below needs
-the landing page's `landing.css` on `main`.
+Starts after: the row fix (#28) and the landing page (#29), both merged, **and** the login and
+sign-up redesign (`feature/auth-pages`), which creates `todos/static/todos/tokens.css`. Step 1b
+needs that file on `main`.
 
 Mockup: [`app-redesign-mockup.html`](app-redesign-mockup.html) (open it in a browser; make the
 window narrow, and switch the system between light and dark, to see each version).
@@ -14,7 +13,7 @@ window narrow, and switch the system between light and dark, to see each version
 
 The pages a person sees after logging in (the list page, the edit page, "New list", "Rename list"
 and "Delete list") look calm, clear and finished, and look like **one product with the landing
-page**: the same colors, the same font, the same corners, the same buttons. Nothing a person does
+page and the login pages**: the same colors, font, corners and buttons. Nothing a person does
 changes: every address, form field, button label and keyboard path stays the same.
 
 Words used in this plan:
@@ -25,6 +24,10 @@ Words used in this plan:
   21 : 1 (black on white). **WCAG AA** is the usual rule: at least 4.5 : 1 for text, and 3 : 1 for
   the edge of a control (a text field's border, a focus ring).
 - A **focus ring** is the outline that shows which button or field the keyboard is on.
+- **Grid areas** are named places in a CSS grid ("main", "actions"); each part of a row is put in
+  one by name, so the layout can change at a small width without changing the HTML.
+- **Specificity** is how CSS decides which of two rules wins: a more exact selector
+  (`ul.todos > li .title`) beats a shorter one (`.title`).
 
 ## The design read and the dials
 
@@ -50,10 +53,10 @@ no bento, no eyebrows, no scroll motion, no icon library.
 
 ## Audit (before)
 
-Screenshots of today's pages, with invented sample data, at 1280 and 390 px wide, light and dark:
-`scratchpad/app-audit-shots/` (not in git; for the review only). Pages: the list (default,
-steps open, search, no match, filter, manual order, owner with members, member view, empty list),
-edit, new list, delete list, a form error on "New list", an add error, and a message.
+Screenshots of the pages before the row fix, with invented sample data, at 1280 and 390 px wide,
+light and dark: `scratchpad/app-audit-shots/` (not in git; for the review only). Pages: the list
+(default, steps open, search, no match, filter, manual order, owner with members, member view,
+empty list), edit, new list, delete list, a form error on "New list", an add error, and a message.
 
 ### Current tokens (`todos/templates/base.html`)
 
@@ -78,138 +81,136 @@ All text passes AA today. The problems are in shape, layout and states, not in c
 
 Most important first.
 
-1. **The to-do row breaks.** All parts of a row are one flex line. A long title gets squeezed to
-   one word per line (19 lines for one to-do at 1280 px); the priority label overlaps the title
-   ("Pay rent" is written over by "Medium"); "Repeats every Thursday" pushes Delete onto its own
-   line; at 390 px Done and Delete land on a second line under the title in most rows. (Being
-   fixed now in another session; this plan's row must keep that fix.)
-2. **No visual system.** Buttons, selects and the date field are browser defaults; the
-   priority select on the add form is bigger than the sort select; the edit page's selects and
-   textarea are tiny and the textarea uses a monospace font. Three different corner styles
-   (square controls, round tags, small-round priority).
-3. **The page does not look like the landing page.** Different background (pure white vs.
-   `#f6f7f9`), pure black text, no accent, no header bar, different widths. Pure `#000` and
-   `#fff` are also an AI tell (skill 8.B, 9.A).
+1. **The to-do row broke** (one word per line, labels on top of the title, buttons pushed onto a
+   new line). **Fixed by #28**: the row now has `.main > .title + div.meta`, then notes, then tags,
+   and `.actions` that stay on one line. This plan keeps that markup and only restyles it.
+2. **No visual system.** Buttons, selects and the date field are browser defaults; the edit
+   page's selects are tiny and its textarea uses a monospace font. Three corner styles.
+3. **The app does not look like the landing and login pages.** Pure white and pure black (an AI
+   tell, skill 8.B and 9.A), no accent, no header bar, a narrower column.
 4. **Errors are hard to see and far from their field.** "Enter a valid date." shows above the
-   whole add form, in the normal text color. On the edit page and "New list", Django puts the
-   error between the label and the field, in black. Fields with an error get no red border.
-5. **Placeholder used as the label.** The add form ("What needs doing?"), search ("Search"), the
-   share field ("Username") and "Add step" (empty field, no hint at all) have no visible label.
-   Skill 4.6: "No placeholder-as-label. Ever."
-6. **No hierarchy between actions.** "Add", "Done", "Delete", "Log out", "Sort", "Search",
-   "Remove" all look the same. Edit is an underlined link between two buttons. "Delete list" (it
-   deletes everything) looks like "Rename". "Yes, delete them" looks like any other button.
-7. **No focus, hover or pressed states of our own.** Only the browser's defaults. The selected
-   list and filter are only bold.
-8. **The search, sort and filter controls are three loose rows** that take 150 px before the
-   first to-do, with nothing grouping them.
-9. **Too narrow on a laptop.** 512 px of content in a 1280 px window; titles wrap early.
-10. **Empty and "no match" states are a plain bullet row** with a line under it, the same as a
-    to-do.
-11. **Messages** ("Shared with ines.") are a gray-bordered box that looks like an input;
-    errors from `messages.error` look the same as success.
-12. **The header** ("Logged in as mara" and "Log out") has no product name; the page has no
-    anchor at the top.
-13. **Edit page**: "Save" and "Cancel" touch each other; the tag help text sits between the
-    label and the field.
-14. **Dark mode** uses `#121212` and neutral grays, while the tags are blue-gray: two gray
-    families (skill 4.2: one gray family).
+   whole add form in the normal text color. On the edit page and "New list", Django puts the
+   error between the label and the field. Fields with an error get no red border.
+5. **Placeholder used as the label** on the add form, search, the share field, and "Add step"
+   (an empty field with no hint at all). Skill 4.6: "No placeholder-as-label. Ever."
+6. **No hierarchy between actions.** Add, Done, Delete, Log out, Sort, Search and Remove all look
+   the same. "Delete list" looks like "Rename". "Yes, delete them" looks like any other button.
+7. **No focus, hover or pressed states of our own.** The current list and filter are only bold.
+8. **Search, sort and filter are three loose rows** that take 150 px before the first to-do.
+9. **Too narrow on a laptop.** 512 px of content in a 1280 px window.
+10. **Empty and "no match" states are a plain row** with a line under it, like a to-do.
+11. **Messages** look like an input; `messages.error` looks the same as success.
+12. **Edit page**: Save and Cancel touch each other; the tag help text sits between label and
+    field.
+13. **Dark mode** uses `#121212` and neutral grays while tags are blue-gray: two gray families.
 
 Checked and fine: no em-dashes or en-dashes in any visible text, no exclamation marks, no fake
-names, no decorative dots, no emoji. Keyboard order is logical. `aria-label`s on row buttons
-name their to-do. Reduced motion: nothing moves today.
+names, no decorative dots, no emoji. Keyboard order is logical. Row buttons' `aria-label`s name
+their to-do. Nothing moves today, so reduced motion is fine.
 
 ### Patterns to keep (skill 11.C)
 
-Every address; the order of the parts of the list page; every form field, its `name` and its
-order; every button and link label; every `id` (`todo-<pk>`, `sharing-heading`, `my-lists`,
-`shared-lists`, `reorder-csrf`); every `aria-label`, `aria-current`, `aria-invalid` and
-`aria-describedby`; `role="status"` on messages and `role="search"`; the `next` field on Done and
-Delete; `?open=` opening the steps; `<details>` for notes, steps and clear completed (they work
-without JavaScript); the Move up / Move down buttons; the light/dark switch by the system only.
+Every address; the order of the parts of the list page and of each row; every form field, its
+`name` and its order; every button and link label; every `id` (`todo-<pk>`, `sharing-heading`,
+`my-lists`, `shared-lists`, `reorder-csrf`); every `aria-label`, `aria-current`, `aria-invalid`
+and `aria-describedby`; `role="status"` on messages and `role="search"`; the `next` field on Done
+and Delete; `?open=` opening the steps; `<details>` for notes, steps and clear completed (they work
+without JavaScript); Move up / Move down; light/dark by the system only.
 
 ## Decisions
 
-- **One shared token file: `todos/static/todos/tokens.css`.** Both `base.html` (the app) and
-  `landing.html` load it first; `landing.css` and the new `app.css` only use the names. Why not
-  copy the landing values into `base.html`: two copies drift apart, and the login and sign-up
-  redesign (a separate task, see below) will need the same tokens a third time. The landing
-  page's values are the starting point and do not change, so the landing page looks the same
-  after step 1.
-- **The app's CSS moves out of `base.html` into `todos/static/todos/app.css`.** It grows from
-  ~70 to ~300 lines; a file is easier to read and review, and the browser can cache it. The
-  landing page already serves CSS this way (WhiteNoise), so nothing new is needed. `base.html`
-  keeps only `<link>`s. No build step, no Tailwind, no JavaScript framework, no external request.
-- **Font: the system font stack**, the same as the landing page:
-  `system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif`. No web font.
-- **One accent, `--accent`** (`#1f4f8f` light, `#8fb6ec` dark), from the landing page. It marks
-  the primary button, links, the current list, the focus ring and tags. Nothing else is blue.
-- **One gray family, cool**, from the landing page (`--text`, `--muted`, `--border`, plus the new
-  `--control` for field and button edges).
-- **Two status colors, only for status**, never for decoration: `--danger` (red: overdue, form
-  errors, destructive buttons) and `--priority-high` (amber: the High label). They must stay
-  different (the color test checks this). Success and info messages use the same calm accent
-  band, so a message never introduces a third status color.
-- **Corners: one rule.** `--radius: 8px` on everything you can click or type into and on boxes
-  (buttons, fields, selects, messages, the clear-completed box, the filter group). `--radius-label:
-  4px` on the small inline labels under 24 px tall (priority, tag, focus ring on text). Nothing is
-  a pill. (Skill 4.4 allows a mixed system when the rule is written down and followed everywhere.)
-- **No cards.** Rows are separated by one bottom line, as today. The only boxes are the ones that
-  carry meaning: a message, the "Clear completed" confirmation, the filter group.
-- **No icons.** Text labels, as on the landing page. The ↑ / ↓ move buttons and the ⠿ handle are
-  text characters and stay.
-- **Visible labels above fields** on the list page: "New to-do", "Due date", "Repeat", "Priority",
-  "Search to-dos", "Sort by:", "New step", "Username". The visible text is the same as (or the
-  start of) the existing `aria-label`, so screen readers and the tests find the same names
-  (WCAG 2.5.3, "label in name"). The label **wraps** the field (`<label>text <input></label>`), so
-  no field gets a new `id` (some tests compare the whole `<input>` tag). Placeholders that are
-  hints, not labels, stay ("What needs doing?", "Search").
-- **Errors under their field, in red, and the field gets a red border** (`[aria-invalid="true"]`).
-  On the edit, new-list and rename pages, Django prints the error before the field; CSS `order`
-  in a flex column puts it below, with no template change for Django's field HTML.
-- **Width: 46rem (736 px)** for the list page and 36rem for the forms on the edit page. Still one
-  column; titles wrap much less.
-- **A header bar** like the landing page's: "To-do list" on the left (a link to `/`, which already
-  sends the person to their first list), "Logged in as mara" and "Log out" on the right. This is
-  the only new link; see Open questions.
-- **Motion**: only `background-color`, `color`, `border-color` and `transform` change, in 150 ms,
-  `ease-out`. Buttons move down 1 px while pressed. Under `prefers-reduced-motion: reduce` there
-  is no transition and no press movement.
-- **Copy**: no visible text changes, except the new visible labels above. No string a test checks
-  changes.
+- **One token file: `todos/static/todos/tokens.css`.** It holds only `:root` (light and dark):
+  colors, `--radius`, `--radius-label`, `--font`, the spacing scale, control heights and `--ease`.
+  The auth-pages branch creates it with the landing values plus `--surface`, `--control` and
+  `--danger`; there, `site_base.html` loads `tokens.css`, then `site.css`, then the page's own CSS.
+  **The app loads `tokens.css`, then `app.css`.** `app.css` never loads `site.css`. This plan only
+  **adds** the tokens the app needs (Step 1b); it does not change a value the other pages use.
+- **The app's CSS moves out of `base.html` into `todos/static/todos/app.css`**, served by
+  WhiteNoise like `site.css`. No build step, no Tailwind, no JavaScript framework, no external
+  request.
+- **Font: the system font stack** (`--font`), as on the other pages. No web font.
+- **One accent, `--accent`** (`#1f4f8f` light, `#8fb6ec` dark). It marks the primary button,
+  links, the current list and filter, the focus ring and tag text. Nothing else is blue.
+- **One gray family, cool** (`--text`, `--muted`, `--border`, `--control`).
+- **Two status colors, only for status**: `--danger` (red: overdue, errors, destructive actions)
+  and `--priority-high` (amber: the High label). The color test keeps them apart. Success and info
+  messages use the calm `--band`, so a message never adds a third status color.
+- **Corners: two values, one rule.** `--radius` (8px) on everything you click or type into and on
+  boxes (buttons, fields, messages, the clear-completed box, the filter group). `--radius-label`
+  (4px) on small things under 24px tall: priority, tag, and each filter link inside its group.
+  Nothing is a pill. No third radius. (Skill 4.4 allows a written rule followed everywhere.)
+- **One button vocabulary for the whole product**, the same class names as `site.css`:
+  `.button` plus one of `.button-primary`, `.button-secondary`, `.button-danger`,
+  `.button-quiet`, and the size `.button-small`. The app adds one size in `app.css`:
+  `.button-compact` (32px, for row, step and header actions). `app.css` repeats the shared button
+  rules (it does not load `site.css`), and a CUJ test checks that the primary button looks the
+  same on both sides (background, radius, font weight).
+- **No cards.** Rows are separated by one bottom line. The only boxes carry meaning: a message,
+  the clear-completed confirmation, the filter group.
+- **No icons.** Text labels, as on the landing page. The ↑ / ↓ buttons and the ⠿ handle are text
+  characters and stay.
+- **Fields: one structure, in DOM order**: `<div class="field">` with the label, the input, the
+  error, then the help text, the same as the auth pages. No CSS `order`, so screen readers and
+  sighted people get the same order. On the edit, new-list and rename pages, the forms render each
+  field with the auth pages' include `todos/_field.html` (`{{ field.label_tag }}`, `{{ field }}`,
+  `{{ field.errors }}`, help). It must use `label_tag`, so the app keeps Django's colon
+  ("Notes:"); a test checks `Notes:</label>`.
+- **Visible labels on the list page**: "New to-do", "Due date", "Repeat", "Priority", "Search
+  to-dos", "Sort by:", "New step", "Username". The visible text is the same as, or the start of,
+  the existing `aria-label`, so screen readers and the tests find the same names (WCAG 2.5.3).
+  Fields that Django renders with an `id` (repeat, priority, sort) get `<label for>`. Fields
+  written by hand in the template (title, due date, search, new step, username) are wrapped by
+  their label, because they must not get a new `id` (tests compare the whole tag). **An error
+  list or a button is never inside a `<label>`**: the error comes after the label, inside the
+  `div.field`. Placeholders that are hints stay ("What needs doing?", "Search").
+- **Errors under their field, in red; the field gets a red edge** (`[aria-invalid="true"]`), and
+  keeps it while focused (the focus ring is accent, around the red edge).
+- **Focus**: `:focus-visible` sets only `outline: 2px solid var(--accent)` and `outline-offset`.
+  It never changes `border-radius` or size.
+- **Width: 46rem (736px)** for the list page, 36rem for the edit and list forms.
+- **A header bar** like `site_base.html`'s: the wordmark "To-do list" left (a link to `/`, as on
+  the visitor pages), "Logged in as mara" (in a `<span class="who">`) and Log out right.
+- **Motion**: only `background-color`, `color`, `border-color` and `transform`, 150ms
+  `ease-out` (`--ease`). Buttons move down 1px while pressed. Under
+  `prefers-reduced-motion: reduce`: no transition, no movement.
+- **Touch**: under `@media (pointer: coarse)` (a finger, not a mouse), row and step actions are
+  at least 44px tall with at least 8px between them.
+- **Copy**: no visible text changes, except the new visible labels above.
 
 ## Tokens
 
-All in `todos/static/todos/tokens.css`. The dark values apply under
-`@media (prefers-color-scheme: dark)`, as today.
+All in `todos/static/todos/tokens.css`. "auth" = created by the auth-pages branch; "app" = added
+by this plan. Dark values apply under `@media (prefers-color-scheme: dark)`.
 
-| Token | Light | Dark | Used for |
-|---|---|---|---|
-| `--bg` | `#f6f7f9` | `#0e1013` | page background (landing) |
-| `--surface` | `#fcfcfd` | `#15181d` | fields, selects, secondary buttons, filter group |
-| `--band` | `#e6edf6` | `#172231` | messages, hover background, current filter, tags, dragged row (landing) |
-| `--text` | `#15181d` | `#e8eaee` | normal text (landing) |
-| `--muted` | `#545b66` | `#a3aab5` | meta line, done title, header, labels of quiet buttons (landing) |
-| `--border` | `#d3d8e0` | `#2d333b` | lines between rows and sections (landing) |
-| `--control` | `#868e9a` | `#6b7480` | the edge of fields and secondary buttons (new) |
-| `--accent` | `#1f4f8f` | `#8fb6ec` | primary button, links, current list, focus ring (landing) |
-| `--accent-hover` | `#173d70` | `#b0cbf2` | primary button and link on hover (landing) |
-| `--on-accent` | `#f6f7f9` | `#0e1013` | text on the primary button (landing) |
-| `--focus` | `= --accent` | `= --accent` | focus ring, 2 px, 2 px away from the element |
-| `--danger` | `#b3261e` | `#ff8a80` | overdue date and label, errors, danger button (new; replaces `--overdue`) |
-| `--danger-hover` | `#8f1d17` | `#ffaba3` | danger button on hover |
-| `--on-danger` | `#f6f7f9` | `#0e1013` | text on the danger button |
-| `--danger-bg` | `#fbeceb` | `#2a1716` | error message, hover of a quiet Delete |
-| `--priority-high` | `#8a4b00` | `#f0b46a` | the High label |
-| `--tag-bg` | `= --band` | `= --band` | tag background |
-| `--tag-text` | `#1f4f8f` | `#b0cbf2` | tag text |
-| `--drag-bg` | `= --band` | `= --band` | the row being dragged |
-| `--radius` | `8px` | | controls and boxes |
-| `--radius-label` | `4px` | | priority, tag, focus ring on text |
-| `--font` | system stack | | everything |
+| Token | Light | Dark | From | Used for |
+|---|---|---|---|---|
+| `--bg` | `#f6f7f9` | `#0e1013` | auth (landing) | page background |
+| `--surface` | `#fcfcfd` | `#15181d` | auth | fields, secondary buttons, filter group |
+| `--band` | `#e6edf6` | `#172231` | auth (landing) | messages, hover, current filter, tag background |
+| `--text` | `#15181d` | `#e8eaee` | auth (landing) | normal text |
+| `--muted` | `#545b66` | `#a3aab5` | auth (landing) | meta line, done title, header text, quiet buttons |
+| `--border` | `#d3d8e0` | `#2d333b` | auth (landing) | lines between rows and sections |
+| `--control` | `#737b87` | `#6f7885` | auth | edge of fields and secondary buttons |
+| `--accent` | `#1f4f8f` | `#8fb6ec` | auth (landing) | primary button, links, current list, focus ring |
+| `--accent-hover` | `#173d70` | `#b0cbf2` | auth (landing) | primary button and links on hover |
+| `--on-accent` | `#f6f7f9` | `#0e1013` | auth (landing) | text on the primary button |
+| `--danger` | `#b42318` | `#ff8f85` | auth | overdue, errors, danger button (replaces `--overdue`) |
+| `--danger-hover` | `#912018` | `#ffb0a8` | app | danger button on hover |
+| `--on-danger` | `#f6f7f9` | `#0e1013` | app | text on the danger button |
+| `--danger-bg` | `#fbeceb` | `#2a1716` | app | error message, quiet Delete on hover and focus |
+| `--priority-high` | `#8a4b00` | `#f0b46a` | app | the High label |
+| `--tag-text` | `#1f4f8f` | `#b0cbf2` | app | tag text (background: `--band`) |
+| `--drag-bg` | `#e6edf6` | `#172231` | app | the row being dragged |
+| `--radius` | `8px` | | auth | controls and boxes |
+| `--radius-label` | `4px` | | app | priority, tag, filter links |
+| `--font` | system stack | | auth | everything |
+| `--space-1` to `--space-7` | 4, 8, 12, 16, 24, 32, 48px | | app | all spacing |
+| `--control-h`, `--control-h-compact`, `--control-h-touch` | 40, 32, 44px | | app | button and field heights |
+| `--ease` | `150ms ease-out` | | app | every transition |
 
 Light `--bg` has a relative luminance of 0.93, so the existing check "the light background is
-light" (above 0.9) still passes. Dark `--bg` is 0.005 and dark `--tag-bg` 0.015 (both under 0.1).
+light" (above 0.9) still passes. Dark `--bg` is 0.005 and dark `--band` (tag background) 0.015
+(both under 0.1).
 
 ### Contrast (computed with the WCAG formula)
 
@@ -218,320 +219,390 @@ light" (above 0.9) still passes. Dark `--bg` is 0.005 and dark `--tag-bg` 0.015 
 | body text on page | `text` on `bg` | 16.6 : 1 | 15.8 : 1 | 4.5 : 1 | yes |
 | input text on input | `text` on `surface` | 17.4 : 1 | 14.8 : 1 | 4.5 : 1 | yes |
 | muted text (meta, done title, header) | `muted` on `bg` | 6.4 : 1 | 8.1 : 1 | 4.5 : 1 | yes |
-| placeholder, help, quiet button on input | `muted` on `surface` | 6.7 : 1 | 7.6 : 1 | 4.5 : 1 | yes |
-| muted text on band (hovered quiet button) | `muted` on `band` | 5.8 : 1 | 6.9 : 1 | 4.5 : 1 | yes |
-| message text | `text` on `band` | 15.1 : 1 | 13.3 : 1 | 4.5 : 1 | yes |
-| link, current list, new list | `accent` on `bg` | 7.6 : 1 | 9.1 : 1 | 4.5 : 1 | yes |
-| accent text on band | `accent` on `band` | 6.9 : 1 | 7.7 : 1 | 4.5 : 1 | yes |
+| placeholder/help on input | `muted` on `surface` | 6.7 : 1 | 7.6 : 1 | 4.5 : 1 | yes |
+| muted text on band | `muted` on `band` | 5.8 : 1 | 6.9 : 1 | 4.5 : 1 | yes |
+| message text on band | `text` on `band` | 15.1 : 1 | 13.3 : 1 | 4.5 : 1 | yes |
+| link / current list / text button | `accent` on `bg` | 7.6 : 1 | 9.1 : 1 | 4.5 : 1 | yes |
+| accent text on band (secondary hover) | `accent` on `band` | 6.9 : 1 | 7.7 : 1 | 4.5 : 1 | yes |
 | primary button label | `on-accent` on `accent` | 7.6 : 1 | 9.1 : 1 | 4.5 : 1 | yes |
-| primary button, hover | `on-accent` on `accent-hover` | 10.1 : 1 | 11.5 : 1 | 4.5 : 1 | yes |
-| overdue, error text | `danger` on `bg` | 6.1 : 1 | 8.3 : 1 | 4.5 : 1 | yes |
-| error message text | `danger` on `danger-bg` | 5.7 : 1 | 7.5 : 1 | 4.5 : 1 | yes |
-| normal text in error box | `text` on `danger-bg` | 15.5 : 1 | 14.1 : 1 | 4.5 : 1 | yes |
-| danger button label | `on-danger` on `danger` | 6.1 : 1 | 8.3 : 1 | 4.5 : 1 | yes |
-| danger button, hover | `on-danger` on `danger-hover` | 8.3 : 1 | 10.5 : 1 | 4.5 : 1 | yes |
-| High label | `priority-high` on `bg` | 6.3 : 1 | 10.4 : 1 | 4.5 : 1 | yes |
-| tag | `tag-text` on `tag-bg` | 6.9 : 1 | 9.7 : 1 | 4.5 : 1 | yes |
-| title on the dragged row | `text` on `drag-bg` | 15.1 : 1 | 13.3 : 1 | 4.5 : 1 | yes |
-| field and button edge on page | `control` on `bg` | 3.1 : 1 | 4.0 : 1 | 3 : 1 | yes |
-| field edge on the field | `control` on `surface` | 3.2 : 1 | 3.8 : 1 | 3 : 1 | yes |
-| focus ring on page | `focus` on `bg` | 7.6 : 1 | 9.1 : 1 | 3 : 1 | yes |
-| focus ring on a field | `focus` on `surface` | 8.0 : 1 | 8.5 : 1 | 3 : 1 | yes |
+| primary button hover | `on-accent` on `accent-hover` | 10.1 : 1 | 11.5 : 1 | 4.5 : 1 | yes |
+| overdue date, Overdue label, danger text | `danger` on `bg` | 6.1 : 1 | 8.6 : 1 | 4.5 : 1 | yes |
+| error message text | `danger` on `danger-bg` | 5.7 : 1 | 7.7 : 1 | 4.5 : 1 | yes |
+| body text in error box | `text` on `danger-bg` | 15.5 : 1 | 14.1 : 1 | 4.5 : 1 | yes |
+| danger button label | `on-danger` on `danger` | 6.1 : 1 | 8.6 : 1 | 4.5 : 1 | yes |
+| danger button hover | `on-danger` on `danger-hover` | 8.1 : 1 | 10.9 : 1 | 4.5 : 1 | yes |
+| High priority label | `priority-high` on `bg` | 6.3 : 1 | 10.4 : 1 | 4.5 : 1 | yes |
+| tag text on tag | `tag-text` on `band` | 6.9 : 1 | 9.7 : 1 | 4.5 : 1 | yes |
+| title on dragged row | `text` on `drag-bg` | 15.1 : 1 | 13.3 : 1 | 4.5 : 1 | yes |
+| current filter underline vs filter group (non-text) | `accent` on `surface` | 8.0 : 1 | 8.5 : 1 | 3.0 : 1 | yes |
+| red edge of an invalid field vs field (non-text) | `danger` on `surface` | 6.4 : 1 | 8.1 : 1 | 3.0 : 1 | yes |
+| quiet Delete on hover band | `danger` on `band` | 5.6 : 1 | 7.3 : 1 | 4.5 : 1 | yes |
+| input/button border vs page (non-text) | `control` on `bg` | 4.0 : 1 | 4.3 : 1 | 3.0 : 1 | yes |
+| input border vs input | `control` on `surface` | 4.2 : 1 | 4.0 : 1 | 3.0 : 1 | yes |
+| focus ring vs page (non-text) | `accent` on `bg` | 7.6 : 1 | 9.1 : 1 | 3.0 : 1 | yes |
+| focus ring vs input | `accent` on `surface` | 8.0 : 1 | 8.5 : 1 | 3.0 : 1 | yes |
+luminance bg light 0.93 dark 0.005 dark band 0.015
 
-`--border` (1.3 : 1 light, 1.5 : 1 dark) is only for lines between rows, never the only edge of a control, so the
-3 : 1 rule does not apply to it. The script that made this table is short (WCAG relative
-luminance, then `(L1 + 0.05) / (L2 + 0.05)`); the CUJ test below does the same in the browser.
+Not a pass on its own: the current filter's `--band` fill on `--surface` is only 1.2 : 1 (light)
+and 1.1 : 1 (dark). So the current filter link also gets a 2px `--accent` line under it (8.0 :
+1 / 8.5 : 1), plus weight 600. `--border` (1.3 : 1 light, 1.5 : 1 dark) is only for lines between
+rows, never the only edge of a control, so the 3 : 1 rule does not apply to it.
 
 ## Type, spacing and shape
 
-**Type scale** (rem; 1 rem = 16 px). One family, weights 400, 550, 650, 700.
+**Type scale** (rem; 1rem = 16px). One family, weights 400, 550, 600, 650, 700.
 
 | Use | Size | Weight | Line height |
 |---|---|---|---|
 | List name (`h1`), "Edit to-do" | 1.75 | 650, letter-spacing -0.015em | 1.2 |
 | "Sharing" (`h2`) | 1.125 | 650 | 1.2 |
 | Body, to-do title, inputs | 1 | 400 (title 550) | 1.5 |
-| Buttons, menu, list actions, filter | 0.9375 | 550 (menu 400) | 1.5 |
-| Labels, meta line, help, errors, summaries | 0.875 | labels and errors 550 | 1.5 |
+| Buttons, menu, list actions, filter | 0.9375 | buttons 600 (as `site.css`), menu 400 | 1.5 |
+| Labels, meta line, help, errors, summaries | 0.875 | labels and errors 600 | 1.5 |
 | Priority, tag | 0.8125 | High 650, others 400 | 1.5 |
 
 Dates and counts use `font-variant-numeric: tabular-nums`. Headings use `text-wrap: balance`.
-Notes are at most 65 characters wide.
+Notes are at most 65 characters wide. `overflow-wrap: anywhere` and `min-width: 0` on every
+text a person types: the list `h1`, `nav.lists a`, "Shared by <username>", the to-do title, notes,
+step titles and member names. So one very long word can never make the page wider than a phone.
 
-**Spacing scale**: `--space-1` 4 px, `--space-2` 8, `--space-3` 12, `--space-4` 16, `--space-5`
-24, `--space-6` 32, `--space-7` 48. Nothing uses another value except 2 px and 3 px for borders
-and the filter group's inner padding.
+**Spacing scale**: `--space-1` to `--space-7` (above). Only borders (1 to 3px) use other values.
 
-**Control heights**: 40 px (fields, buttons), 32 px (`.small`: header button, row actions, step
-actions, Remove, Add step). At 390 px every target is at least 32 x 32 px (WCAG 2.5.8 asks 24).
+**Control heights**: 40px (fields, buttons), 32px (`.button-compact`), 44px for row and step
+actions on a touch screen. Every target is at least 32 x 32px with a mouse.
 
 ## Components
 
 ### Header
 
-A full-width bar, 56 px high, bottom line `--border`. Inside the 46rem column: the wordmark "To-do
-list" (700, `--text`, no underline) left; "Logged in as mara" (`--muted`, 0.9375rem) and the
-**Log out** button (secondary, small) right. One line at 390 px too. The logout form keeps
-`<form method="post" action="/accounts/logout/"` at the start of its tag (a test checks it); a
-`class` may only come after `action`.
+A full-width bar, at least 56px high, bottom line `--border`. Inside the 46rem column: the
+wordmark "To-do list" (700, `--text`, no underline, a link to `/`) left; `<span class="who">Logged
+in as mara</span>` (`--muted`, 0.9375rem) and **Log out** (`.button-secondary .button-compact`)
+right. The logout form keeps `<form method="post" action="/accounts/logout/"` at the start of its
+tag (a test checks it); a `class` may only come after `action`. At 320px "Logged in as mara" may
+wrap to two lines; it stays visible.
 
 ### Messages
 
-Under the header, 24 px space. Each message: `--band` background, `--text`, `--radius`, padding
-12 / 16 px. `messages.error` (`.message.error`, from `message.tags`) uses `--danger-bg` and
-`--danger`. Still `role="status"`. No icon, no close button (it goes away on the next page).
+Under the header, 24px space. Each message: `--band`, `--text`, `--radius`, padding 12 / 16px.
+`.message.error` (from `message.tags`): `--danger-bg` and `--danger`. Still `role="status"`. No
+icon, no close button.
 
 ### List menu (`nav.lists`)
 
 Two lines, as today: "My lists:" and "Shared with me:" in `--muted`, then the links in `--text`
-without underline, 16 px apart. Hover: a 2 px `--border` line under the link. **Current list**
-(`aria-current="page"`): weight 650 and a 2 px `--accent` line under it. "+ New list" in
-`--accent`. A shared list's owner, "(theo)", is wrapped in a `<span class="owner">` in `--muted`:
-the link's name stays "Band practice (theo)". Wraps on small screens.
+without underline, 16px apart, wrapping. Hover: a 2px `--border` line under the link. **Current
+list** (`aria-current="page"`): weight 650 and a 2px `--accent` line under it. "+ New list" in
+`--accent`. A shared list's owner, "(theo)", is in a `<span class="owner">` in `--muted`: the
+link's name stays "Band practice (theo)".
 
 ### List title and owner actions
 
-`h1` on the left, and on the same line on the right: **Rename** (`--accent`) and **Delete list**
-(`--danger`), both quiet text links with an 8 px-radius `--band` hover background. A member sees
-"Shared by theo" in `--muted` in the same place. They wrap under the name when the name is long.
+`h1` left; on the same line right: **Rename** (`--accent`) and **Delete list** (`--danger`), quiet
+text links with an 8px `--band` hover background. A member sees "Shared by theo" in `--muted` in
+the same place. They wrap under the name when the name is long.
 
 ### Add form
 
-Two rows. Row 1: label "New to-do", the title field, full width. Row 2 on a grid: "Due date",
-"Repeat", "Priority" (each a label above its field), then **Add** (primary) lined up with the
-fields. At 390 px: Due date full width, Repeat and Priority side by side, Add full width. Errors
-from the add (`form.title.errors` etc.) move from above the form to under their own field; their
-`id`s (`id_title_error`, ...) and the fields' `aria-describedby` stay.
+Two rows. Row 1: "New to-do" and the title field, full width. Row 2 on a grid: "Due date",
+"Repeat", "Priority" (label above each), then **Add** (`.button-primary`) lined up with the fields.
+At 390px: Due date full width, Repeat and Priority side by side, Add full width. Each error
+(`form.title.errors` and so on) moves from above the form into its field's `div.field`, after the
+input; its `id` (`id_title_error`, ...) and the field's `aria-describedby` stay. The priority and
+repeat selects stay exactly as Django renders them (no new widget attributes or classes in
+`forms.py`, no new `id`).
 
-### Search, filter, sort (one "find" bar)
+### Search, sort, filter (one "find" bar)
 
-One row under a `--border` line, 32 px below the add form: the search field with its label
-"Search to-dos" and the **Search** button (secondary) joined; the filter links as one segmented
-group (`--surface`, `--border` edge, 8 px radius; the current link gets `--band` and weight 600;
-the others `--muted`); "Sort by:" with its select and the **Sort** button (secondary). "Show all"
-stays a text link after Search. At 390 px the three stack. The filter `<a>`s and "Show all" get
-**no new attributes** (tests compare the whole tag with `html=True`); they are styled through
-`nav.filter a` and `form.search a`.
+One row under a `--border` line, 32px below the add form, **in the HTML order: search, sort,
+filter** (no DOM move). Search: the label "Search to-dos" wraps the field and the **Search**
+button sits after the label (`.button-secondary`), "Show all" after it. Sort: "Sort by:" (Django's
+`label_tag`), its select, **Sort** (`.button-secondary`). Filter: the three links as one group
+(`--surface`, 1px `--border` edge, `--radius`); each link has `--radius-label`; the current one
+gets `--band`, weight 600 and a 2px `--accent` line under it; the others `--muted`. At 390px the
+three stack. The filter `<a>`s and "Show all" get **no new attributes** (tests compare whole tags);
+they are styled through `nav.filter a` and `form.search a`. `<form class="sort" method="get">`
+keeps exactly that start; `<form class="search"` keeps `class` first.
 
-### To-do row (`ul.todos > li`)
+### To-do row (`ul.todos > li`) - CSS only
 
-A CSS grid instead of one flex line. This is what keeps the fix from the other session.
+The markup from #28 stays as it is: `.handle` (manual order only), `.main` (`.title`, then
+`div.meta` with priority, due date, Overdue and repeat, then `details.notes`, then `.tags`),
+`.actions` (move form, Edit, Done/Undo form, Delete form), `details.steps`. This plan changes only
+CSS, plus button classes.
 
 ```
-desktop                       title (wraps)                 | Edit  Done  Delete
-                               High  Due 7 Oct 2026  Overdue  Repeats every Thursday
-                               #admin  #home
-                               > Notes
-                               > Steps: 2 of 5 done   (full width when open)
+1280px, normal         title (wraps)                         | Edit  Done  Delete
+                       High  Due 7 Oct 2026  Overdue  Repeats every Thursday
+                       > Notes
+                       #admin  #home
+                       > Steps: 2 of 5 done   (full width when open)
 
-manual order (?sort=manual)  ⠿ | title ...                   | ↑ ↓  Edit  Done  Delete
+1280px, manual order  ⠿ | title ...                           | ↓  Edit  Done  Delete
 
-390 px                        title (wraps)
-                              High  Due 7 Oct 2026  Overdue  Repeats ...
-                              #admin
-                              Edit  Done  Delete
-                              > Steps ...
+390px, normal          title / meta / notes / tags
+                       Edit  Done  Delete
+                       > Steps
+
+390px, manual order   ⠿ | title / meta / notes / tags
+                        | ↑ ↓  Edit  Done  Delete
+                        | > Steps
 ```
 
-- Columns: `[handle] minmax(0, 1fr) auto`. The handle column exists only when the list can be
-  reordered (`ul.todos[data-reorder-url]`). Grid areas: `"handle main actions" "handle steps
-  steps"`. At under 768 px: `"handle main" "handle actions" "handle steps"`.
-- **Markup change** in `_todo_item.html`: the priority label, due date, Overdue and the repeat
-  text move into `<p class="meta">` inside `.main`, under the title; the move form, Edit, Done and
-  Delete move into `<div class="actions">`. Tags and notes stay in `.main`. Nothing else changes:
-  same classes on the `li` (`done`, `overdue`), same `.title`, `.priority priority-N`,
-  `.visually-hidden`, `time`, `.overdue-label`, `.repeat`, `.tag`, `details.notes`,
-  `details.steps`, `aria-label`s and `id`. Reading order becomes title, meta, tags, notes,
-  actions (today: title, notes, tags, meta, actions).
-- **Title**: weight 550, `overflow-wrap: anywhere`, `min-width: 0` on its column. It can never be
-  narrower than the space left by the actions, so it never squeezes to one word per line and
+Grid (columns, then areas):
+
+| Width | Normal | Manual order (`ul.todos[data-reorder-url]`) |
+|---|---|---|
+| 768px and up | `minmax(0, 1fr) auto`; `"main actions" "steps steps"` | `auto minmax(0, 1fr) auto`; `"handle main actions" "handle steps steps"` |
+| under 768px | `minmax(0, 1fr)`; `"main" "actions" "steps"` | `auto minmax(0, 1fr)`; `"handle main" "handle actions" "handle steps"` |
+
+- **Title**: 550, `display: block`, `overflow-wrap: anywhere`; `.main` has `min-width: 0`. The
+  actions column takes only what it needs, so the title never squeezes to one word per line and
   nothing overlaps it.
-- **Meta line**: 0.875rem `--muted`, wraps with a 4 / 12 px gap. Repeat text and dates wrap
-  inside this line, so they can never push the actions.
-- **Actions**: one line that never wraps, top-aligned with the title. **Edit** (quiet text
-  button), **Done / Undo** (secondary, small: the one bordered button in the row), **Delete**
-  (quiet text button, `--muted`, red text and `--danger-bg` on hover and focus). ↑ / ↓ are small
-  secondary square buttons, before Edit.
-- **Priority label**: 1 px border in `currentColor`, `--radius-label`. High: `--priority-high`,
-  650. Medium and Low: `--muted`, 400. In a done row: `--muted`, 400 (equal to the done title
-  color; the test checks this).
-- **Overdue**: date and the "Overdue" label in `--danger`; the label in 650. No dot, no icon.
-- **Tags**: `--tag-bg`, `--tag-text`, `--radius-label`, 0.8125rem; the HTML stays
+- **Meta line**: 0.875rem `--muted`, wraps with a 4 / 12px gap, inside `.main`, so a long repeat
+  text can never push the actions.
+- **Actions**: one line (`flex-wrap: nowrap`) at 768px and up, top-aligned with the title.
+  **Edit** (`.button-quiet .button-compact`; it stays a plain link with its `aria-label`),
+  **Done / Undo** (`.button-secondary .button-compact`: the one bordered button in the row),
+  **Delete** (`.button-quiet .button-compact`; `--muted`, and `--danger` on `--danger-bg` on
+  hover **and** on `:focus-visible`). ↑ / ↓: `.button-secondary .button-compact`, before Edit.
+  Under 768px the actions get their own line and may wrap; with a finger they are 44px tall,
+  8px apart.
+- **Priority label**: 1px `currentColor` edge, `--radius-label`. High: `--priority-high`, 650.
+  Medium and Low: `--muted`, 400. In a done row: `--muted`, 400 (the test checks it equals the
+  done title).
+- **Overdue**: date and "Overdue" in `--danger`, the label 650. No dot, no icon.
+- **Tags**: `--band`, `--tag-text`, `--radius-label`, 0.8125rem; the HTML stays
   `<span class="tag">#home</span>`.
-- **Done row**: title `--muted` with a line through, weight 400; priority muted; tags and notes
-  stay as they are (not crossed out).
-- **Notes**: `<details class="notes">` (the tag stays exactly so), summary "Notes" 0.875rem
-  `--muted`, `--text` on hover; open text 0.9375rem `--muted`, max 65ch.
-- **Steps**: `<details class="steps">` (exactly so, plus `open` from `?open=`). Summary as notes.
-  When open: the steps in a list with a 2 px `--border` line on the left; each step's title and
-  its quiet **Done / Undo** and **Delete** text buttons on one line; done steps crossed out in
-  `--muted`. Then a small "New step" label, its field (32 px) and **Add step** (secondary, small).
-- **Drag**: the dragged row gets `--drag-bg` and a 2 px dashed `--control` outline. The handle
-  ⠿ is `--muted`, `cursor: grab`.
-- **Hover** on a row: none (rows are not clickable as a whole).
+- **Done row**: title `--muted`, line-through, 400; priority muted; tags and notes are not
+  crossed out.
+- **Notes**: summary "Notes" 0.875rem `--muted`; the open text 0.9375rem `--muted`, max 65ch,
+  `overflow-wrap: anywhere` (a long URL wraps).
+- **Steps**: summary as notes. Open: a 2px `--border` line on the left; each step's title and its
+  quiet **Done / Undo** and **Delete** on one line; done steps crossed out in `--muted`. Then the
+  "New step" label wrapping its field (32px), and **Add step** (`.button-secondary
+  .button-compact`) after the label.
+- **Drag**: the dragged row gets `--drag-bg` and a 2px dashed `--control` outline. The handle is
+  `--muted`, `cursor: grab`, in its own grid area.
 
 ### Buttons
 
-| Kind | Look | Used for |
+| Class | Look | Used for |
 |---|---|---|
-| Primary | `--accent` fill, `--on-accent` text | Add, Save (all forms), Share |
-| Secondary | `--surface` fill, 1 px `--control` edge, `--text`; hover `--band` | Done/Undo (row), Search, Sort, Log out, Remove, Add step, Leave this list, ↑ / ↓, Cancel (a link that looks like this) |
-| Danger | `--danger` fill, `--on-danger` text | Delete list (on the confirm page), Yes, delete them |
-| Quiet text | no edge, `--muted`; hover `--band` and `--text` | Edit (row), Delete (row, red on hover), step Done/Undo/Delete |
+| `.button .button-primary` | `--accent` fill, `--on-accent` text | Add, Save, Share |
+| `.button .button-secondary` | `--surface`, 1px `--control` edge, `--text`; hover `--band` | Done/Undo (row), Search, Sort, Log out, Remove, Add step, Leave this list, ↑ / ↓ |
+| `.button .button-danger` | `--danger` fill, `--on-danger` text | Delete list (confirm page), Yes, delete them |
+| `.button .button-quiet` | no edge, `--muted`; hover `--band` and `--text` | Edit, Delete (row, red on hover and focus), step Done/Undo/Delete |
+| `.button-small` / `.button-compact` | 40px / 32px tall | header, rows, steps, Remove |
 
-All: 8 px radius, 0.9375rem, weight 550, never wrap, 1 px down while pressed, focus ring 2 px
-`--focus` 2 px away. The class goes on the `<button>`; no button label changes.
+All: `--radius`, 0.9375rem, weight 600, never wrap, 1px down while pressed, the focus ring.
+Labels do not change. **Cancel** stays a plain `<a href="...">Cancel</a>` with no class (a test
+compares the whole tag); `.form-actions > a` gives it the secondary look.
 
 ### Fields
 
-`--surface` fill, 1 px `--control` edge, 8 px radius, 40 px high, text 1rem (so iOS does not zoom
-in), `font: inherit` (also the textarea: no more monospace). Placeholder `--muted`. Focus: edge
-and ring `--accent`. Error: edge `--danger` (`[aria-invalid="true"]`), the message under the field,
-0.875rem 550 `--danger`. Help text under the field, 0.875rem `--muted`. Labels above, 0.875rem 550
-`--text`. Select and date fields get the same height and edge as text fields.
+`--surface` fill, 1px `--control` edge, `--radius`, 40px, text 1rem (so iOS does not zoom),
+`font: inherit` (also the textarea: no monospace). Placeholder `--muted`. Focus: edge `--accent`
+and the ring. Error: edge `--danger`, kept while focused; the message after the input, 0.875rem
+600 `--danger`. Help after the error, 0.875rem `--muted`. Labels 0.875rem 600 `--text`.
 
 ### "Clear completed" and the other confirmations
 
-`details.clear-completed`: a box with a 1 px `--border` edge and 8 px radius; the summary
-"Clear completed (2)" in `--muted`; open: the sentence in `--text`, then **Yes, delete them**
-(danger). "Delete list" page: `h1` question, "This cannot be undone." in `--muted`, then **Delete
-list** (danger) and **Cancel** (secondary link-button), 8 px apart.
+`details.clear-completed`: 1px `--border` edge, `--radius`; summary "Clear completed (2)" in
+`--muted`; open: the sentence, then **Yes, delete them** (`.button-danger`). "Delete list" page:
+`h1` question, "This cannot be undone." in `--muted`, then **Delete list** (`.button-danger`) and
+Cancel (plain link, secondary look), 8px apart, in `.form-actions`.
 
 ### Sharing (owner) and Leave (member)
 
-Its own section 48 px below the list, with a `--border` line on top. `h2` "Sharing". Members: one
-row each, name left, **Remove** (secondary, small) right, a `--border` line under each row (the
-HTML `<span class="title">ines</span>` stays). "Only you can see this list." in `--muted` when
-there are no members. The share form: label "Username" above the field, **Share** (primary). A
-member instead sees **Leave this list** (secondary) in the same place.
+Its own section 48px below the list, a `--border` line on top. `h2` "Sharing". One row per
+member: name left (`<span class="title">ines</span>` stays), **Remove** (`.button-secondary
+.button-compact`) right. "Only you can see this list." in `--muted` when empty. The share form:
+the label "Username" wraps its field, **Share** (`.button-primary`) after the label. A member
+sees **Leave this list** (`.button-secondary`) instead.
 
 ### Empty states (copy unchanged)
 
-- Empty list: "Nothing to do yet. Add something above." as one `--muted` line with 32 px
-  space above and below, no line under it (`<li class="empty">`).
-- No match: "No to-dos match “bicycle”." the same way; "Show all" is already next to Search.
-- Manual order with a filter: "Clear the filter to change the order." in `--muted`, as today.
-- No members: "Only you can see this list." in `--muted`, as today.
+- Empty list: "Nothing to do yet. Add something above." as one `--muted` line, 32px above and
+  below, no line under it (`<li class="empty">`).
+- No match: "No to-dos match “bicycle”." the same way; "Show all" is next to Search.
+- Manual order with a filter: "Clear the filter to change the order." in `--muted`.
+- No members: "Only you can see this list." in `--muted`.
 
 ### Edit page, "New list", "Rename list"
 
-`h1`, then the form as one column, 36rem wide, 16 px between fields. Each Django field `div` is
-a flex column: label (order 1), field (2), help (3), error (4). Labels keep Django's colon
-("Notes:"; a test checks it). Buttons in a row at the end: **Save** (primary) and **Cancel**
-(secondary link-button). On the edit page the order of the fields stays: Title, Due date,
-Repeat, Notes, Priority, Tags.
+`h1`, then one column, 36rem wide, 16px between fields. Each field through `todos/_field.html`:
+label (with Django's colon), input, error, help, in DOM order. The edit page's field order stays:
+Title, Due date, Repeat, Notes, Priority, Tags. "A repeating to-do needs a due date." is an error
+of the **Repeat** field, so it shows under Repeat. Save (`.button-primary`) and Cancel in
+`.form-actions`.
 
-### Mobile (390 px)
+### Mobile (390px and 320px)
 
-16 px side space; no horizontal scroll (the existing CUJ check stays). The header stays one line.
-The add form and the find bar stack as described above. Each row: text first, then its actions on
-their own line, left-aligned. Step actions stay on the step's line.
+16px side space; no horizontal scroll at 390 or 320px. The header stays one bar. The add form and
+the find bar stack. Each row: text first, then its actions on their own line. Step actions stay on
+the step's line.
 
 ### States, checked on every page
 
-Hover, pressed, focus (keyboard), disabled (not used today), error, empty, done, overdue,
-dragging, open/closed `details`. There is no loading state: every action is a normal page load.
+Hover, pressed, focus (keyboard), invalid, invalid and focused, empty, done, overdue, dragging,
+open/closed `details`, touch sizes. There is no loading state: every action is a normal page load.
 
 ## Not part of this task
 
-- **The login and sign-up pages** (`accounts/templates/registration/*.html`). They will be
-  redesigned separately, with the same design as the landing page and CSS shared with
-  `landing.css`. This plan does not spec them. Until that task, they only change as much as
-  `base.html` changes (the new background, header and field styles apply to them too, because
-  they extend `base.html`); they must keep working, and the tests for them must keep passing.
-- A light/dark toggle (the system decides, as today).
-- Icons, an icon library, a web font, pictures.
-- New features or changed behaviour: no new pages, no new fields, no JavaScript beyond
-  `reorder.js` (unchanged), no change to what the server sends after an action.
-- Moving error messages from `messages.error` (bad step title, bad share username) to the field.
-  They keep showing at the top, now in the error style.
+- **The login and sign-up pages.** They are redesigned separately (`feature/auth-pages`): they
+  now extend `todos/site_base.html` and use `site.css`, not `base.html`, so this plan does not
+  touch them. This plan reuses that branch's `tokens.css` and `todos/_field.html`.
+- **The landing page.** `landing.html` and its CSS are not touched, except its screenshots (last
+  step).
+- A light/dark toggle; icons, an icon library, a web font, pictures.
+- New features or changed behaviour: no new page, field or JavaScript; `reorder.js` unchanged.
+- Moving `messages.error` texts (bad step title, bad share username) to the field. They keep
+  showing at the top, now in the error style.
 - The Django admin.
 
 ## Changes to files
 
 | File | Change |
 |---|---|
-| `todos/static/todos/tokens.css` | **New.** All tokens in the table above, light and dark. |
-| `todos/static/todos/app.css` | **New.** All app CSS, moved out of `base.html` and redesigned. |
-| `todos/static/todos/landing.css` | Its `:root` blocks are removed; it uses `tokens.css`. No visual change. |
-| `todos/templates/todos/landing.html` | One `<link>` to `tokens.css` before `landing.css`. |
-| `todos/templates/base.html` | The `<style>` block becomes two `<link>`s; the header gets the wordmark and an inner container; `<main>` around the content. |
-| `todos/templates/todos/todo_list.html` | Wrapping `<label>`s with visible text; errors under their fields; the find bar wrapper; `<span class="owner">`; classes on buttons; `li.empty`. |
-| `todos/templates/todos/_todo_item.html` | `.meta` and `.actions` wrappers; classes on buttons; a "New step" label. |
-| `todos/templates/todos/todo_edit.html`, `list_form.html`, `list_confirm_delete.html` | Classes on buttons; a wrapper for Save and Cancel. |
-| `todos/tests/cuj/test_journeys.py` | The color test grows; one new row-layout test (see Tests). |
-| `AGENTS.md`, `README.md` | The CSS now lives in `tokens.css` and `app.css`, not in `base.html`. |
-| `todos/static/todos/landing/*.webp` | Retaken at the very end (last step). |
+| `todos/static/todos/tokens.css` | Add the "app" tokens in the table. No existing value changes. |
+| `todos/static/todos/app.css` | **New.** First the current app CSS word for word (1a), then the redesign. |
+| `todos/templates/base.html` | `<style>` becomes `<link>`s to `tokens.css` and `app.css`; header with wordmark, inner container and `<span class="who">`; `<main class="container">`. |
+| `todos/templates/todos/todo_list.html` | `div.field`s and labels; errors after their inputs; the find bar wrapper; `<span class="owner">`; button classes; `li.empty`. |
+| `todos/templates/todos/_todo_item.html` | Button classes and the "New step" label only. |
+| `todos/templates/todos/todo_edit.html`, `list_form.html`, `list_confirm_delete.html` | Fields through `todos/_field.html`; `.form-actions`; button classes. |
+| `todos/tests/cuj/test_journeys.py` | Color test extended; row layout test extended; the header color selector; the shared-button check (see Tests). |
+| `scripts/landing_shots.py`, `scripts/landing_seed.py`, `Makefile` | **New.** The landing screenshot tool and `make landing-shots` (Step 9). |
+| `todos/static/todos/landing/*.webp` | Retaken at the end. |
+| `AGENTS.md`, `README.md` | `app.css` and `tokens.css` rows; `base.html` no longer holds CSS; `make landing-shots`. |
 
-No model, migration, view, form, URL or package change.
+No model, migration, view, form, URL or package change. `landing.css`, `landing.html`,
+`site.css` and `site_base.html` are not changed.
 
 ## Tests
 
 Rule: test each rule once, in the lowest layer where a person would notice it. Colors and layout
-are only real in a browser, so new checks are CUJ tests.
+are only real in a browser, so the new checks are CUJ tests.
 
 ### Existing tests that check colors, layout or exact HTML
 
-None of them has to change, **if** the constraints below are kept. Each was checked by reading it.
+Only one existing line has to change (the header selector). The rest pass **if** the constraints
+in this table are kept. Each was checked by reading it.
 
-| Test | What it checks | Effect of the redesign |
+| Test | What it checks | Effect / constraint |
 |---|---|---|
-| `cuj/test_journeys.py` `test_readable_in_light_and_dark` | Light `body` background luminance > 0.9, dark < 0.1; AA for text, done title, header, overdue, High, tag; High ≠ overdue; a done High label has the done color; dark tag background < 0.1 | Passes with the new tokens (0.93 / 0.005; all pairs above). **Extended** (see below). |
-| `cuj/test_journeys.py` `test_fix_a_typo` | No horizontal scroll at 375 px; a done title's line-through does not reach the notes | Passes: `min-width: 0` and `overflow-wrap: anywhere` on the title and notes; line-through only on `.title`. |
-| `cuj/test_journeys.py` `test_reorder_by_drag`, `test_escape_cancels_a_drag` | Drags `.handle` onto a row's box; `li.dragging` | Passes: the handle and the row classes stay. |
-| `cuj` tests using `get_by_label("New to-do" / "Due date" / "Priority" / "Search to-dos" / "Title" / "Notes" / "Tags")` and button names (Add, Done, Undo, Delete, Edit, Share, Remove carol, Move down: Third, Add step, Yes, delete them, Leave this list, Log out, New list, Groceries (alice)) | Accessible names | Pass: `aria-label`s stay and every visible label is the same text; link text "Groceries (alice)" stays when "(alice)" is in a span. |
-| `integration/test_filter.py` (filter links, `html=True`), `test_search.py` and `test_sort.py` ("Show all", `html=True`) | The whole `<a>` tag | **Constraint**: no `class` or other attribute on these links. |
-| `integration/test_search.py` `test_search_box_keeps_typed_text` (`html=True`) | The whole search `<input>` | **Constraint**: no new attribute on it (no `id`, no `class`); the label wraps it. |
-| `integration/test_views.py` `test_add_input_keeps_its_browser_checks` | `placeholder="What` on the title input | Passes: the placeholder stays as a hint. |
-| `integration/test_search.py` (`<details class="steps" open>`), `test_views.py` (`<details class="notes">`, `<summary aria-label="Notes for …">Notes</summary>`, `<span class="overdue-label">Overdue</span>`, `<h1>Edit to-do</h1>`, `Notes:</label>`), `test_sharing.py` (`<span class="tag">#work</span>`, `<span class="title">&lt;b&gt;ben</span>`) | Exact HTML | **Constraint**: these tags keep exactly these attributes. |
-| `integration/test_lists.py` `test_menu_shows_my_lists` | `aria-current="page">` exactly twice | **Constraint**: no new `aria-current` on the page (the wordmark gets none). |
-| `accounts/tests/integration/test_accounts.py` | `<form method="post" action="/accounts/logout/"` and "Logged in as alice" | **Constraint**: keep the start of the tag; the text stays visible at 390 px. |
+| `cuj/test_journeys.py` `ColorSchemeTests.test_readable_in_light_and_dark` | Light `body` luminance > 0.9, dark < 0.1; AA for text, done title, header, overdue, High, tag; High ≠ overdue; done High = done title; dark tag background < 0.1 | Passes (0.93 / 0.005; all pairs above). **Change** line 183: `header.site` becomes `header.site .who` (the header itself now holds the wordmark in `--text`; the muted text is the span). **Extended** (below). |
+| `cuj/test_journeys.py` `RowLayoutTests.test_a_full_row_stays_readable` | Title and priority do not overlap; title fits its box; Done and Delete on one line; 1280 and 390, normal and manual, light and dark | Passes with the CSS grid. **Extended** (below). |
+| `cuj/test_journeys.py` `test_fix_a_typo` | No horizontal scroll at 375px; the line-through does not reach the notes | Passes (`overflow-wrap`, line-through only on `.title`). |
+| `cuj/test_journeys.py` `test_reorder_by_drag`, `test_escape_cancels_a_drag` | Drags `.handle` onto a row; `li.dragging` | Passes: classes stay. |
+| CUJ `get_by_label(...)` and button names | Accessible names | Pass: `aria-label`s stay; visible labels use the same text. |
+| `integration/test_filter.py` (filter links), `test_search.py` and `test_sort.py` ("Show all"), all `html=True` | The whole `<a>` tag | No `class` or other attribute on these links. |
+| `integration/test_search.py` `test_search_box_keeps_typed_text` (`html=True`) | The whole search `<input>` | No new attribute (no `id`, no `class`); its label wraps it. |
+| `integration/test_sort.py` `test_forms_keep_each_other` (lines 109-115) | `<form class="sort" method="get">` exact start; finds `<form class="search"` | Keep both starts exactly. |
+| `integration/test_views.py` `test_add_input_keeps_its_browser_checks` | `placeholder="What` on the title input | The placeholder stays as a hint. |
+| `integration/test_views.py` lines 688-693 (`assertInHTML` of the add form's priority select with an error) | `<select name="priority" aria-label="Priority" aria-invalid="true" aria-describedby="id_priority_error" id="id_priority">` | No widget attribute or class added in `forms.py`; no new `id`; the `<label for="id_priority">` is outside the select. |
+| `integration/test_views.py` line 912 | `aria-label="Repeat"` | Stays on the repeat select. |
+| `integration/test_views.py` line 114 | The title's `</span>` comes before `<details class="notes">` | Row order unchanged (CSS only). |
+| `integration/test_views.py` lines 467-471, `test_sharing.py` line 701 | `<a href="...">Cancel</a>` exactly | Cancel gets no class; styled by `.form-actions > a`. |
+| `integration/test_views.py` (`<details class="notes">`, `<summary aria-label="Notes for …">Notes</summary>`, `<span class="overdue-label">Overdue</span>`, `<h1>Edit to-do</h1>`, `Notes:</label>`), `test_search.py` (`<details class="steps" open>`), `test_sharing.py` (`<span class="tag">#work</span>`, `<span class="title">&lt;b&gt;ben</span>`) | Exact HTML | These tags keep exactly these attributes; `_field.html` uses `label_tag` (the colon). |
+| `integration/test_lists.py` `test_menu_shows_my_lists` | `aria-current="page">` exactly twice | No new `aria-current` (the wordmark gets none). |
+| `accounts/tests/integration/test_accounts.py` | `<form method="post" action="/accounts/logout/"` and "Logged in as alice" | Keep the start of the tag; the text stays visible at 390px. |
 
 ### New and extended tests (CUJ, `todos/tests/cuj/test_journeys.py`)
 
 | Test | What it checks |
 |---|---|
-| `test_readable_in_light_and_dark` (extended) | Also: the primary button's text on its background, a link (`nav.lists a[aria-current]`), a field's edge on the page (≥ 3 : 1), the focus ring on a focused field (≥ 3 : 1), the meta line, an error under a field. Same helper, same two modes. |
-| `test_row_keeps_its_shape` (new, unless the row fix already added one like it) | At 1280 and 390 px, a to-do with a 140-character title, High, a due date and "Repeats every …": the title's box does not overlap the priority label's box; the Edit, Done and Delete buttons have the same `y` (one line); at 1280 px they are to the right of the title; no horizontal scroll. |
+| `test_readable_in_light_and_dark` (extended) | Also: the primary button's text on its background; a link (`nav.lists a[aria-current]`); a field's edge on the page (≥ 3 : 1); the focus ring on a focused field (≥ 3 : 1); the meta line; an error under a field; the current filter's underline on its group (≥ 3 : 1). Same helper, both modes. |
+| `RowLayoutTests.test_a_full_row_stays_readable` (extended) | The to-do gets a 140-character title, notes with an 80-character unbroken URL, and steps; notes and steps are open (`?open=`). Widths 1280, 390 **and 320**. New checks: at 1280 the actions are to the right of the title (`actions.x >= title.x + title.width`); no horizontal scroll (`scrollWidth <= clientWidth`); the open notes and steps stay inside the row. |
+| `test_primary_button_is_the_same_everywhere` (new) | On `/` logged out (landing, `.button-primary`) and on the list page (Add): the computed `background-color`, `border-radius` and `font-weight` are equal, in light and dark. |
 
-Every new test is shown failing before its change and passing after (`AGENTS.md`).
+Every new check is shown failing before its change and passing after (`AGENTS.md`).
 
 ## Steps
 
 Each step is one small commit that keeps `make check` green. Look at the pages in light and dark,
-at 1280 and 390 px, after each one.
+at 1280, 390 and 320px, after each one.
 
-0. **Wait** for the row fix and the landing page to be on `main`. Rebase on `main`.
-1. **Tokens.** Add `tokens.css` with the landing values plus the new tokens. Make `landing.css`
-   use it (landing looks the same: compare screenshots). Move the app CSS from `base.html` into
-   `app.css`, using the new token names. Extend the color test first and see it fail on the old
-   colors where it should (the field edge), then pass.
-2. **Typography and frame.** Font stack, type scale, `tabular-nums`, the 46rem column, the
-   header bar with the wordmark, `<main>`, spacing scale.
-3. **Buttons and fields.** The four button kinds and their classes, field styles, focus ring,
-   pressed state, reduced motion, label/field/help/error order, red edge on errors.
-4. **The to-do row.** Write `test_row_keeps_its_shape` (or check the one from the row fix), then
-   the `.meta` / `.actions` markup and the grid. Steps, notes, tags, priority, overdue, drag.
-5. **Page sections.** List menu, title and owner actions, add form with visible labels and errors
-   under fields, the find bar, clear completed, sharing and leave.
+0. **Wait** for `feature/auth-pages` (it creates `tokens.css` and `todos/_field.html`). Rebase on
+   `main`.
+1. **a. Move.** Move the current CSS from `base.html` into `app.css` word for word; `base.html`
+   links it. No visual change (compare screenshots).
+   **b. Tokens.** Extend the color test first and see it fail (the field edge, the current filter
+   line). Add the app tokens to `tokens.css`, link `tokens.css` before `app.css`, switch `app.css`
+   to the new names and values. The test passes.
+2. **Typography and frame.** Type scale, `tabular-nums`, the 46rem column, the header bar with the
+   wordmark and `.who` (change the test selector here), `<main>`, spacing.
+3. **Buttons and fields.** The button classes on every button, field styles, the focus ring,
+   pressed state, reduced motion, touch sizes, `div.field` structure, `_field.html` on the edit
+   and list forms, red edge on errors. Add `test_primary_button_is_the_same_everywhere` first.
+4. **The to-do row (CSS only).** Extend `RowLayoutTests` first (it fails at 320px or on the
+   actions position), then the grid for both widths and the manual order, steps, notes, tags,
+   priority, overdue, drag.
+5. **Page sections.** List menu, title and owner actions, add form with labels and errors after
+   their fields, the find bar, clear completed, sharing and leave.
 6. **The other app pages.** Edit, New list, Rename list, Delete list.
 7. **Empty, error and message states.** `li.empty`, the error message style, the "no match" and
    "clear the filter" lines.
-8. **Docs.** `AGENTS.md` (the `base.html` row and two new rows: `tokens.css`, `app.css`) and
-   `README.md`. Run `make check`.
-9. **Last: retake the landing page screenshots** (`todos/static/todos/landing/*.webp`, light and
-   dark) so the landing page shows the new app. Same names and sizes; check the `alt` texts still
-   describe what the pictures show.
+8. **Docs.** `AGENTS.md` and `README.md`. Run `make check`.
+9. **Last: retake the landing page screenshots.** Commit the tool first: `scripts/landing_shots.py`
+   and its seed `scripts/landing_seed.py` (a scratch database, never `db.sqlite3`; a free port,
+   never 8000), and `make landing-shots`. Then retake the 7 pairs in
+   `todos/static/todos/landing/`, each `-light.webp` and `-dark.webp`, 1088px wide (544 CSS px at
+   2x): `list` (1088 x 1266), `share-owner` (1088 x 466), `share-member` (1088 x 334), `steps`
+   (1088 x 612), `find` (1088 x 896), `order` (1088 x 734), `compare` (1088 x 838; the light and
+   dark halves). Heights will change with the new layout: update `width`/`height` in
+   `landing.html` to match, and check each `alt` text still describes the picture. The login and
+   sign-up pages reuse `list-*.webp`, so check them too.
 
 ## Open questions
 
-1. **The wordmark in the header.** "To-do list" at the top left, linking to `/` (your first
-   list), like on the landing page. It is the only new link. Keep it, or show it as plain text?
-2. **Row actions on a phone.** The plan puts Edit, Done and Delete on their own line under the
-   text at 390 px, so the title gets the full width. The other choice is a narrow column on the
-   right with smaller buttons. Is a taller row on the phone fine?
-3. **A quiet Delete.** In each row, Delete is gray text that turns red on hover, so the list is
-   calmer. It still deletes at once with no question, as today. Fine, or keep a bordered button?
-4. **Visible labels.** The add form, search, "Username" and "New step" get a small label above
-   the field (the skill asks for it; today only screen readers hear these names). This makes the
-   top of the list page about 40 px taller. OK?
+Each with a recommendation.
+
+1. **One look for the secondary button across the whole product?** Today the visitor pages'
+   secondary button is a blue outline; this plan's app buttons use a gray edge (`--control`),
+   because a list page has many secondary buttons and blue everywhere would be loud.
+   *Recommendation:* one gray-edge look everywhere (change `site.css` to match, in the auth-pages
+   branch or a small follow-up), so "one product" holds. The other choice: blue outline on
+   visitor pages, gray in the app.
+2. **Row actions on phones, and the row Delete.** On phones the actions get their own line, at
+   least 44px tall. The row Delete is quiet gray, red on hover and keyboard focus, or always red.
+   *Recommendation:* own line on phones; quiet gray Delete (a list of red words is loud, and the
+   row already has one bordered button). On a phone there is no hover, so it shows gray until
+   tapped.
+3. **Visible labels** above "New to-do", search, "Username" and "New step" (about 40px more at the
+   top of the list page). *Recommendation:* yes: the skill and WCAG both ask for a visible label,
+   and "New step" has no hint at all today.
+4. **Keep the landing screenshot script in the repo**, with `make landing-shots`.
+   *Recommendation:* yes: every later visual change needs new screenshots, and a script makes them
+   the same each time with invented data only.
+
+## Review
+
+Changes after the review (approved with changes):
+
+- The row fix (#28) is merged: the row is now **CSS only**. The plan keeps `div.meta`, notes
+  before tags, `.actions`. The new row test was dropped; `RowLayoutTests.test_a_full_row_stays_readable`
+  is extended instead (140-character title, 80-character URL in notes, notes and steps open, 320px,
+  actions right of the title at 1280px, no horizontal scroll). The mockup uses this markup.
+- **One token file** `tokens.css`, from the auth-pages branch (with its `--control` and `--danger`
+  values, contrast recomputed); this plan only adds tokens. `landing.css` and `landing.html` are no
+  longer changed. The auth pages extend `site_base.html`, not `base.html`.
+- **One button vocabulary** (`.button`, `-primary`, `-secondary`, `-danger`, `-quiet`, `-small`,
+  plus the app's `-compact`), buttons at weight 600 like `site.css`, and a new CUJ check that the
+  primary button looks the same on the landing page and in the app.
+- Cancel stays a plain link, styled by `.form-actions > a`.
+- More constraints in the test table: the priority select `assertInHTML`, the sort and search form
+  starts, `aria-label="Repeat"`, title before notes, and the header color test now reads
+  `header.site .who`.
+- The current filter gets a 2px accent line (its fill alone is 1.2 : 1); filter links use
+  `--radius-label` (no third radius).
+- Accessibility: fields in DOM order through `todos/_field.html` (no CSS `order`); no error list
+  or button inside a `<label>`; `:focus-visible` sets only the outline; an invalid focused field
+  keeps its red edge; 44px touch targets with 8px gaps; Delete red on focus too. The mockup's
+  "needs a due date" error moved under Repeat, where Django puts it.
+- The find bar keeps the HTML order: search, sort, filter.
+- Both grid layouts for the manual order (with a handle area) are written out; long words wrap in
+  the `h1`, the list menu and "Shared by"; 320px is checked.
+- Step 1 is split into 1a (move, no visual change) and 1b (tokens). Step 9 commits the screenshot
+  tool with `make landing-shots` and lists the 7 image pairs. "Grid areas" and "specificity" are
+  explained. The wordmark question is gone (kept, as on `site_base.html`). New open questions.
