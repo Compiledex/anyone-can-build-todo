@@ -78,7 +78,12 @@
     {% endif %}
     <form class="add-step" method="post" action="{% url 'subtask_add' todo.pk %}">
       {% csrf_token %}
-      <input name="title" aria-label="New step for {{ todo.title }}" maxlength="200" required>
+      {# The label wraps the input, so the input needs no id. #}
+      <div class="field">
+        <label>New step
+          <input name="title" aria-label="New step for {{ todo.title }}" maxlength="200" required>
+        </label>
+      </div>
       <button class="button button-secondary button-compact" type="submit">Add step</button>
     </form>
   </details>

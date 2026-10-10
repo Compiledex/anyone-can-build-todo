@@ -621,33 +621,58 @@ def overlaps(a, b):
     )
 
 
+def inside(inner, outer):
+    """True if the box `inner` is inside the box `outer` (left and right)."""
+    return inner["x"] >= outer["x"] - 0.5 and (
+        inner["x"] + inner["width"] <= outer["x"] + outer["width"] + 0.5
+    )
+
+
+# 140 characters, and a link of 80 characters with no space to break at.
+LONG_TITLE = (
+    "Pay the electricity bill and the rent, then call the landlords about the "
+    "broken window in the kitchen and ask when the painters can come by."
+)
+LONG_URL = "https://example.org/" + "a" * 60
+
+
 class RowLayoutTests(BrowserTestCase):
     def test_a_full_row_stays_readable(self):
         """A to-do with a long title and every label: nothing on top of each other."""
+        self.assertEqual(len(LONG_TITLE), 140)
+        self.assertEqual(len(LONG_URL), 80)
         page = self.page
         user = make_user_with_inbox()
         the_list = user.todo_lists.get()
         rent = the_list.todos.create(
-            title="Pay the electricity bill and the rent",
+            title=LONG_TITLE,
             priority=3,  # High
             due_date=timezone.localdate() + timedelta(days=3),
             repeat="weekly",
+            description=f"The form is at {LONG_URL} for the meter reading.",
         )
         rent.set_tags(["home", "money"])
+        for step in ["Read the meter", "Find the contract"]:
+            rent.subtasks.create(title=step)
         self.log_in_as(user)
 
-        # 1280 is a laptop, 390 a phone. The manual order adds the handle and Move.
-        for width in [1280, 390]:
-            for sort in ["", "?sort=manual"]:
+        # 1280 is a laptop, 390 and 320 phones. The manual order adds the handle
+        # and Move. ?open= opens the steps.
+        for width in [1280, 390, 320]:
+            for sort in ["?", "?sort=manual&"]:
                 for scheme in ["light", "dark"]:
                     with self.subTest(width=width, sort=sort, scheme=scheme):
                         page.set_viewport_size({"width": width, "height": 800})
                         page.emulate_media(color_scheme=scheme)
                         page.goto(
-                            f"{self.live_server_url}{the_list.get_absolute_url()}{sort}"
+                            f"{self.live_server_url}{the_list.get_absolute_url()}"
+                            f"{sort}open={rent.pk}"
                         )
                         row = page.locator(f"#todo-{rent.pk}")
                         expect(row.locator(".repeat")).to_contain_text("Repeats every")
+                        row.locator("details.notes summary").click()
+                        expect(row.locator("details.notes p")).to_be_visible()
+                        expect(row.locator("details.steps ul")).to_be_visible()
 
                         title = row.locator(".title").bounding_box()
                         priority = row.locator(".priority").bounding_box()
@@ -659,9 +684,37 @@ class RowLayoutTests(BrowserTestCase):
                             )
                         )
 
-                        done = row.get_by_role("button", name="Done").bounding_box()
-                        delete = row.get_by_role("button", name="Delete").bounding_box()
+                        # exact: not the steps' "Done: Read the meter" buttons.
+                        done = row.get_by_role("button", name="Done", exact=True)
+                        delete = row.get_by_role("button", name="Delete", exact=True)
+                        done, delete = done.bounding_box(), delete.bounding_box()
                         self.assertEqual(done["y"], delete["y"], (done, delete))
+
+                        # On a laptop, the buttons are to the right of the title,
+                        # at the top of the row. On a phone, on their own line.
+                        actions = row.locator(".actions").bounding_box()
+                        main = row.locator(".main").bounding_box()
+                        if width == 1280:
+                            self.assertGreaterEqual(
+                                actions["x"], title["x"] + title["width"]
+                            )
+                            self.assertLessEqual(abs(actions["y"] - title["y"]), 8)
+                        else:
+                            self.assertGreaterEqual(
+                                actions["y"], main["y"] + main["height"]
+                            )
+                        # The open notes and steps stay inside the row.
+                        box = row.bounding_box()
+                        for part in ["details.notes", "details.steps"]:
+                            part_box = row.locator(part).bounding_box()
+                            self.assertTrue(inside(part_box, box), (part, part_box))
+                        # Nothing is wider than the screen.
+                        self.assertTrue(
+                            page.evaluate(
+                                "document.documentElement.scrollWidth"
+                                " <= document.documentElement.clientWidth"
+                            )
+                        )
 
 
 # The size of a laptop screen and of a phone (iPhone 14), in CSS pixels.

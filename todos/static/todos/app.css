@@ -365,6 +365,221 @@ form.form-actions {
   color: var(--text);
 }
 
+/* ---- The to-do row (ul.todos > li) ----
+   The HTML of a row: .handle (only in the manual order), .main (.title, then
+   div.meta, then details.notes, then .tags), .actions (Move, Edit, Done/Undo,
+   Delete), then details.steps. A CSS grid puts each part in a named place (a grid
+   area), so a phone gets another layout from the same HTML:
+   - 768px and up: the text on the left, the buttons on the right, the steps under
+     both. The buttons take only the room they need, so a long title wraps instead
+     of being squeezed to one word per line.
+   - under 768px: the text, then the buttons on their own line, then the steps. */
+
+ul.todos {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+ul.todos > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "main actions"
+    "steps steps";
+  column-gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* The manual order: the drag handle gets its own column in front. */
+ul.todos[data-reorder-url] > li {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "handle main actions"
+    "handle steps steps";
+}
+
+.handle {
+  grid-area: handle;
+  color: var(--muted);
+  cursor: grab;
+  user-select: none;
+  line-height: 1.5;
+}
+
+ul.todos > li > .main {
+  grid-area: main;
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+ul.todos > li .title {
+  display: block;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+/* The facts under the title: priority, due date, Overdue, repeat. They wrap
+   inside .main, so they never push the buttons. */
+ul.todos > li .meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* The priority label. Low and Medium are gray; High is amber and bold. */
+.priority {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-label);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.priority-3 {
+  color: var(--priority-high);
+  font-weight: 650;
+}
+
+/* Overdue: the date and the label in red. No dot, no icon. */
+.overdue time,
+.overdue-label {
+  color: var(--danger);
+}
+
+.overdue-label {
+  font-weight: 650;
+}
+
+ul.todos > li .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.tag {
+  padding: 0 6px;
+  border-radius: var(--radius-label);
+  background: var(--band);
+  color: var(--tag-text);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* A done row: the title (only the title) gray and crossed out. */
+ul.todos > li.done .title {
+  color: var(--muted);
+  font-weight: 400;
+  text-decoration: line-through;
+}
+
+ul.todos > li.done .priority {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* The buttons: one line, at the top of the row. */
+ul.todos > li > .actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  align-self: start;
+  gap: var(--space-1);
+}
+
+/* The forms around Move, Done and Delete do not make their own boxes. */
+ul.todos > li > .actions form {
+  display: contents;
+}
+
+/* Notes and steps open and close with no JavaScript (<details>). */
+ul.todos details summary {
+  width: fit-content;
+  color: var(--muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+ul.todos details summary:hover {
+  color: var(--text);
+}
+
+/* The notes: at most 65 characters wide; a long link wraps. */
+details.notes p {
+  max-width: 65ch;
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+/* The steps, under the text and the buttons. Only .step-title is crossed out,
+   so a done to-do does not cross out its steps. */
+details.steps {
+  grid-area: steps;
+  min-width: 0;
+  margin-top: var(--space-2);
+}
+
+ul.steps {
+  margin: var(--space-2) 0 0;
+  padding: 0 0 0 var(--space-4);
+  border-left: 2px solid var(--border);
+  list-style: none;
+}
+
+ul.steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 0;
+  font-size: 0.9375rem;
+}
+
+ul.steps .step-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+ul.steps li.done .step-title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+/* "New step": its label wraps the field; Add step lines up with the field. */
+form.add-step {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0 calc(var(--space-4) + 2px);
+}
+
+form.add-step .field {
+  flex: 1;
+}
+
+form.add-step input {
+  min-height: var(--control-height-compact);
+}
+
+/* Drag and drop (reorder.js): the row being dragged. */
+ul.todos > li.dragging {
+  background: var(--drag-bg);
+  outline: 2px dashed var(--control);
+}
+
 /* ---- Messages, at the top of the page ---- */
 
 .messages {
@@ -390,6 +605,28 @@ form.form-actions {
   main.container {
     padding-top: var(--space-4);
   }
+
+  /* A row: the text, then the buttons on their own line, then the steps. */
+  ul.todos > li {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "main"
+      "actions"
+      "steps";
+  }
+
+  ul.todos[data-reorder-url] > li {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "handle main"
+      "handle actions"
+      "handle steps";
+  }
+
+  ul.todos > li > .actions {
+    flex-wrap: wrap;
+    margin-top: var(--space-2);
+  }
 }
 
 /* ---- Not redesigned yet (the next commits replace these) ---- */
@@ -411,51 +648,14 @@ form.add input[type=date] { flex: 0 0 auto; }
 form.add select { padding: 0.5rem; font-size: 1rem; }
 form.search, form.sort { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
 form.search input { flex: 1; padding: 0.5rem; font-size: 1rem; }
-ul.todos, ul.members { list-style: none; padding: 0; }
+ul.members { list-style: none; padding: 0; }
 .sharing { margin-top: 2rem; }
-ul.todos > li, ul.members > li { display: flex; align-items: center; gap: 0.5rem;
-                                 padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
-ul.todos > li { flex-wrap: wrap; } /* So the steps can take their own line. */
-/* One to-do row: the text on the left (.main: the title, then .meta and the tags under it),
-   the buttons on the right (.actions). The text gets at least 12rem; when the row is too
-   narrow for both, the buttons move under the text as one group, never one by one. */
-ul.todos > li > .main { flex: 1 1 12rem; min-width: 0; }
-li .title { display: block; overflow-wrap: anywhere; }
-li .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem;
-           margin-top: 0.25rem; font-size: 0.9rem; }
-ul.todos > li > .actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 0.5rem;
-                           margin-left: auto; }
+ul.members > li { display: flex; align-items: center; gap: 0.5rem;
+                  padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
 ul.members > li > .title { flex: 1; min-width: 0; }
-.notes { font-size: 0.9rem; color: var(--muted); }
-.repeat { font-size: 0.9rem; color: var(--muted); }
-.notes p { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
-li .tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
-.tag { font-size: 0.8rem; padding: 0.1rem 0.4rem; border-radius: 0.6rem;
-       background: var(--band); color: var(--tag-text); white-space: nowrap; }
-.overdue time, .overdue-label { color: var(--danger); }
-li.done .title { text-decoration: line-through; color: var(--muted); }
-/* Steps. Only .step-title is crossed out, so a done to-do does not cross out its steps. */
-details.steps { flex-basis: 100%; font-size: 0.9rem; }
-details.steps summary { cursor: pointer; color: var(--muted); }
-ul.steps { list-style: none; margin: 0.25rem 0; padding: 0 0 0 1.5rem; }
-ul.steps li { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; }
-ul.steps .step-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
-li.step.done .step-title { text-decoration: line-through; color: var(--muted); }
-form.add-step { display: flex; gap: 0.5rem; margin: 0.25rem 0 0 1.5rem; }
-form.add-step input { flex: 1; min-width: 0; padding: 0.3rem; font-size: 0.9rem; }
 details.clear-completed { margin-top: 1.5rem; padding: 0.5rem; border: 1px solid var(--border); }
 details.clear-completed summary { cursor: pointer; color: var(--muted); }
 details.clear-completed p { margin: 0.5rem 0; }
-/* The priority label. Medium uses the normal text color. */
-.priority { color: var(--text); border: 1px solid currentColor; border-radius: 0.25rem;
-            padding: 0 0.3rem; font-size: 0.8rem; white-space: nowrap; }
-.priority-3 { color: var(--priority-high); font-weight: bold; } /* 3 is High */
-.priority-1 { color: var(--muted); } /* 1 is Low */
-li.done .priority { color: var(--muted); }
-/* Manual order (#15): the drag handle, the row being dragged, the Move buttons. */
-.handle { cursor: grab; color: var(--muted); user-select: none; }
-ul.todos > li.dragging { background: var(--drag-bg); outline: 2px dashed var(--border); }
-form.move { display: flex; gap: 0.25rem; }
 
 /* ---- Touch: under a finger, row and step buttons are 44px tall, 8px apart ---- */
 
