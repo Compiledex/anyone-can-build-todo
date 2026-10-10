@@ -1,6 +1,6 @@
 # Plan: Mac notifications for to-dos that are due
 
-Status: **approved, changed on 2026-10-10** — not started. The person changed how reminders are
+Status: **approved again on 2026-10-10** — not started. The person changed how reminders are
 shown (see the next section). Read "New open questions" at the end before the work starts.
 
 Builds on: **accounts** (wave 1: Django `User`, login everywhere), **lists** (wave 2: each to-do
@@ -613,15 +613,13 @@ decided later" (it is decided: the person's Mac).
   email addresses.
 - The Mac's time zone is `Asia/Tokyo`, the same as `TIME_ZONE`.
 
-## New open questions
+### Answered on 2026-10-10 (the plan is approved again)
 
-1. **Shared lists:** should the notification also show to-dos due today in lists shared **with**
-   the person? This plan says no (own lists only), because `reminded_on` is one date per to-do.
-   Yes needs a small new table ("shown to this person on this day") instead of `reminded_on`.
-2. **Moving the project:** the plan recommends moving it out of `~/Documents/GitHub/` (for
-   example to `~/code/`), because macOS blocks background jobs there. Is that all right for you?
-3. **Is 08:00 the right time?** It is only the `Hour` and `Minute` in the plist; the code does not
-   change.
+- **Shared lists:** own lists only, as this plan says. A to-do that another person added to one of
+  the person's own lists is still shown.
+- **Moving the project:** yes. The person moves the project out of `~/Documents/GitHub/` (for
+  example to `~/code/`) before installing the launchd job. No Full Disk Access for Python.
+- **Time:** 08:00 is right.
 
 ## Review
 
