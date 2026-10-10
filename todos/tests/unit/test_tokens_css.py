@@ -1,8 +1,8 @@
 """One design source: every token is set only in tokens.css.
 
 tokens.css has only `:root` (light) and `:root` inside the dark media query.
-site.css, landing.css and auth.css only use the tokens, so the landing page,
-the login and sign-up pages (and later the app) cannot drift apart.
+site.css, app.css, landing.css and auth.css only use the tokens, so the landing
+page, the login and sign-up pages and the app cannot drift apart.
 """
 
 import re
@@ -14,12 +14,15 @@ from django.test import SimpleTestCase
 STATIC = Path(settings.BASE_DIR)
 TOKENS_CSS = STATIC / "todos/static/todos/tokens.css"
 SITE_CSS = STATIC / "todos/static/todos/site.css"
+# The app's own shared CSS (base.html). Like site.css, it holds the shared rules
+# (buttons, fields, the header) for its pages, and it styles the to-do row.
+APP_CSS = STATIC / "todos/static/todos/app.css"
 # Every CSS file of every app, except tokens.css. A new file is checked too.
 OTHER_CSS = sorted(
     path for path in STATIC.glob("*/static/**/*.css") if path != TOKENS_CSS
 )
-# A page's own CSS: every other file except the shared site.css.
-PAGE_CSS = [path for path in OTHER_CSS if path != SITE_CSS]
+# A page's own CSS: every other file except the shared site.css and app.css.
+PAGE_CSS = [path for path in OTHER_CSS if path not in (SITE_CSS, APP_CSS)]
 # A custom property being declared, like `--accent: #1f4f8f;`: at the start of a
 # line, or after `{` or `;`. Not `var(--accent)`, and not a selector.
 SETS_A_TOKEN = re.compile(r"(?:^|[{;])\s*--[\w-]+\s*:", re.M)
@@ -70,7 +73,7 @@ class TokensCssTests(SimpleTestCase):
 
     def test_every_css_file_is_checked(self):
         names = {path.name for path in OTHER_CSS}
-        self.assertLessEqual({"site.css", "landing.css", "auth.css"}, names)
+        self.assertLessEqual({"site.css", "app.css", "landing.css", "auth.css"}, names)
 
     def test_other_css_sets_no_tokens_and_has_no_root(self):
         for path in OTHER_CSS:
@@ -88,7 +91,10 @@ class TokensCssTests(SimpleTestCase):
                     self.assertNotIn(selector, css)
 
     def test_no_generic_actions_class(self):
-        # The app's to-do row uses `.actions`; the shared CSS must not style it.
+        # The app's to-do row uses `.actions`; only app.css (the app's own CSS)
+        # may style it, never the visitor pages' CSS.
         for path in OTHER_CSS:
+            if path == APP_CSS:
+                continue
             with self.subTest(path=path.name):
                 self.assertIsNone(re.search(r"\.actions\b", path.read_text()))
