@@ -137,6 +137,27 @@ class SendRemindersTests(RemindersTestCase):
         self.assertEqual(self.shown_text(), "- Buy milk")
         self.assertEqual(self.reminded_on(todo), TODAY)
 
+    def test_cut_todos_are_also_marked(self):
+        # Only 3 titles fit in the text, but all 5 counted in the title are marked.
+        made = [self.add(title) for title in "ABCDE"]
+        self.assertEqual(send_reminders(self.alice, TODAY), 5)
+        for todo in made:
+            self.assertEqual(self.reminded_on(todo), TODAY)
+        self.assertEqual(send_reminders(self.alice, TODAY), 0)
+        self.assertEqual(self.run.call_count, 1)
+
+    def test_shown_in_list_order_then_position(self):
+        # Inbox is Alice's older list. Its to-dos are made in a different order
+        # than their positions, and the newer list's to-do is made last.
+        second = self.add("Second")
+        first = self.add("First")
+        work = TodoList.objects.create(owner=self.alice, name="Work")
+        self.add("Work thing", todo_list=work)
+        Todo.objects.filter(pk=first.pk).update(position=1)
+        Todo.objects.filter(pk=second.pk).update(position=2)
+        send_reminders(self.alice, TODAY)
+        self.assertEqual(self.shown_text(), "- First\n- Second\n- Work thing")
+
     def test_recurring_copy_starts_unreminded(self):
         todo = self.add("Water plants", repeat=Todo.Repeat.DAILY, reminded_on=TODAY)
         todo.done = True

@@ -58,6 +58,10 @@ class NotificationTextTests(FakeOsascriptMixin, SimpleTestCase):
         _, text = notification_text(todos("y" * 60))
         self.assertEqual(text, "- " + "y" * 60)
 
+    def test_exactly_three_has_no_more_line(self):
+        _, text = notification_text(todos("A", "B", "C"))
+        self.assertEqual(text, "- A\n- B\n- C")
+
     def test_more_than_three_says_how_many_more(self):
         title, text = notification_text(todos("A", "B", "C", "D", "E"))
         self.assertEqual(text, "- A\n- B\n- C\nand 2 more")
@@ -105,6 +109,8 @@ class ShowNotificationTests(FakeOsascriptMixin, SimpleTestCase):
         self.assertIs(kwargs["check"], True)
         self.assertEqual(kwargs["timeout"], 30)
         self.assertFalse(kwargs.get("shell", False))
+        # Keeps osascript's output (it can repeat to-do titles) out of the log.
+        self.assertIs(kwargs["capture_output"], True)
 
     def test_timeout_raises_notification_error(self):
         self.run.side_effect = subprocess.TimeoutExpired("osascript", 30)
