@@ -42,6 +42,7 @@ AUTH_COLORS = """() => {
         button: style("button[type=submit]").color,
         buttonBackground: style("button[type=submit]").backgroundColor,
         headerLink: style(".site-nav a:not(.wordmark)").color,
+        headerLinkEdge: style(".site-nav a:not(.wordmark)").borderTopColor,
     };
     input.blur();
     return colors;
@@ -111,6 +112,11 @@ class AuthPagesTests(BrowserTestCase):
                     contrast(colors["button"], colors["buttonBackground"]), AA_CONTRAST
                 )
                 self.assertEqual(colors["focusStyle"], "solid")
+                # The header button (secondary): its gray edge can be seen.
+                self.assertGreaterEqual(
+                    contrast(colors["headerLinkEdge"], colors["background"]),
+                    UI_CONTRAST,
+                )
                 for name in ["inputBorder", "errorBorder", "focusRing"]:
                     for against in ["background", "inputBackground"]:
                         self.assertGreaterEqual(

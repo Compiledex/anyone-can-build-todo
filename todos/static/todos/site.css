@@ -1,7 +1,8 @@
 /* The shared design of the pages a visitor sees: the landing page and the login and
    sign-up pages. They all extend todos/templates/todos/site_base.html, which loads
    tokens.css (the colors, sizes and font), then this file, then the page's own CSS.
-   The logged-in app pages (base.html) do not use it yet.
+   The logged-in app pages (base.html) do not use it: they have app.css, with the
+   same button class names and the same button look.
 
    This is the ONE place for the header, the footer, the buttons, the links, the form
    fields and the focus ring. It sets no token: it only uses the ones in tokens.css.
@@ -178,13 +179,16 @@ button.button {
   border-color: var(--accent-hover);
 }
 
+/* The same secondary look as the app (app.css): a gray edge, the normal text color. */
 .button-secondary {
-  background: transparent;
-  color: var(--accent);
+  border-color: var(--control);
+  background: var(--surface);
+  color: var(--text);
 }
 
 .button-secondary:hover {
   background: var(--band);
+  color: var(--text);
 }
 
 .button-small {

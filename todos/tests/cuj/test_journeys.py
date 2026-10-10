@@ -722,13 +722,17 @@ class LandingTests(BrowserTestCase):
                             muted: color(".muted"),
                             button: color(".button-primary"),
                             buttonBackground: color(".button-primary", "backgroundColor"),
-                            link: color(".button-secondary"),
+                            secondary: color(".button-secondary"),
+                            secondaryEdge: color(
+                                ".button-secondary", "borderTopColor"
+                            ),
+                            accent: color(".button-primary", "backgroundColor"),
                             band: color(".band", "backgroundColor"),
                             bandText: color(".band p"),
                         };
                     }"""
                 )
-                for name in ["text", "body", "muted", "link"]:
+                for name in ["text", "body", "muted", "secondary"]:
                     self.assertGreaterEqual(
                         contrast(colors[name], colors["background"]), AA_CONTRAST, name
                     )
@@ -738,6 +742,13 @@ class LandingTests(BrowserTestCase):
                 self.assertGreaterEqual(
                     contrast(colors["bandText"], colors["band"]), AA_CONTRAST
                 )
+                # The secondary button: a gray edge you can see, a label that is
+                # not the accent color (the one look of the whole product).
+                self.assertGreaterEqual(
+                    contrast(colors["secondaryEdge"], colors["background"]),
+                    UI_CONTRAST,
+                )
+                self.assertNotEqual(colors["secondary"], colors["accent"], colors)
                 if scheme == "dark":
                     self.assertLess(luminance(colors["background"]), 0.05, colors)
                 else:
@@ -753,11 +764,22 @@ BUTTON_LOOK = """el => {
         weight: style.fontWeight,
     };
 }"""
+# A secondary button: also its edge and its label.
+SECONDARY_LOOK = """el => {
+    const style = getComputedStyle(el);
+    return {
+        background: style.backgroundColor,
+        edge: style.borderTopColor,
+        color: style.color,
+        radius: style.borderRadius,
+        weight: style.fontWeight,
+    };
+}"""
 
 
 class OneProductTests(BrowserTestCase):
     def test_primary_button_is_the_same_everywhere(self):
-        """The landing page and the app use the same primary button."""
+        """The landing page and the app use the same primary and secondary buttons."""
         page = self.page
         user = make_user_with_inbox()
         for scheme in ["light", "dark"]:
@@ -766,8 +788,13 @@ class OneProductTests(BrowserTestCase):
                 self.context.clear_cookies()
                 page.goto(self.live_server_url)  # The landing page.
                 landing = page.locator(".hero .button-primary").evaluate(BUTTON_LOOK)
+                log_in = page.locator(".hero .button-secondary").evaluate(
+                    SECONDARY_LOOK
+                )
 
                 self.log_in_as(user)
                 page.goto(self.live_server_url)  # The list page.
                 add = page.get_by_role("button", name="Add", exact=True)
                 self.assertEqual(add.evaluate(BUTTON_LOOK), landing)
+                search = page.get_by_role("button", name="Search", exact=True)
+                self.assertEqual(search.evaluate(SECONDARY_LOOK), log_in)
