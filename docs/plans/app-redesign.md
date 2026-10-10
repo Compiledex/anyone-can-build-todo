@@ -1,6 +1,6 @@
 # Plan: redesign of the app pages
 
-Status: **approved with changes** (review below). Not started.
+Status: **approved** by the person on 2026-10-11 (see "Decided by the person"). Not started.
 
 Starts after: the row fix (#28) and the landing page (#29), both merged, **and** the login and
 sign-up redesign (`feature/auth-pages`), which creates `todos/static/todos/tokens.css`. Step 1b
@@ -143,8 +143,12 @@ without JavaScript); Move up / Move down; light/dark by the system only.
   `.button` plus one of `.button-primary`, `.button-secondary`, `.button-danger`,
   `.button-quiet`, and the size `.button-small`. The app adds one size in `app.css`:
   `.button-compact` (32px, for row, step and header actions). `app.css` repeats the shared button
-  rules (it does not load `site.css`), and a CUJ test checks that the primary button looks the
-  same on both sides (background, radius, font weight).
+  rules (it does not load `site.css`), and a CUJ test checks that the primary and secondary
+  buttons look the same on both sides.
+- **One secondary look everywhere** (decided by the person): `--surface` fill, 1px `--control`
+  gray edge, `--text` label, `--band` on hover. So `site.css`'s `.button-secondary` changes too
+  (today: transparent with a blue `--accent` edge and text). On the visitor pages this changes the
+  landing page's "Log in" buttons and the header button on the login and sign-up pages (Step 3b).
 - **No cards.** Rows are separated by one bottom line. The only boxes carry meaning: a message,
   the clear-completed confirmation, the filter group.
 - **No icons.** Text labels, as on the landing page. The ↑ / ↓ buttons and the ⠿ handle are text
@@ -459,9 +463,10 @@ open/closed `details`, touch sizes. There is no loading state: every action is a
 
 - **The login and sign-up pages.** They are redesigned separately (`feature/auth-pages`): they
   now extend `todos/site_base.html` and use `site.css`, not `base.html`, so this plan does not
-  touch them. This plan reuses that branch's `tokens.css` and `todos/_field.html`.
-- **The landing page.** `landing.html` and its CSS are not touched, except its screenshots (last
-  step).
+  touch their templates. This plan reuses that branch's `tokens.css` and `todos/_field.html`.
+  The one shared change that reaches them is the secondary button in `site.css` (Step 3b).
+- **The landing page.** `landing.html` and `landing.css` are not touched, except its screenshots
+  (last step) and the secondary button look that comes from `site.css`.
 - A light/dark toggle; icons, an icon library, a web font, pictures.
 - New features or changed behaviour: no new page, field or JavaScript; `reorder.js` unchanged.
 - Moving `messages.error` texts (bad step title, bad share username) to the field. They keep
@@ -481,11 +486,14 @@ open/closed `details`, touch sizes. There is no loading state: every action is a
 | `todos/templates/todos/todo_edit.html`, `list_form.html`, `list_confirm_delete.html` | Fields through `todos/_field.html`; `.form-actions`; button classes. |
 | `todos/tests/cuj/test_journeys.py` | Color test extended; row layout test extended; the header color selector; the shared-button check (see Tests). |
 | `scripts/landing_shots.py`, `scripts/landing_seed.py`, `Makefile` | **New.** The landing screenshot tool and `make landing-shots` (Step 9). |
+| `todos/static/todos/site.css` | `.button-secondary` (and its hover) get the gray-edge look (Step 3b). Nothing else. |
+| `todos/tests/cuj/test_journeys.py` `LandingTests`, `todos/tests/cuj/test_auth_pages.py` | The secondary button checks (Step 3b). |
 | `todos/static/todos/landing/*.webp` | Retaken at the end. |
 | `AGENTS.md`, `README.md` | `app.css` and `tokens.css` rows; `base.html` no longer holds CSS; `make landing-shots`. |
 
-No model, migration, view, URL or package change. The only form change is `label_suffix = ""`. `landing.css`, `landing.html`,
-`site.css` and `site_base.html` are not changed.
+No model, migration, view, URL or package change. The only form change is `label_suffix = ""`.
+`landing.css`, `landing.html` and `site_base.html` are not changed; `site.css` changes only in
+`.button-secondary`.
 
 ## Tests
 
@@ -553,9 +561,22 @@ at 1280, 390 and 320px, after each one.
    test change (change the test first and show it failing). Type scale, `tabular-nums`, the
    46rem column, the header bar with the wordmark and `.who` (change the test selector here),
    `<main>`, spacing.
-3. **Buttons and fields.** The button classes on every button, field styles, the focus ring,
+3. **a. Buttons and fields in the app.** The button classes on every button, field styles, the focus ring,
    pressed state, reduced motion, touch sizes, `div.field` structure, `_field.html` on the edit
    and list forms, red edge on errors. Add `test_primary_button_is_the_same_everywhere` first.
+   **b. The secondary button on the visitor pages.** Change `.button-secondary` in `site.css` to
+   the gray-edge look (`--surface`, 1px `--control`, `--text`; hover `--band`). Tests, changed
+   first and shown failing:
+   - `cuj/test_journeys.py` `LandingTests.test_landing_is_readable_in_light_and_dark` (line 666
+     reads `.button-secondary` as `link`): rename the key to `secondary`; it still needs 4.5 : 1
+     on the page (`--text` on `--bg`: 16.6 / 15.8). Add: its `border-color` is at least 3 : 1 on
+     the page (`--control` on `--bg`: 4.0 / 4.3), and its label is not the accent color.
+   - `cuj/test_auth_pages.py` `test_auth_pages_are_readable_in_light_and_dark` (`headerLink`):
+     the header button text still passes; add the same 3 : 1 edge check.
+   - `test_primary_button_is_the_same_everywhere` also compares the secondary button (landing
+     "Log in" and the list page's Search): `background-color`, `border-color`, `color`,
+     `border-radius`, `font-weight`.
+   - Retake no screenshots here; Step 9 does it once.
 4. **The to-do row (CSS only).** Extend `RowLayoutTests` first (it fails at 320px or on the
    actions position), then the grid for both widths and the manual order, steps, notes, tags,
    priority, overdue, drag.
@@ -575,27 +596,19 @@ at 1280, 390 and 320px, after each one.
    `landing.html` to match, and check each `alt` text still describes the picture. The login and
    sign-up pages reuse `list-*.webp`, so check them too.
 
-## Open questions
+## Decided by the person (2026-10-11)
 
-Each with a recommendation.
+The plan is **approved**, with these answers:
 
-1. **One look for the secondary button across the whole product?** Today the visitor pages'
-   secondary button is a blue outline; this plan's app buttons use a gray edge (`--control`),
-   because a list page has many secondary buttons and blue everywhere would be loud.
-   *Recommendation:* one gray-edge look everywhere (change `site.css` to match, in the auth-pages
-   branch or a small follow-up), so "one product" holds. The other choice: blue outline on
-   visitor pages, gray in the app.
-2. **Row actions on phones, and the row Delete.** On phones the actions get their own line, at
-   least 44px tall. The row Delete is quiet gray, red on hover and keyboard focus, or always red.
-   *Recommendation:* own line on phones; quiet gray Delete (a list of red words is loud, and the
-   row already has one bordered button). On a phone there is no hover, so it shows gray until
-   tapped.
-3. **Visible labels** above "New to-do", search, "Username" and "New step" (about 40px more at the
-   top of the list page). *Recommendation:* yes: the skill and WCAG both ask for a visible label,
-   and "New step" has no hint at all today.
-4. **Keep the landing screenshot script in the repo**, with `make landing-shots`.
-   *Recommendation:* yes: every later visual change needs new screenshots, and a script makes them
-   the same each time with invented data only.
+1. **Secondary button: one gray-edge look everywhere.** `site.css`'s `.button-secondary` changes
+   too, so the landing page's "Log in" and the header button on the login and sign-up pages get
+   the gray edge. The change and its landing and auth test updates are Step 3b.
+2. **Phones: row actions on their own line**, at least 44px tall with a finger. The **row Delete
+   is quiet gray**, and red on hover and on keyboard focus.
+3. **Visible labels: yes**, above "New to-do", search, "Username" and "New step".
+4. **The screenshot script goes in the repo**, with `make landing-shots` (Step 9).
+
+Decided earlier by the person: labels have no colon (`label_suffix = ""`).
 
 ## Review
 
@@ -630,3 +643,6 @@ Changes after the review (approved with changes):
 - Decided by the person: **no colon after labels**. `label_suffix = ""` on the app's forms;
   `todos/_field.html` keeps `{{ field.label_tag }}`; `test_views.py` line 579 (`Notes:</label>`)
   changes to `Notes</label>`. Lines 193-195 do not check a colon and stay.
+- Approved by the person (2026-10-11): the open questions became "Decided by the person". The
+  secondary button change in `site.css` and its landing and auth test updates were added as
+  Step 3b.
