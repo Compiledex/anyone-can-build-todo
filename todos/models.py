@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
-from django.db.models import Q
+from django.db.models import Max, Q
 from django.db.models.functions import Lower
 from django.urls import reverse
 from django.utils import timezone
@@ -123,12 +123,29 @@ class Todo(models.Model):
         on_delete=models.SET_NULL,
         related_name="next_copy",
     )
+    # The place in the list's manual order: smaller comes first. Shared by
+    # everyone who sees the list. Not unique: equal numbers are allowed, and
+    # then created_at and pk decide. Gaps (1, 2, 4) do not matter.
+    position = models.PositiveIntegerField(default=0)
 
     class Meta:
         ordering = ["created_at"]
 
     def __str__(self):
         return self.title
+
+    def save(self, *args, **kwargs):
+        """A new to-do goes last in its list's manual order.
+
+        Here, not in a view: the add view, a recurring copy and the admin all
+        make to-dos. It always sets the number for a new row, even a copied one.
+        """
+        if self.pk is None:
+            biggest = Todo.objects.filter(todo_list_id=self.todo_list_id).aggregate(
+                biggest=Max("position")
+            )["biggest"]
+            self.position = (biggest or 0) + 1
+        super().save(*args, **kwargs)
 
     def set_tags(self, names):
         """Make this to-do's tags exactly these clean names.

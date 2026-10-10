@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load static %}
 
 {% block title %}{{ the_list.name }}{% endblock %}
 
@@ -86,7 +87,14 @@
     {% endfor %}
   </nav>
 
-  <ul class="todos">
+  {# Reordering only when every to-do is shown: manual order, no search, no filter. #}
+  {% if can_reorder %}
+    {# drag and drop sends this form's CSRF token with the new order (reorder.js). #}
+    <form id="reorder-csrf" hidden>{% csrf_token %}</form>
+  {% elif current_sort == "manual" %}
+    <p class="muted">Clear the filter to change the order.</p>
+  {% endif %}
+  <ul class="todos"{% if can_reorder %} data-reorder-url="{% url 'todo_reorder' the_list.pk %}"{% endif %}>
     {% for todo in todos %}
       {% include "todos/_todo_item.html" %}
     {% empty %}
@@ -138,5 +146,9 @@
       {% csrf_token %}
       <button type="submit">Leave this list</button>
     </form>
+  {% endif %}
+  {% if can_reorder %}
+    {# defer: runs after the page is read, so it can find the list. #}
+    <script src="{% static 'todos/reorder.js' %}" defer></script>
   {% endif %}
 {% endblock %}

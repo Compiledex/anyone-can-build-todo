@@ -478,3 +478,39 @@ class SearchJourneyTests(BrowserTestCase):
             page.get_by_role("listitem").filter(has_text="Call home")
         ).to_be_visible()
         expect(page.get_by_label("Search to-dos")).to_have_value("")
+
+
+class ReorderJourneyTests(BrowserTestCase):
+    def test_reorder_by_drag(self):
+        page = self.page
+        user = make_user_with_inbox()
+        self.log_in_as(user)
+        page.goto(self.live_server_url)  # Opens the list page.
+
+        for title in ["First", "Second", "Third"]:
+            page.get_by_label("New to-do").fill(title)
+            page.get_by_role("button", name="Add").click()
+            expect(page.get_by_role("listitem").filter(has_text=title)).to_be_visible()
+
+        list_url = user.todo_lists.get().get_absolute_url()
+        page.goto(f"{self.live_server_url}{list_url}?sort=manual")
+        titles = page.locator("ul.todos > li .title")
+        expect(titles).to_have_text(["First", "Second", "Third"])
+
+        def row(title):
+            return page.locator("ul.todos > li").filter(has_text=title)
+
+        # Drop on the top edge of "First", not the middle: there, before or
+        # after would be a coin toss. Wait for the answer before the reload.
+        with page.expect_response(lambda r: r.url.endswith("/reorder/")) as answer:
+            row("Third").locator(".handle").drag_to(
+                row("First"), target_position={"x": 5, "y": 2}
+            )
+        self.assertEqual(answer.value.status, 204)
+        expect(titles).to_have_text(["Third", "First", "Second"])
+
+        page.reload()  # Saved on the server, not only moved in the page.
+        expect(titles).to_have_text(["Third", "First", "Second"])
+
+        page.get_by_role("button", name="Move down: Third").click()
+        expect(titles).to_have_text(["First", "Third", "Second"])

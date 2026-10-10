@@ -1,6 +1,6 @@
 from django.contrib import messages
 from django.db import transaction
-from django.http import HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.defaultfilters import date as format_date
 from django.template.defaultfilters import pluralize
@@ -11,7 +11,15 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from .forms import ShareForm, SubtaskForm, TodoForm, TodoListForm, TodoQueryForm
 from .models import Subtask, Todo, TodoList
-from .queries import DEFAULT_SORT, apply_list_query, chosen_sort, list_query
+from .ordering import parse_ids, save_order
+from .queries import (
+    DEFAULT_SORT,
+    SORT_OPTIONS,
+    apply_list_query,
+    can_reorder,
+    chosen_sort,
+    list_query,
+)
 
 # A view that reads or changes a list or its to-dos finds the list with
 #   get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
@@ -116,6 +124,8 @@ def render_list_page(request, the_list, form):
             # The order shown, always a key of SORT_OPTIONS (#15 uses "manual").
             "current_sort": chosen_sort(query_form),
             "default_sort": DEFAULT_SORT,
+            # Drag handles and Move buttons: manual order, no search, no filter.
+            "can_reorder": can_reorder(query_form),
             # "Show all" clears the search and the filter, but keeps the order.
             "show_all_query": list_query(data, q="", status=""),
             # A search or a filter is set: "No to-dos match" and "Show all".
@@ -269,6 +279,48 @@ def todo_edit(request, pk):
     else:
         form = TodoForm(instance=todo)
     return render(request, "todos/todo_edit.html", {"form": form, "todo": todo})
+
+
+@require_POST
+def todo_reorder(request, pk):
+    """Save a new manual order from drag and drop: id=7&id=3&id=5.
+
+    The ids must be exactly the to-dos of this list, or nothing is saved (400).
+    The JavaScript then reloads the page. The owner and the members may do it.
+    """
+    the_list = get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
+    try:
+        save_order(the_list, parse_ids(request.POST.getlist("id")))
+    except ValueError:
+        return HttpResponseBadRequest("The order does not match this list.")
+    return HttpResponse(status=204)  # It worked, nothing to send back.
+
+
+@require_POST
+def todo_move(request, pk):
+    """Move up or Move down: swap the to-do with its neighbour in the manual order.
+
+    A move that is not possible (the first to-do up) changes nothing.
+    """
+    direction = request.POST.get("direction")
+    # Read and save in one transaction, so the order cannot change in between.
+    with transaction.atomic():
+        todo = get_visible_todo(request.user, pk)  # 404 before 400: reveals nothing.
+        if direction not in ("up", "down"):
+            return HttpResponseBadRequest("Direction must be up or down.")
+        the_list = todo.todo_list
+        ids = list(
+            the_list.todos.order_by(*SORT_OPTIONS["manual"][1]).values_list(
+                "pk", flat=True
+            )
+        )
+        here = ids.index(todo.pk)
+        there = here - 1 if direction == "up" else here + 1
+        if 0 <= there < len(ids):
+            ids[here], ids[there] = ids[there], ids[here]
+            save_order(the_list, ids)
+    # Back to the moved row, so a keyboard user does not start at the top.
+    return redirect(f"{the_list.get_absolute_url()}?sort=manual#todo-{todo.pk}")
 
 
 @require_POST
