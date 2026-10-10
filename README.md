@@ -66,7 +66,8 @@ uv run pre-commit install
 uv run python manage.py runserver
 ```
 
-Open <http://127.0.0.1:8000/> and click *Create an account*. Each account sees only its own
+Open <http://127.0.0.1:8000/>. You see the landing page, which says what the app does. Click
+*Create an account*. Each account sees only its own
 lists and to-dos, plus the lists other people share with it. Press `Ctrl+C` in the terminal to
 stop the server.
 
@@ -80,8 +81,8 @@ You should see `OK`, and then one line for each layer of tests:
 
 ```
 Test layers
-  CUJ          11 passed
-  Integration  363 passed
+  CUJ          15 passed
+  Integration  371 passed
   Unit         82 passed
 ```
 
@@ -219,6 +220,9 @@ runs the same checks and the tests on every push.
 | `todos/views.py` | What happens when each address is visited |
 | `todos/templates/base.html` | The frame every page shares: the colors, the style, who is logged in, the messages |
 | `todos/templates/todos/todo_list.html` | The page you see: one list |
+| `todos/templates/todos/landing.html` | The landing page: what a visitor who is not logged in sees at `/` |
+| `todos/static/todos/landing.css` | The style of the landing page only |
+| `todos/static/todos/landing/` | The landing page's pictures: screenshots of the app, light and dark, with invented sample data |
 | `todos/templates/todos/list_form.html` | The page to make or rename a list |
 | `todos/templates/todos/list_confirm_delete.html` | The page that asks before a list is deleted |
 | `todos/templates/todos/_todo_item.html` | One row of the list |
