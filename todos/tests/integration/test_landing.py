@@ -7,13 +7,24 @@ from html.parser import HTMLParser
 
 from django.contrib.staticfiles import finders
 from django.templatetags.static import static
-from django.test import TestCase
+from django.test import Client, TestCase
 from django.urls import reverse
 
 from accounts.tests.helpers import make_user
 from todos.models import Subtask, Todo, TodoList
 
 LANDING_TEMPLATE = "todos/landing.html"
+
+# Tags that make the browser load something, and the attributes with the address.
+LOADING_TAGS = {"link", "script", "img", "source", "iframe", "video"}
+ADDRESS_ATTRIBUTES = ("href", "src", "srcset")
+DARK_MEDIA = "(prefers-color-scheme: dark)"
+EM_DASH, EN_DASH = "\u2014", "\u2013"
+
+
+def landing_css():
+    with open(finders.find("todos/landing.css"), encoding="utf-8") as file:
+        return file.read()
 
 
 class PageParts(HTMLParser):
@@ -25,6 +36,9 @@ class PageParts(HTMLParser):
         self.images = []  # the attributes of each <img>
         self.image_files = []  # every address in src and srcset
         self.tags = set()
+        self.loaded = []  # every address the browser would load
+        self.pictures = []  # each <picture>: {"sources": [attrs], "img": attrs}
+        self._picture = None
         self._href = None
         self._text = []
 
@@ -36,6 +50,18 @@ class PageParts(HTMLParser):
             self._text = []
         if tag == "img":
             self.images.append(attrs)
+        if tag in LOADING_TAGS:
+            for name in ADDRESS_ATTRIBUTES:
+                for part in (attrs.get(name) or "").split(","):
+                    if part.strip():
+                        self.loaded.append(part.split()[0])
+        if tag == "picture":
+            self._picture = {"sources": [], "img": None}
+            self.pictures.append(self._picture)
+        elif self._picture is not None and tag == "source":
+            self._picture["sources"].append(attrs)
+        elif self._picture is not None and tag == "img":
+            self._picture["img"] = attrs
         if tag in ("img", "source"):
             if attrs.get("src"):
                 self.image_files.append(attrs["src"])
@@ -48,6 +74,8 @@ class PageParts(HTMLParser):
             self._text.append(data)
 
     def handle_endtag(self, tag):
+        if tag == "picture":
+            self._picture = None
         if tag == "a" and self._href is not None:
             self.links.append((self._href, " ".join("".join(self._text).split())))
             self._href = None
@@ -127,15 +155,65 @@ class LandingPageTests(TestCase):
         response = self.client.get("/")
         parts = parts_of(response)
         self.assertNotIn("script", parts.tags)
-        for url in parts.image_files:
-            self.assertFalse(url.startswith(("http:", "https:", "//")), url)
+        self.assertTrue(parts.loaded)
+        for url in parts.loaded:
+            with self.subTest(url=url):
+                self.assertFalse(url.startswith(("http:", "https:", "//")), url)
         page = response.content.decode()
-        self.assertNotIn("fonts.googleapis", page)
         self.assertNotIn("@import", page)
 
-    def test_landing_is_get_only(self):
-        response = self.client.post("/")
-        self.assertEqual(response.status_code, 405)
+    def test_landing_css_loads_nothing_from_other_sites(self):
+        css = landing_css()
+        for text in ["@import", "url(http", "url(//"]:
+            self.assertFalse(text in css, f"landing.css has {text}")
+
+    def test_every_picture_has_a_dark_version(self):
+        pictures = parts_of(self.client.get("/")).pictures
+        self.assertTrue(pictures)
+        for picture in pictures:
+            img = picture["img"]
+            with self.subTest(src=img and img.get("src")):
+                self.assertIsNotNone(img)
+                dark = [s for s in picture["sources"] if s.get("media") == DARK_MEDIA]
+                self.assertEqual(len(dark), 1)
+                self.assertTrue(dark[0].get("srcset", "").endswith("-dark.webp"))
+                self.assertTrue(img.get("src", "").endswith("-light.webp"))
+                self.assertEqual(dark[0].get("width"), img.get("width"))
+                self.assertEqual(dark[0].get("height"), img.get("height"))
+
+    def test_no_long_dashes(self):
+        page = self.client.get("/").content.decode()
+        for name, text in [("the page", page), ("landing.css", landing_css())]:
+            for dash in [EM_DASH, EN_DASH]:
+                self.assertFalse(dash in text, f"{name} has {dash!r}")
+
+    def test_privacy_text_is_about_lists(self):
+        # `/` itself needs no login now, so the page must not say every page does.
+        response = self.client.get("/")
+        self.assertContains(response, "Every list needs a login.")
+        self.assertNotContains(response, "Every page needs a login.")
+
+    def test_landing_is_get_or_head_only(self):
+        self.assertEqual(self.client.head("/").status_code, 200)
+        self.assertEqual(self.client.post("/").status_code, 405)
+
+    def test_landing_does_not_show_a_logged_in_persons_message(self):
+        alice = make_user("alice")
+        make_user("carol")
+        inbox = TodoList.objects.create(owner=alice, name="Inbox")
+        alices_browser = Client()
+        alices_browser.force_login(alice)
+        # Makes the message "Shared with carol." and leaves it unread in alice's
+        # browser (the redirect is not followed).
+        alices_browser.post(
+            reverse("list_share", args=[inbox.pk]), {"username": "carol"}
+        )
+        # The visitor has their own browser (self.client), never alice's.
+        response = self.client.get("/")
+        self.assertNotContains(response, "Shared with carol")
+        self.assertNotContains(response, "alice")
+        # alice's message really was waiting for her.
+        self.assertContains(alices_browser.get("/", follow=True), "Shared with carol.")
 
 
 class LoggedInHomeTests(TestCase):

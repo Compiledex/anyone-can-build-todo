@@ -8,7 +8,12 @@ from django.template.defaultfilters import pluralize
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.http import url_has_allowed_host_and_scheme
-from django.views.decorators.http import require_GET, require_http_methods, require_POST
+from django.views.decorators.http import (
+    require_GET,
+    require_http_methods,
+    require_POST,
+    require_safe,
+)
 
 from .forms import ShareForm, SubtaskForm, TodoForm, TodoListForm, TodoQueryForm
 from .models import Subtask, Todo, TodoList
@@ -149,7 +154,7 @@ def render_list_page(request, the_list, form):
 
 
 @login_not_required  # A visitor must see the landing page. It shows no user data.
-@require_GET
+@require_safe  # GET and HEAD only.
 def todo_list(request):
     """`/`. A visitor who is not logged in sees the landing page.
 
