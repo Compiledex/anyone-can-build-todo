@@ -130,6 +130,241 @@ header.site {
   min-width: 0;
 }
 
+/* ---- Focus: the same ring everywhere ---- */
+
+/* Only the outline changes: never the size, the corners or the edge. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- Buttons: the product's one vocabulary ----
+   The same class names and the same look as site.css (the visitor pages):
+   .button with .button-primary, .button-secondary, .button-danger or .button-quiet,
+   and a size: .button-small (40px, the same as .button here) or .button-compact
+   (32px, for the row, step and header buttons). A label never wraps. */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--control);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--ease),
+    border-color var(--ease),
+    color var(--ease),
+    transform var(--ease);
+}
+
+/* Pressed: one pixel down. */
+.button:active {
+  transform: translateY(1px);
+}
+
+.button-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button-primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+  color: var(--on-accent);
+}
+
+.button-secondary:hover {
+  background: var(--band);
+  color: var(--text);
+}
+
+.button-danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--on-danger);
+}
+
+.button-danger:hover {
+  border-color: var(--danger-hover);
+  background: var(--danger-hover);
+  color: var(--on-danger);
+}
+
+/* No edge: for actions that are used often but must not shout. */
+.button-quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.button-quiet:hover {
+  background: var(--band);
+  color: var(--text);
+}
+
+/* Delete in a row or a step: gray, and red on hover and on keyboard focus. */
+.button-quiet.delete:hover,
+.button-quiet.delete:focus-visible {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.button-small {
+  min-height: var(--control-height-small);
+}
+
+.button-compact {
+  min-height: var(--control-height-compact);
+  padding: 0 var(--space-3);
+  font-size: 0.875rem;
+}
+
+.button-quiet.button-compact {
+  padding: 0 var(--space-2);
+}
+
+/* ---- Fields: label, input, error, help, in this order in the HTML ---- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.field > label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* A label that wraps its input: for inputs written by hand in a template, which
+   must not get a new id. The text of the label stays above the input. */
+.field > label:has(input) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+input:not([type="hidden"]),
+select,
+textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--control);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem; /* 16px or more, so a phone does not zoom in. */
+  font-weight: 400;
+  transition: border-color var(--ease);
+}
+
+textarea {
+  min-height: 6rem;
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+}
+
+input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--text);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--accent);
+}
+
+/* An invalid field keeps its red edge, also with the focus ring around it. */
+[aria-invalid="true"],
+[aria-invalid="true"]:hover,
+[aria-invalid="true"]:focus-visible {
+  border-color: var(--danger);
+}
+
+.errorlist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--danger);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.helptext {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* ---- Edit, New list, Rename list, Delete list ---- */
+
+form.page-form {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 36rem;
+  margin-top: var(--space-5);
+}
+
+.lead {
+  margin-top: var(--space-3);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+form.form-actions {
+  margin-top: var(--space-5);
+}
+
+/* Cancel is a plain <a> (a test reads the whole tag), so its secondary button
+   look comes from here. */
+.form-actions > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--control);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--ease);
+}
+
+.form-actions > a:hover {
+  background: var(--band);
+  color: var(--text);
+}
+
 /* ---- Messages, at the top of the page ---- */
 
 .messages {
@@ -170,18 +405,7 @@ nav.filter a { padding: 0 0.75rem; border-radius: var(--radius-label); color: va
 nav.filter a[aria-current="page"] { background: var(--band); color: var(--text);
                                     box-shadow: inset 0 -2px 0 var(--accent); }
 .list-actions { display: flex; gap: 1rem; margin-top: -0.5rem; }
-.errorlist { list-style: none; padding: 0; margin: 0 0 0.5rem; color: var(--danger); font-weight: 600; }
-form.account div, form.edit div { margin-bottom: 0.75rem; }
-form.account label, form.edit label { display: block; margin-bottom: 0.25rem; }
-form.account input, form.edit input { box-sizing: border-box; width: 100%; padding: 0.5rem; font-size: 1rem; }
-form.account .helptext, form.account .helptext ul { color: var(--muted); font-size: 0.85rem; }
 form.add { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
-/* Fields: a --control edge (3 : 1 on the page), red when invalid. */
-input:not([type=hidden]), select, textarea { border: 1px solid var(--control); border-radius: var(--radius);
-                           background: var(--surface); color: var(--text); }
-[aria-invalid="true"] { border-color: var(--danger); }
-/* Focus: only the outline, in the accent color. */
-:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 form.add input { flex: 1; padding: 0.5rem; font-size: 1rem; }
 form.add input[type=date] { flex: 0 0 auto; }
 form.add select { padding: 0.5rem; font-size: 1rem; }
@@ -217,7 +441,6 @@ ul.steps { list-style: none; margin: 0.25rem 0; padding: 0 0 0 1.5rem; }
 ul.steps li { display: flex; align-items: center; gap: 0.5rem; padding: 0.2rem 0; }
 ul.steps .step-title { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 li.step.done .step-title { text-decoration: line-through; color: var(--muted); }
-details.steps button { padding: 0.2rem 0.5rem; font-size: 0.8rem; }
 form.add-step { display: flex; gap: 0.5rem; margin: 0.25rem 0 0 1.5rem; }
 form.add-step input { flex: 1; min-width: 0; padding: 0.3rem; font-size: 0.9rem; }
 details.clear-completed { margin-top: 1.5rem; padding: 0.5rem; border: 1px solid var(--border); }
@@ -233,5 +456,33 @@ li.done .priority { color: var(--muted); }
 .handle { cursor: grab; color: var(--muted); user-select: none; }
 ul.todos > li.dragging { background: var(--drag-bg); outline: 2px dashed var(--border); }
 form.move { display: flex; gap: 0.25rem; }
-form.move button { padding: 0.2rem 0.5rem; }
-button { padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; }
+
+/* ---- Touch: under a finger, row and step buttons are 44px tall, 8px apart ---- */
+
+@media (pointer: coarse) {
+  .actions,
+  ul.steps li {
+    gap: var(--space-2);
+  }
+
+  .actions .button,
+  ul.steps .button {
+    min-height: var(--control-height-touch);
+  }
+}
+
+/* ---- Less motion, when the person asks for it ---- */
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .form-actions > a,
+  input,
+  select,
+  textarea {
+    transition: none;
+  }
+
+  .button:active {
+    transform: none;
+  }
+}

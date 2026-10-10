@@ -24,7 +24,7 @@
           <span class="who">Logged in as {{ user.username }}</span>
           <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}
-            <button type="submit">Log out</button>
+            <button class="button button-secondary button-compact" type="submit">Log out</button>
           </form>
         </div>
       </div>

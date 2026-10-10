@@ -742,3 +742,32 @@ class LandingTests(BrowserTestCase):
                     self.assertLess(luminance(colors["background"]), 0.05, colors)
                 else:
                     self.assertGreater(luminance(colors["background"]), 0.8, colors)
+
+
+# What makes two buttons look the same, read with getComputedStyle.
+BUTTON_LOOK = """el => {
+    const style = getComputedStyle(el);
+    return {
+        background: style.backgroundColor,
+        radius: style.borderRadius,
+        weight: style.fontWeight,
+    };
+}"""
+
+
+class OneProductTests(BrowserTestCase):
+    def test_primary_button_is_the_same_everywhere(self):
+        """The landing page and the app use the same primary button."""
+        page = self.page
+        user = make_user_with_inbox()
+        for scheme in ["light", "dark"]:
+            with self.subTest(scheme=scheme):
+                page.emulate_media(color_scheme=scheme)
+                self.context.clear_cookies()
+                page.goto(self.live_server_url)  # The landing page.
+                landing = page.locator(".hero .button-primary").evaluate(BUTTON_LOOK)
+
+                self.log_in_as(user)
+                page.goto(self.live_server_url)  # The list page.
+                add = page.get_by_role("button", name="Add", exact=True)
+                self.assertEqual(add.evaluate(BUTTON_LOOK), landing)

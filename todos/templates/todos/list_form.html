@@ -5,19 +5,22 @@
 {% block content %}
   {% if the_list %}
     <h1>Rename “{{ the_list.name }}”</h1>
-    <form class="account" method="post" action="{% url 'list_rename' the_list.pk %}">
+    <form class="page-form" method="post" action="{% url 'list_rename' the_list.pk %}">
   {% else %}
     <h1>New list</h1>
-    <form class="account" method="post" action="{% url 'list_create' %}">
+    <form class="page-form" method="post" action="{% url 'list_create' %}">
   {% endif %}
     {% csrf_token %}
-    {{ form.as_div }}
-    <button type="submit">Save</button>
-    {% if the_list %}
-      <a href="{{ the_list.get_absolute_url }}">Cancel</a>
-    {% elif has_lists %}
-      {# With no lists, `/` would only send the person back to this page. #}
-      <a href="{% url 'todo_list' %}">Cancel</a>
-    {% endif %}
+    {{ form.non_field_errors }}
+    {% for field in form %}{% include "todos/_field.html" %}{% endfor %}
+    <div class="form-actions">
+      <button class="button button-primary" type="submit">Save</button>
+      {% if the_list %}
+        <a href="{{ the_list.get_absolute_url }}">Cancel</a>
+      {% elif has_lists %}
+        {# With no lists, `/` would only send the person back to this page. #}
+        <a href="{% url 'todo_list' %}">Cancel</a>
+      {% endif %}
+    </div>
   </form>
 {% endblock %}

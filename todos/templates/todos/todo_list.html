@@ -53,7 +53,7 @@
            {% if form.due_date.errors %}aria-invalid="true" aria-describedby="{{ form.due_date.auto_id }}_error"{% endif %}>
     {{ form.repeat }}
     {{ form.priority }}
-    <button type="submit">Add</button>
+    <button class="button button-primary" type="submit">Add</button>
   </form>
 
   {# GET: a search only reads. With no action, it stays on this list. #}
@@ -64,7 +64,7 @@
     {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
     {# And the order. current_sort is always a key of SORT_OPTIONS. #}
     {% if current_sort != default_sort %}<input type="hidden" name="sort" value="{{ current_sort }}">{% endif %}
-    <button type="submit">Search</button>
+    <button class="button button-secondary" type="submit">Search</button>
     {# Clears the search and the filter, keeps the order. #}
     {% if filtering %}<a href="{{ list_url }}{{ show_all_query }}">Show all</a>{% endif %}
   </form>
@@ -76,7 +76,7 @@
     {{ query_form.sort.label_tag }} {{ query_form.sort }}
     {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
     {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
-    <button type="submit">Sort</button>
+    <button class="button button-secondary" type="submit">Sort</button>
   </form>
 
   {# Links, not a form: each keeps the search and changes only the status. #}
@@ -112,7 +112,7 @@
       <form method="post" action="{% url 'list_clear_completed' the_list.pk %}">
         {% csrf_token %}
         <p>Delete {{ done_count }} done to-do{{ done_count|pluralize }}? This cannot be undone.</p>
-        <button type="submit">Yes, delete them</button>
+        <button class="button button-danger" type="submit">Yes, delete them</button>
       </form>
     </details>
   {% endif %}
@@ -127,7 +127,7 @@
               <span class="title">{{ member.username }}</span>
               <form method="post" action="{% url 'list_member_remove' the_list.pk member.pk %}">
                 {% csrf_token %}
-                <button type="submit" aria-label="Remove {{ member.username }}">Remove</button>
+                <button class="button button-secondary button-compact" type="submit" aria-label="Remove {{ member.username }}">Remove</button>
               </form>
             </li>
           {% endfor %}
@@ -138,13 +138,13 @@
       <form class="add" method="post" action="{% url 'list_share' the_list.pk %}">
         {% csrf_token %}
         {{ share_form.username }}
-        <button type="submit">Share</button>
+        <button class="button button-primary" type="submit">Share</button>
       </form>
     </section>
   {% else %}
     <form class="leave" method="post" action="{% url 'list_leave' the_list.pk %}">
       {% csrf_token %}
-      <button type="submit">Leave this list</button>
+      <button class="button button-secondary" type="submit">Leave this list</button>
     </form>
   {% endif %}
   {% if can_reorder %}
