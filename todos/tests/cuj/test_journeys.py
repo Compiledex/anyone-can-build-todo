@@ -195,7 +195,7 @@ class ColorSchemeTests(BrowserTestCase):
                             background: color("body", "backgroundColor"),
                             text: color("li:not(.done) .title", "color"),
                             done: color("li.done .title", "color"),
-                            header: color("header.site", "color"),
+                            header: color("header.site .who", "color"),
                             overdue: color("li.overdue time", "color"),
                             high: color("li:not(.done) .priority-3", "color"),
                             doneHigh: color("li.done .priority-3", "color"),

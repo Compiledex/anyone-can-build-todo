@@ -3,9 +3,162 @@
    login and sign-up pages), then this file. This file sets no token: it only uses
    them with var(). It never loads site.css (the visitor pages' CSS). */
 
-body { font-family: var(--font); max-width: 32rem; margin: 2rem auto; padding: 0 1rem;
-       background: var(--bg); color: var(--text); }
-a { color: var(--text); }
+/* ---- Base and type ---- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2 {
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  font-weight: 650;
+  text-wrap: balance;
+}
+
+/* The list's name, "Edit to-do", "New list". A long name wraps, even one long word. */
+h1 {
+  font-size: 1.75rem;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+h2 {
+  font-size: 1.125rem;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+/* Dates and counts: every digit equally wide, so they line up. */
+time,
+.count {
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Hidden on the screen, but read by screen readers. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- The frame: one centered column, 46rem wide ---- */
+
+.container {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+main.container {
+  padding-top: var(--space-5);
+  padding-bottom: var(--space-7);
+}
+
+/* The header bar: the wordmark on the left, the person and Log out on the right. */
+header.site {
+  border-bottom: 1px solid var(--border);
+}
+
+.site-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 56px;
+}
+
+.wordmark {
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.wordmark:hover {
+  color: var(--text);
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  font-size: 0.9375rem;
+}
+
+/* "Logged in as ..." may wrap to two lines on a small phone; it stays visible. */
+.user .who {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* ---- Messages, at the top of the page ---- */
+
+.messages {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.message {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--band);
+  color: var(--text);
+}
+
+/* ---- Under 768px ---- */
+
+@media (max-width: 767px) {
+  .container {
+    padding: 0 var(--space-4);
+  }
+
+  main.container {
+    padding-top: var(--space-4);
+  }
+}
+
+/* ---- Not redesigned yet (the next commits replace these) ---- */
+
 nav.lists { margin: 1rem 0; }
 nav.lists .menu { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 0 0 0.5rem; }
 .menu-label, .muted { color: var(--muted); }
@@ -17,11 +170,7 @@ nav.filter a { padding: 0 0.75rem; border-radius: var(--radius-label); color: va
 nav.filter a[aria-current="page"] { background: var(--band); color: var(--text);
                                     box-shadow: inset 0 -2px 0 var(--accent); }
 .list-actions { display: flex; gap: 1rem; margin-top: -0.5rem; }
-.messages { margin-bottom: 1rem; }
-.message { margin: 0 0 0.5rem; padding: 0.5rem; border: 1px solid var(--border); }
 .errorlist { list-style: none; padding: 0; margin: 0 0 0.5rem; color: var(--danger); font-weight: 600; }
-header.site { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
-              padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); color: var(--muted); }
 form.account div, form.edit div { margin-bottom: 0.75rem; }
 form.account label, form.edit label { display: block; margin-bottom: 0.25rem; }
 form.account input, form.edit input { box-sizing: border-box; width: 100%; padding: 0.5rem; font-size: 1rem; }
@@ -80,9 +229,6 @@ details.clear-completed p { margin: 0.5rem 0; }
 .priority-3 { color: var(--priority-high); font-weight: bold; } /* 3 is High */
 .priority-1 { color: var(--muted); } /* 1 is Low */
 li.done .priority { color: var(--muted); }
-/* Hidden on the screen, but read by screen readers. */
-.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
-                   border: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 /* Manual order (#15): the drag handle, the row being dragged, the Move buttons. */
 .handle { cursor: grab; color: var(--muted); user-select: none; }
 ul.todos > li.dragging { background: var(--drag-bg); outline: 2px dashed var(--border); }

@@ -1,4 +1,10 @@
 {% load static %}<!doctype html>
+{% comment %}
+  The shared frame of the logged-in app pages (the list page, edit, new list, rename
+  and delete list). It has the <head>, the header bar and Django's messages. The look
+  is in todos/static/todos/tokens.css (the colors, sizes and font, shared with the
+  landing, login and sign-up pages), then todos/static/todos/app.css. Never site.css.
+{% endcomment %}
 <html lang="en">
 <head>
   <meta charset="utf-8">
@@ -12,22 +18,29 @@
 <body>
   {% if user.is_authenticated %}
     <header class="site">
-      <span>Logged in as {{ user.username }}</span>
-      <form method="post" action="{% url 'logout' %}">
-        {% csrf_token %}
-        <button type="submit">Log out</button>
-      </form>
+      <div class="container site-inner">
+        <a class="wordmark" href="{% url 'todo_list' %}">To-do list</a>
+        <div class="user">
+          <span class="who">Logged in as {{ user.username }}</span>
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit">Log out</button>
+          </form>
+        </div>
+      </div>
     </header>
   {% endif %}
 
-  {% if messages %}
-    <div class="messages" role="status">
-      {% for message in messages %}
-        <p class="message{% if message.tags %} {{ message.tags }}{% endif %}">{{ message }}</p>
-      {% endfor %}
-    </div>
-  {% endif %}
+  <main class="container">
+    {% if messages %}
+      <div class="messages" role="status">
+        {% for message in messages %}
+          <p class="message{% if message.tags %} {{ message.tags }}{% endif %}">{{ message }}</p>
+        {% endfor %}
+      </div>
+    {% endif %}
 
-  {% block content %}{% endblock %}
+    {% block content %}{% endblock %}
+  </main>
 </body>
 </html>
