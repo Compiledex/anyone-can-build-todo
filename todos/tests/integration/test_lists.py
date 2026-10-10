@@ -155,7 +155,9 @@ class ListPageTests(LoggedInTestCase):
         )
         self.assertContains(response, ">Inbox<")
         # The open list is marked, and only that one (the `>` leaves out the CSS).
-        self.assertContains(response, 'aria-current="page">', count=1)
+        # The second mark is "All" in the filter links.
+        self.assertContains(response, 'aria-current="page">', count=2)
+        self.assertContains(response, 'aria-current="page">All<')
         self.assertContains(
             response, f'href="{work.get_absolute_url()}" aria-current="page">Work<'
         )

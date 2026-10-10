@@ -160,9 +160,14 @@ class ShareForm(forms.Form):
 class TodoQueryForm(forms.Form):
     """What the list page shows, read from the address (`request.GET`).
 
-    Only reads, never saves. Today one field: `q`, the search text. Filter and
-    sort add their fields here too. apply_list_query in todos/queries.py uses it.
+    Only reads, never saves. `q` is the search text; `status` is the filter
+    ("open" or "done"; empty means all). Sort adds its field here too.
+    apply_list_query in todos/queries.py uses it.
     """
+
+    STATUS_CHOICES = [("open", "Not done"), ("done", "Done")]
 
     # CharField removes spaces at the start and end (strip=True is the default).
     q = forms.CharField(required=False, max_length=200)
+    # Any other value is not valid, so it is left out of cleaned_data: all to-dos.
+    status = forms.ChoiceField(choices=STATUS_CHOICES, required=False)
