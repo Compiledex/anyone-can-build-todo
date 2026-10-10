@@ -333,7 +333,7 @@ form.edit { display: grid; gap: var(--space-4); max-width: 36rem; margin-top: va
         <span class="joined"><input type="search" name="q" aria-label="Search to-dos" placeholder="Search"><button type="button" class="button button-secondary">Search</button></span></label></div>
     </form>
     <form class="sort" method="get">
-      <div class="field"><label for="id_sort">Sort by:</label>
+      <div class="field"><label for="id_sort">Sort by</label>
         <select id="id_sort" name="sort"><option>Created</option><option>Due date</option><option>Priority</option><option>Title</option><option>Manual</option></select></div>
       <button type="button" class="button button-secondary">Sort</button>
     </form>
@@ -481,14 +481,14 @@ form.edit { display: grid; gap: var(--space-4); max-width: 36rem; margin-top: va
   <!-- The edit page. Each field: label, input, error, help, in this order in the HTML. -->
   <h1>Edit to-do</h1>
   <form class="edit">
-    <div class="field"><label for="id_title">Title:</label><input id="id_title" value="Paint the hallway"></div>
-    <div class="field"><label for="id_due_date2">Due date:</label><input id="id_due_date2" type="text" value=""></div>
-    <div class="field"><label for="id_repeat2">Repeat:</label>
+    <div class="field"><label for="id_title">Title</label><input id="id_title" value="Paint the hallway"></div>
+    <div class="field"><label for="id_due_date2">Due date</label><input id="id_due_date2" type="text" value=""></div>
+    <div class="field"><label for="id_repeat2">Repeat</label>
       <select id="id_repeat2" aria-invalid="true" aria-describedby="id_repeat_error"><option>Never</option><option selected>Weekly</option></select>
       <ul class="errorlist" id="id_repeat_error"><li>A repeating to-do needs a due date.</li></ul></div>
-    <div class="field"><label for="id_description">Notes:</label><textarea id="id_description" rows="4">Light grey, the same as the kitchen.</textarea></div>
-    <div class="field"><label for="id_priority2">Priority:</label><select id="id_priority2"><option>Low</option><option selected>Medium</option><option>High</option></select></div>
-    <div class="field"><label for="id_tag_names">Tags:</label>
+    <div class="field"><label for="id_description">Notes</label><textarea id="id_description" rows="4">Light grey, the same as the kitchen.</textarea></div>
+    <div class="field"><label for="id_priority2">Priority</label><select id="id_priority2"><option>Low</option><option selected>Medium</option><option>High</option></select></div>
+    <div class="field"><label for="id_tag_names">Tags</label>
       <input id="id_tag_names" value="home, weekend" aria-describedby="id_tag_names_helptext">
       <div class="helptext" id="id_tag_names_helptext">Separate tags with commas, for example: work, home</div></div>
     <div class="form-actions"><button type="button" class="button button-primary">Save</button><a href="#">Cancel</a></div>

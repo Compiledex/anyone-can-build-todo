@@ -153,10 +153,16 @@ without JavaScript); Move up / Move down; light/dark by the system only.
   error, then the help text, the same as the auth pages. No CSS `order`, so screen readers and
   sighted people get the same order. On the edit, new-list and rename pages, the forms render each
   field with the auth pages' include `todos/_field.html` (`{{ field.label_tag }}`, `{{ field }}`,
-  `{{ field.errors }}`, help). It must use `label_tag`, so the app keeps Django's colon
-  ("Notes:"); a test checks `Notes:</label>`.
+  `{{ field.errors }}`, help). The include keeps `{{ field.label_tag }}`, so Django still
+  writes the `<label for>` and the required mark.
+- **Labels have no colon** ("Notes", not "Notes:"), as on the new login and sign-up pages. The
+  person decided this. The Django way: the app's forms (`TodoForm`, `TodoListForm`,
+  `SubtaskForm`, `ShareForm`, `TodoQueryForm`) get `label_suffix = ""` (set in each form's
+  `__init__`, or as a class attribute on a small shared base form in `todos/forms.py`). Then
+  `label_tag` writes "Notes" and "Sort by" without a colon, everywhere the form is used. One
+  test changes because of it (see Tests).
 - **Visible labels on the list page**: "New to-do", "Due date", "Repeat", "Priority", "Search
-  to-dos", "Sort by:", "New step", "Username". The visible text is the same as, or the start of,
+  to-dos", "Sort by", "New step", "Username". The visible text is the same as, or the start of,
   the existing `aria-label`, so screen readers and the tests find the same names (WCAG 2.5.3).
   Fields that Django renders with an `id` (repeat, priority, sort) get `<label for>`. Fields
   written by hand in the template (title, due date, search, new step, username) are wrapped by
@@ -175,7 +181,8 @@ without JavaScript); Move up / Move down; light/dark by the system only.
   `prefers-reduced-motion: reduce`: no transition, no movement.
 - **Touch**: under `@media (pointer: coarse)` (a finger, not a mouse), row and step actions are
   at least 44px tall with at least 8px between them.
-- **Copy**: no visible text changes, except the new visible labels above.
+- **Copy**: no visible text changes, except the new visible labels above and the colons that
+  go away after labels.
 
 ## Tokens
 
@@ -316,8 +323,8 @@ repeat selects stay exactly as Django renders them (no new widget attributes or 
 
 One row under a `--border` line, 32px below the add form, **in the HTML order: search, sort,
 filter** (no DOM move). Search: the label "Search to-dos" wraps the field and the **Search**
-button sits after the label (`.button-secondary`), "Show all" after it. Sort: "Sort by:" (Django's
-`label_tag`), its select, **Sort** (`.button-secondary`). Filter: the three links as one group
+button sits after the label (`.button-secondary`), "Show all" after it. Sort: "Sort by" (Django's
+`label_tag`, no colon), its select, **Sort** (`.button-secondary`). Filter: the three links as one group
 (`--surface`, 1px `--border` edge, `--radius`); each link has `--radius-label`; the current one
 gets `--band`, weight 600 and a 2px `--accent` line under it; the others `--muted`. At 390px the
 three stack. The filter `<a>`s and "Show all" get **no new attributes** (tests compare whole tags);
@@ -432,7 +439,7 @@ sees **Leave this list** (`.button-secondary`) instead.
 ### Edit page, "New list", "Rename list"
 
 `h1`, then one column, 36rem wide, 16px between fields. Each field through `todos/_field.html`:
-label (with Django's colon), input, error, help, in DOM order. The edit page's field order stays:
+label (no colon), input, error, help, in DOM order. The edit page's field order stays:
 Title, Due date, Repeat, Notes, Priority, Tags. "A repeating to-do needs a due date." is an error
 of the **Repeat** field, so it shows under Repeat. Save (`.button-primary`) and Cancel in
 `.form-actions`.
@@ -470,13 +477,14 @@ open/closed `details`, touch sizes. There is no loading state: every action is a
 | `todos/templates/base.html` | `<style>` becomes `<link>`s to `tokens.css` and `app.css`; header with wordmark, inner container and `<span class="who">`; `<main class="container">`. |
 | `todos/templates/todos/todo_list.html` | `div.field`s and labels; errors after their inputs; the find bar wrapper; `<span class="owner">`; button classes; `li.empty`. |
 | `todos/templates/todos/_todo_item.html` | Button classes and the "New step" label only. |
+| `todos/forms.py` | `label_suffix = ""` on the app's forms (no colon after labels). No other change: no widget attribute or class. |
 | `todos/templates/todos/todo_edit.html`, `list_form.html`, `list_confirm_delete.html` | Fields through `todos/_field.html`; `.form-actions`; button classes. |
 | `todos/tests/cuj/test_journeys.py` | Color test extended; row layout test extended; the header color selector; the shared-button check (see Tests). |
 | `scripts/landing_shots.py`, `scripts/landing_seed.py`, `Makefile` | **New.** The landing screenshot tool and `make landing-shots` (Step 9). |
 | `todos/static/todos/landing/*.webp` | Retaken at the end. |
 | `AGENTS.md`, `README.md` | `app.css` and `tokens.css` rows; `base.html` no longer holds CSS; `make landing-shots`. |
 
-No model, migration, view, form, URL or package change. `landing.css`, `landing.html`,
+No model, migration, view, URL or package change. The only form change is `label_suffix = ""`. `landing.css`, `landing.html`,
 `site.css` and `site_base.html` are not changed.
 
 ## Tests
@@ -486,12 +494,23 @@ are only real in a browser, so the new checks are CUJ tests.
 
 ### Existing tests that check colors, layout or exact HTML
 
-Only one existing line has to change (the header selector). The rest pass **if** the constraints
-in this table are kept. Each was checked by reading it.
+Two existing lines have to change, and the rest pass **if** the constraints in this table are
+kept. Each was checked by reading it.
+
+**Tests that must change:**
+
+| Test | Today | After | Why |
+|---|---|---|---|
+| `integration/test_views.py` line 579 (the edit page shows the Notes field) | `assertContains(response, "Notes:</label>")` | `assertContains(response, "Notes</label>")` | The person decided no colon after labels (`label_suffix = ""`). |
+| `cuj/test_journeys.py` line 183 (`test_readable_in_light_and_dark`) | `color("header.site", "color")` | `color("header.site .who", "color")` | The header now holds the wordmark in `--text`; the muted "Logged in as" text is the span. |
+
+Checked and not affected by the colon: `test_views.py` lines 193-195 (`id="id_title_error"`,
+`aria-describedby`, `aria-invalid`), and the CUJ `get_by_label("Name")`, `("Title")`, `("Notes")`,
+`("Tags")` (Playwright matches the label text without the colon too).
 
 | Test | What it checks | Effect / constraint |
 |---|---|---|
-| `cuj/test_journeys.py` `ColorSchemeTests.test_readable_in_light_and_dark` | Light `body` luminance > 0.9, dark < 0.1; AA for text, done title, header, overdue, High, tag; High ≠ overdue; done High = done title; dark tag background < 0.1 | Passes (0.93 / 0.005; all pairs above). **Change** line 183: `header.site` becomes `header.site .who` (the header itself now holds the wordmark in `--text`; the muted text is the span). **Extended** (below). |
+| `cuj/test_journeys.py` `ColorSchemeTests.test_readable_in_light_and_dark` | Light `body` luminance > 0.9, dark < 0.1; AA for text, done title, header, overdue, High, tag; High ≠ overdue; done High = done title; dark tag background < 0.1 | Passes (0.93 / 0.005; all pairs above). **Changes** at line 183 (see above). **Extended** (below). |
 | `cuj/test_journeys.py` `RowLayoutTests.test_a_full_row_stays_readable` | Title and priority do not overlap; title fits its box; Done and Delete on one line; 1280 and 390, normal and manual, light and dark | Passes with the CSS grid. **Extended** (below). |
 | `cuj/test_journeys.py` `test_fix_a_typo` | No horizontal scroll at 375px; the line-through does not reach the notes | Passes (`overflow-wrap`, line-through only on `.title`). |
 | `cuj/test_journeys.py` `test_reorder_by_drag`, `test_escape_cancels_a_drag` | Drags `.handle` onto a row; `li.dragging` | Passes: classes stay. |
@@ -504,7 +523,7 @@ in this table are kept. Each was checked by reading it.
 | `integration/test_views.py` line 912 | `aria-label="Repeat"` | Stays on the repeat select. |
 | `integration/test_views.py` line 114 | The title's `</span>` comes before `<details class="notes">` | Row order unchanged (CSS only). |
 | `integration/test_views.py` lines 467-471, `test_sharing.py` line 701 | `<a href="...">Cancel</a>` exactly | Cancel gets no class; styled by `.form-actions > a`. |
-| `integration/test_views.py` (`<details class="notes">`, `<summary aria-label="Notes for …">Notes</summary>`, `<span class="overdue-label">Overdue</span>`, `<h1>Edit to-do</h1>`, `Notes:</label>`), `test_search.py` (`<details class="steps" open>`), `test_sharing.py` (`<span class="tag">#work</span>`, `<span class="title">&lt;b&gt;ben</span>`) | Exact HTML | These tags keep exactly these attributes; `_field.html` uses `label_tag` (the colon). |
+| `integration/test_views.py` (`<details class="notes">`, `<summary aria-label="Notes for …">Notes</summary>`, `<span class="overdue-label">Overdue</span>`, `<h1>Edit to-do</h1>`), `test_search.py` (`<details class="steps" open>`), `test_sharing.py` (`<span class="tag">#work</span>`, `<span class="title">&lt;b&gt;ben</span>`) | Exact HTML | These tags keep exactly these attributes. |
 | `integration/test_lists.py` `test_menu_shows_my_lists` | `aria-current="page">` exactly twice | No new `aria-current` (the wordmark gets none). |
 | `accounts/tests/integration/test_accounts.py` | `<form method="post" action="/accounts/logout/"` and "Logged in as alice" | Keep the start of the tag; the text stays visible at 390px. |
 
@@ -530,8 +549,10 @@ at 1280, 390 and 320px, after each one.
    **b. Tokens.** Extend the color test first and see it fail (the field edge, the current filter
    line). Add the app tokens to `tokens.css`, link `tokens.css` before `app.css`, switch `app.css`
    to the new names and values. The test passes.
-2. **Typography and frame.** Type scale, `tabular-nums`, the 46rem column, the header bar with the
-   wordmark and `.who` (change the test selector here), `<main>`, spacing.
+2. **Typography and frame.** `label_suffix = ""` on the app's forms and the `Notes</label>`
+   test change (change the test first and show it failing). Type scale, `tabular-nums`, the
+   46rem column, the header bar with the wordmark and `.who` (change the test selector here),
+   `<main>`, spacing.
 3. **Buttons and fields.** The button classes on every button, field styles, the focus ring,
    pressed state, reduced motion, touch sizes, `div.field` structure, `_field.html` on the edit
    and list forms, red edge on errors. Add `test_primary_button_is_the_same_everywhere` first.
@@ -606,3 +627,6 @@ Changes after the review (approved with changes):
 - Step 1 is split into 1a (move, no visual change) and 1b (tokens). Step 9 commits the screenshot
   tool with `make landing-shots` and lists the 7 image pairs. "Grid areas" and "specificity" are
   explained. The wordmark question is gone (kept, as on `site_base.html`). New open questions.
+- Decided by the person: **no colon after labels**. `label_suffix = ""` on the app's forms;
+  `todos/_field.html` keeps `{{ field.label_tag }}`; `test_views.py` line 579 (`Notes:</label>`)
+  changes to `Notes</label>`. Lines 193-195 do not check a colon and stay.
