@@ -8,6 +8,7 @@
 
   Blocks: title, meta (more <meta> tags), page_css (the page's own CSS, after site.css),
   nav (the links on the right of the header), content (the <main>).
+  Django's messages, if there are any, show at the top of <main>, above the content.
 {% endcomment %}
 <html lang="en">
 <head>
@@ -32,6 +33,13 @@
   </header>
 
   <main>
+    {% if messages %}
+      <div class="container messages" role="status">
+        {% for message in messages %}
+          <p class="message{% if message.tags %} {{ message.tags }}{% endif %}">{{ message }}</p>
+        {% endfor %}
+      </div>
+    {% endif %}
     {% block content %}{% endblock %}
   </main>
 

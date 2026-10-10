@@ -265,6 +265,26 @@ button.button {
   line-height: 1.45;
 }
 
+/* Django's messages, at the top of the page: a tinted line with an accent edge. */
+
+.messages {
+  display: grid;
+  gap: var(--space-2);
+  margin-top: var(--space-5); /* margin: .container sets the padding on a phone */
+}
+
+.message {
+  max-width: none;
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent);
+  background: var(--band);
+  color: var(--text);
+}
+
+.message.error {
+  border-left-color: var(--danger);
+}
+
 .site-footer {
   padding: 2rem 0;
   border-top: 1px solid var(--border);

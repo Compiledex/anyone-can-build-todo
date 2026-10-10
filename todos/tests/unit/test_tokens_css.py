@@ -13,13 +13,16 @@ from django.test import SimpleTestCase
 
 STATIC = Path(settings.BASE_DIR)
 TOKENS_CSS = STATIC / "todos/static/todos/tokens.css"
-OTHER_CSS = [
-    STATIC / "todos/static/todos/site.css",
-    STATIC / "todos/static/todos/landing.css",
-    STATIC / "accounts/static/accounts/auth.css",
-]
-# A custom property being set, like `--accent: #1f4f8f;`.
-SETS_A_TOKEN = re.compile(r"--[\w-]+\s*:")
+SITE_CSS = STATIC / "todos/static/todos/site.css"
+# Every CSS file of every app, except tokens.css. A new file is checked too.
+OTHER_CSS = sorted(
+    path for path in STATIC.glob("*/static/**/*.css") if path != TOKENS_CSS
+)
+# A page's own CSS: every other file except the shared site.css.
+PAGE_CSS = [path for path in OTHER_CSS if path != SITE_CSS]
+# A custom property being declared, like `--accent: #1f4f8f;`: at the start of a
+# line, or after `{` or `;`. Not `var(--accent)`, and not a selector.
+SETS_A_TOKEN = re.compile(r"(?:^|[{;])\s*--[\w-]+\s*:", re.M)
 COMMENT = re.compile(r"/\*.*?\*/", re.DOTALL)
 DARK_QUERY = "@media (prefers-color-scheme: dark)"
 COLORS = [
@@ -65,6 +68,10 @@ class TokensCssTests(SimpleTestCase):
         selectors = re.findall(r"([^{}]+)\{", self.css)
         self.assertEqual([s.strip() for s in selectors], [":root", DARK_QUERY, ":root"])
 
+    def test_every_css_file_is_checked(self):
+        names = {path.name for path in OTHER_CSS}
+        self.assertLessEqual({"site.css", "landing.css", "auth.css"}, names)
+
     def test_other_css_sets_no_tokens_and_has_no_root(self):
         for path in OTHER_CSS:
             with self.subTest(path=path.name):
@@ -74,7 +81,7 @@ class TokensCssTests(SimpleTestCase):
 
     def test_page_css_has_no_shared_rules(self):
         shared = [".site-nav", ".site-footer", ".button-primary", ".wordmark", ".field"]
-        for path in OTHER_CSS[1:]:
+        for path in PAGE_CSS:
             css = path.read_text()
             for selector in shared:
                 with self.subTest(path=path.name, selector=selector):

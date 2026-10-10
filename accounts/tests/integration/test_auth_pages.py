@@ -7,13 +7,16 @@ a label, and the help and error texts are linked to their input.
 
 from html.parser import HTMLParser
 
+from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.messages.storage.cookie import CookieStorage
 from django.contrib.staticfiles import finders
+from django.http import HttpResponse
 from django.templatetags.static import static
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
-from accounts.tests.helpers import TEST_PASSWORD, make_user
+from accounts.tests.helpers import TEST_PASSWORD, LoggedInTestCase, make_user
 
 LOGIN_URL = "/accounts/login/"
 SIGNUP_URL = "/accounts/signup/"
@@ -175,6 +178,8 @@ class SharedFrameTests(TestCase):
                 self.assertTrue(image.get("width", "").isdigit())
                 self.assertTrue(image.get("height", "").isdigit())
                 self.assertTrue(image.get("alt", "").strip())
+                # A phone hides the picture; lazy means it then never downloads it.
+                self.assertEqual(image.get("loading"), "lazy")
                 sources = parts.all("source", media="(prefers-color-scheme: dark)")
                 self.assertEqual(len(sources), 1)
                 for file_url in [image["src"], sources[0]["srcset"]]:
@@ -263,9 +268,14 @@ class FormFieldTests(TestCase):
         )
 
     def test_signup_error_is_below_its_input_and_linked_to_it(self):
+        # Too short. Long enough that it cannot appear in the page by chance.
+        bad_password = "zq7zq7x"
         response = self.client.post(
-            SIGNUP_URL, {"username": "carol", "password1": "123", "password2": "123"}
+            SIGNUP_URL,
+            {"username": "carol", "password1": bad_password, "password2": bad_password},
         )
+        # A password is never sent back to the browser, not even a wrong one.
+        self.assertNotContains(response, bad_password)
         self.assertEqual(response.status_code, 200)
         self.assertFalse(get_user_model().objects.filter(username="carol").exists())
         parts = parts_of(response)
@@ -290,6 +300,7 @@ class FormFieldTests(TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("_auth_user_id", self.client.session)
+        self.assertNotContains(response, "wrong-password-1")
         parts = parts_of(response)
         errors = parts.position("ul", **{"class": "errorlist nonfield"})
         self.assertLess(errors, parts.position("input", name="username"))
@@ -310,3 +321,42 @@ class FormFieldTests(TestCase):
         self.assertRedirects(
             response, reverse("list_create"), fetch_redirect_response=False
         )
+
+
+class MessagesTests(TestCase):
+    def test_a_message_shows_on_the_login_page(self):
+        # Make a message the way a view does, and give its cookie to the client.
+        request = RequestFactory().get("/")
+        request._messages = CookieStorage(request)
+        messages.info(request, "Your session ended. Please log in again.")
+        response = HttpResponse()
+        request._messages.update(response)
+        self.client.cookies.update(response.cookies)
+
+        response = self.client.get(LOGIN_URL)
+        parts = parts_of(response)
+        boxes = parts.all("div", **{"class": "container messages", "role": "status"})
+        self.assertEqual(len(boxes), 1, "the message box is missing")
+        self.assertContains(response, "Your session ended. Please log in again.")
+        # Above the page's own content.
+        self.assertLess(
+            parts.position("div", **{"class": "container messages"}),
+            parts.position("h1", id="auth-title"),
+        )
+
+    def test_no_message_box_without_a_message(self):
+        for url in [LOGIN_URL, SIGNUP_URL, "/"]:
+            with self.subTest(url=url):
+                self.assertNotContains(
+                    self.client.get(url), 'class="container messages"'
+                )
+
+
+class AppPagesTests(LoggedInTestCase):
+    def test_app_pages_do_not_load_the_visitor_css(self):
+        response = self.client.get(self.todo_list.get_absolute_url())
+        self.assertTemplateUsed(response, "base.html")
+        self.assertTemplateNotUsed(response, SITE_FRAME)
+        self.assertNotContains(response, "todos/site.css")
+        # tokens.css is not checked here: the app redesign will load it from
+        # base.html on purpose, so the app and the visitor pages share the tokens.
