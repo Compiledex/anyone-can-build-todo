@@ -1,6 +1,6 @@
 /* The landing page (todos/templates/todos/landing.html). Only that page loads this file,
-   after the shared todos/static/todos/site.css. The colors, the font, the header, the
-   footer and the buttons are in site.css; this file only places the landing page's
+   after the shared todos/static/todos/tokens.css and site.css. The colors and sizes are in tokens.css,
+   the header, the footer and the buttons in site.css; this file only places the landing page's
    sections. It sets no color token, so the pages cannot drift apart. */
 
 /* Layout */
@@ -197,7 +197,7 @@
   text-align: center;
 }
 
-.closing .actions {
+.closing .cta-row {
   justify-content: center;
   margin-top: 0.75rem;
 }

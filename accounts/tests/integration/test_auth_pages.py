@@ -102,8 +102,12 @@ class SharedFrameTests(TestCase):
                 stylesheets = [
                     a["href"] for a in parts_of(response).all("link", rel="stylesheet")
                 ]
-                # The shared CSS comes first, so a page's own CSS can build on it.
-                self.assertEqual(stylesheets[0], static("todos/site.css"))
+                # The tokens, then the shared CSS, then the page's own CSS.
+                self.assertEqual(
+                    stylesheets[:2],
+                    [static("todos/tokens.css"), static("todos/site.css")],
+                )
+                self.assertEqual(len(stylesheets), 3)
 
     def test_every_stylesheet_is_a_static_file_and_nothing_comes_from_other_sites(self):
         for url in [LOGIN_URL, SIGNUP_URL]:
@@ -179,6 +183,11 @@ class SharedFrameTests(TestCase):
 
 
 class FormFieldTests(TestCase):
+    def test_fields_use_the_shared_field_include(self):
+        for url in [LOGIN_URL, SIGNUP_URL]:
+            with self.subTest(url=url):
+                self.assertTemplateUsed(self.client.get(url), "todos/_field.html")
+
     def test_every_input_has_a_label(self):
         for url in [LOGIN_URL, SIGNUP_URL]:
             with self.subTest(url=url):

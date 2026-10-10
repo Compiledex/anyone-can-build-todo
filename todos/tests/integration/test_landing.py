@@ -22,8 +22,8 @@ DARK_MEDIA = "(prefers-color-scheme: dark)"
 EM_DASH, EN_DASH = "\u2014", "\u2013"
 
 
-# The CSS the landing page loads: the shared site.css, then its own landing.css.
-LANDING_CSS_FILES = ["todos/site.css", "todos/landing.css"]
+# The CSS the landing page loads, in order: the tokens, the shared site.css, its own.
+LANDING_CSS_FILES = ["todos/tokens.css", "todos/site.css", "todos/landing.css"]
 
 
 def static_text(path):

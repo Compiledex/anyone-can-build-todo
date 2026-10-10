@@ -82,8 +82,8 @@ You should see `OK`, and then one line for each layer of tests:
 ```
 Test layers
   CUJ          20 passed
-  Integration  389 passed
-  Unit         84 passed
+  Integration  390 passed
+  Unit         88 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
@@ -222,7 +222,9 @@ runs the same checks and the tests on every push.
 | `todos/templates/base.html` | The frame every page shares: the colors, the style, who is logged in, the messages |
 | `todos/templates/todos/todo_list.html` | The page you see: one list |
 | `todos/templates/todos/site_base.html` | The frame of the pages a visitor sees (landing, login, sign-up): the header and the footer |
-| `todos/static/todos/site.css` | The one style of those pages: colors, font, buttons, form fields |
+| `todos/static/todos/tokens.css` | The colors, sizes and font of those pages, in light and dark: the one place to change them |
+| `todos/static/todos/site.css` | The shared style of those pages: header, footer, buttons, form fields |
+| `todos/templates/todos/_field.html` | One form field: label, input, error, help text |
 | `todos/templates/todos/landing.html` | The landing page: what a visitor who is not logged in sees at `/` |
 | `todos/static/todos/landing.css` | Where the landing page puts its sections |
 | `todos/static/todos/landing/` | The landing page's pictures: screenshots of the app, light and dark, with invented sample data |

@@ -1,0 +1,57 @@
+/* The design tokens: the ONE place that sets colors, sizes and the font for the pages
+   a visitor sees (landing, login, sign-up), and later for the app. Only `:root` blocks
+   here, no other selectors. site.css and every page's own CSS only use these with var().
+
+   The page follows the system's light or dark mode. One accent color (a calm blue), one
+   gray family, one radius. Every text color has at least 4.5 : 1 contrast on its
+   background in both modes (WCAG AA); --control (the edge of a field) and the focus
+   ring (--accent) have at least 3 : 1. */
+
+:root {
+  color-scheme: light dark;
+
+  /* Colors */
+  --bg: #f6f7f9; /* the page */
+  --band: #e6edf6; /* a tinted band, and a secondary button's hover */
+  --text: #15181d;
+  --muted: #545b66; /* helper text, captions */
+  --border: #d3d8e0; /* lines that only divide, like the header's bottom line */
+  --surface: #fcfcfd; /* the inside of a field */
+  --control: #737b87; /* the edge of a field or control */
+  --accent: #1f4f8f; /* links, primary buttons, the focus ring */
+  --accent-hover: #173d70;
+  --on-accent: #f6f7f9; /* text on --accent */
+  --danger: #b42318; /* error text and the edge of a field with an error */
+
+  /* Sizes */
+  --radius: 8px; /* everything that is rounded */
+  --control-height: 48px; /* buttons and fields */
+  --control-height-small: 40px; /* small buttons, like in the header */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 3rem;
+  --space-8: 5rem;
+
+  /* Font: the system's own sans-serif, nothing to download. */
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1013;
+    --band: #172231;
+    --text: #e8eaee;
+    --muted: #a3aab5;
+    --border: #2d333b;
+    --surface: #15181d;
+    --control: #6f7885;
+    --accent: #8fb6ec;
+    --accent-hover: #b0cbf2;
+    --on-accent: #0e1013;
+    --danger: #ff8f85;
+  }
+}

@@ -1,7 +1,7 @@
 /* The login and sign-up pages (accounts/templates/registration/). They load this file
-   after the shared todos/static/todos/site.css, which has the colors, the font, the
-   header, the footer, the buttons and the form fields. This file only places the form
-   and the screenshot. It sets no color token, so the pages cannot drift apart. */
+   after the shared todos/static/todos/tokens.css (colors, sizes, font) and site.css (the
+   header, the footer, the buttons and the form fields). This file only places the form
+   and the screenshot. It sets no token, so the pages cannot drift apart. */
 
 /* The form on the left, one app screenshot on the right. */
 
@@ -49,7 +49,7 @@
 
 .form-errors {
   padding-left: 0.875rem;
-  border-left: 3px solid var(--error);
+  border-left: 3px solid var(--danger);
 }
 
 .auth-shot img {

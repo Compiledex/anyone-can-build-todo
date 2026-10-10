@@ -1,49 +1,14 @@
 /* The shared design of the pages a visitor sees: the landing page and the login and
-   sign-up pages. They all extend todos/templates/todos/site_base.html, which loads this
-   file first. The logged-in app pages (base.html) do not use it.
+   sign-up pages. They all extend todos/templates/todos/site_base.html, which loads
+   tokens.css (the colors, sizes and font), then this file, then the page's own CSS.
+   The logged-in app pages (base.html) do not use it yet.
 
-   This is the ONE place for the colors, the font, the header, the footer, the buttons,
-   the links, the form fields and the focus ring. A page's own CSS (landing.css, auth.css)
-   only places things on its page; it never sets a color token.
+   This is the ONE place for the header, the footer, the buttons, the links, the form
+   fields and the focus ring. It sets no token: it only uses the ones in tokens.css.
+   A page's own CSS (landing.css, auth.css) only places things on its page.
 
-   One theme rule: the page follows the system's light or dark mode, like the app.
-   One accent color (a calm blue, from the app's tag color), one gray family, and one
-   radius: everything that is rounded uses --radius. Every text color has at least
-   4.5 : 1 contrast on its background in both modes (WCAG AA), and every edge a person
-   must see (an input's border, the focus ring) at least 3 : 1. */
-
-:root {
-  color-scheme: light dark;
-  --bg: #f6f7f9;
-  --band: #e6edf6;
-  --text: #15181d;
-  --muted: #545b66;
-  --border: #d3d8e0;
-  --field-bg: #fcfcfd;
-  --field-border: #737b87;
-  --accent: #1f4f8f;
-  --accent-hover: #173d70;
-  --on-accent: #f6f7f9;
-  --error: #b42318;
-  --radius: 8px;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e1013;
-    --band: #172231;
-    --text: #e8eaee;
-    --muted: #a3aab5;
-    --border: #2d333b;
-    --field-bg: #15181d;
-    --field-border: #6f7885;
-    --accent: #8fb6ec;
-    --accent-hover: #b0cbf2;
-    --on-accent: #0e1013;
-    --error: #ff8f85;
-  }
-}
+   Buttons: .button with .button-primary or .button-secondary, and .button-small.
+   (.button-danger and .button-quiet can be added later in the same way.) */
 
 *,
 *::before,
@@ -130,7 +95,7 @@ input:focus-visible {
 .container {
   max-width: 72rem;
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 var(--space-5);
 }
 
 /* Navigation: one line, 64px high. */
@@ -178,7 +143,7 @@ input:focus-visible {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-height: 48px;
+  min-height: var(--control-height);
   padding: 0 1.25rem;
   border: 1px solid var(--accent);
   border-radius: var(--radius);
@@ -223,12 +188,13 @@ button.button {
 }
 
 .button-small {
-  min-height: 40px;
-  padding: 0 1rem;
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-4);
   font-size: 0.9375rem;
 }
 
-.actions {
+/* A row of call-to-action buttons. Its own name, because the app's to-do row already has a class for its buttons. */
+.cta-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.75rem;
@@ -254,11 +220,11 @@ button.button {
 
 .field input {
   width: 100%;
-  min-height: 48px;
+  min-height: var(--control-height);
   padding: 0 0.875rem;
-  border: 1px solid var(--field-border);
+  border: 1px solid var(--control);
   border-radius: var(--radius);
-  background: var(--field-bg);
+  background: var(--surface);
   color: var(--text);
   font: inherit;
   font-size: 1rem; /* 16px or more, so a phone does not zoom in. */
@@ -275,7 +241,7 @@ button.button {
 }
 
 .field input[aria-invalid="true"] {
-  border-color: var(--error);
+  border-color: var(--danger);
 }
 
 .helptext {
@@ -293,7 +259,7 @@ button.button {
   margin: 0;
   padding: 0;
   list-style: none;
-  color: var(--error);
+  color: var(--danger);
   font-size: 0.9375rem;
   font-weight: 600;
   line-height: 1.45;
@@ -320,7 +286,7 @@ button.button {
   }
 
   .container {
-    padding: 0 1rem;
+    padding: 0 var(--space-4);
   }
 
   .nav-links {
@@ -328,8 +294,8 @@ button.button {
   }
 
   .button-small {
-    min-height: 40px;
-    padding: 0 0.75rem;
+    min-height: var(--control-height-small);
+    padding: 0 var(--space-3);
   }
 }
 

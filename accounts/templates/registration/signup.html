@@ -27,7 +27,7 @@
           <form class="auth-form" method="post" action="{% url 'signup' %}">
             {% csrf_token %}
             {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
-            {% for field in form %}{% include "registration/_field.html" %}{% endfor %}
+            {% for field in form %}{% include "todos/_field.html" %}{% endfor %}
             <button class="button button-primary" type="submit">Create an account</button>
           </form>
         </div>
