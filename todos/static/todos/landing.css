@@ -1,0 +1,496 @@
+/* The landing page (todos/templates/todos/landing.html). Only that page loads this file,
+   so the app pages do not change.
+
+   One theme rule: the page follows the system's light or dark mode, like the app.
+   One accent color (a calm blue, from the app's tag color), one gray family, and one
+   radius: everything that is rounded uses --radius. Every text color has at least
+   4.5 : 1 contrast on its background in both modes (WCAG AA). */
+
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9;
+  --band: #e6edf6;
+  --text: #15181d;
+  --muted: #545b66;
+  --border: #d3d8e0;
+  --accent: #1f4f8f;
+  --accent-hover: #173d70;
+  --on-accent: #f6f7f9;
+  --radius: 8px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1013;
+    --band: #172231;
+    --text: #e8eaee;
+    --muted: #a3aab5;
+    --border: #2d333b;
+    --accent: #8fb6ec;
+    --accent-hover: #b0cbf2;
+    --on-accent: #0e1013;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: clamp(2.25rem, 1.5rem + 2.4vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+}
+
+h2 {
+  font-size: clamp(1.625rem, 1.3rem + 1vw, 2.25rem);
+  font-weight: 650;
+}
+
+h3 {
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+
+p {
+  margin: 0;
+  max-width: 62ch;
+}
+
+figure {
+  margin: 0;
+}
+
+figcaption {
+  margin-top: 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 0.2em;
+}
+
+/* Focus: the same ring for every link and button, in the accent color. */
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius);
+}
+
+/* Layout */
+
+.container {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+.section {
+  padding: 5rem 0;
+}
+
+.section-head {
+  display: grid;
+  gap: 0.75rem;
+  margin-bottom: 2.5rem;
+}
+
+.section-head p,
+.split-text p,
+.grid-four p,
+.cell-text p,
+.band p,
+.closing p {
+  color: var(--muted);
+}
+
+/* Navigation: one line, 64px high. */
+
+.site-nav {
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: 64px;
+}
+
+.wordmark {
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.nav-link {
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nav-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* Buttons: links that look like buttons. Never wrap. */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 1.25rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out,
+    transform 150ms ease-out;
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.button-secondary {
+  background: transparent;
+  color: var(--accent);
+}
+
+.button-secondary:hover {
+  background: var(--band);
+}
+
+.button-small {
+  min-height: 40px;
+  padding: 0 1rem;
+  font-size: 0.9375rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/* Screenshots: a thin frame, so a white screenshot stands apart from the page. */
+
+.shot img,
+.compare-frame {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* 1. Hero: text on the left, the app on the right. */
+
+.hero {
+  padding: 3rem 0 4rem;
+}
+
+.hero-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 30rem);
+  align-items: center;
+  gap: 4rem;
+}
+
+.hero-text {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.hero-text p {
+  font-size: 1.1875rem;
+  color: var(--muted);
+  max-width: 34ch;
+}
+
+.hero-shot img {
+  max-height: 34rem;
+  width: auto;
+  margin-left: auto;
+}
+
+/* 2. Sharing: two screenshots side by side, each with a caption. */
+
+.pair {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: start;
+  gap: 2.5rem;
+}
+
+/* 3. Steps: the screenshot on the left, the text on the right. */
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  align-items: center;
+  gap: 4rem;
+}
+
+.split-text {
+  display: grid;
+  gap: 0.75rem;
+}
+
+/* 4. Dates: four short points, two by two, no pictures. */
+
+.grid-four {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 2rem 4rem;
+  margin-top: 2.5rem;
+  max-width: 56rem;
+}
+
+.grid-four > div {
+  display: grid;
+  gap: 0.5rem;
+  align-content: start;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+/* 5. Find: three cells of different sizes; the big one spans two rows. */
+
+.bento {
+  display: grid;
+  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
+  grid-template-rows: auto auto;
+  gap: 1.25rem;
+  margin-top: 2.5rem;
+}
+
+.cell {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.cell-large {
+  grid-row: span 2;
+}
+
+.cell-text {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.5rem;
+}
+
+.cell-shot {
+  margin-top: auto;
+  border-top: 1px solid var(--border);
+}
+
+.cell-tinted {
+  justify-content: center;
+  background: var(--band);
+  border-color: var(--band);
+}
+
+/* 6. Privacy: one statement on a tinted band, the full width of the page. */
+
+.band {
+  padding: 5rem 0;
+  background: var(--band);
+}
+
+.band h2 {
+  max-width: 24ch;
+  font-size: clamp(1.75rem, 1.3rem + 1.6vw, 2.75rem);
+}
+
+.band p {
+  margin-top: 1.25rem;
+}
+
+/* 7. Light and dark: the same screenshot, light on the left half and dark on the right. */
+
+.themes-grid {
+  display: grid;
+}
+
+.compare {
+  width: 100%;
+  max-width: 44rem;
+  margin-left: auto;
+}
+
+.compare-frame {
+  position: relative;
+  overflow: hidden;
+}
+
+.compare-frame img {
+  width: 100%;
+}
+
+.compare-dark {
+  position: absolute;
+  inset: 0;
+  clip-path: inset(0 0 0 50%);
+}
+
+/* 8. Closing: centered, the same two buttons as the hero. */
+
+.closing {
+  border-top: 1px solid var(--border);
+}
+
+.closing-inner {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.closing .actions {
+  justify-content: center;
+  margin-top: 0.75rem;
+}
+
+.site-footer {
+  padding: 2rem 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.9375rem;
+}
+
+.footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+}
+
+/* Under 768px: every section is one column. */
+
+@media (max-width: 767px) {
+  body {
+    font-size: 1rem;
+  }
+
+  .container {
+    padding: 0 1rem;
+  }
+
+  .section,
+  .band {
+    padding: 3.5rem 0;
+  }
+
+  .hero {
+    padding: 2rem 0 3rem;
+  }
+
+  .hero-grid,
+  .pair,
+  .split,
+  .grid-four,
+  .bento {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 2rem;
+  }
+
+  .hero-text {
+    gap: 1.25rem;
+  }
+
+  .hero-text p {
+    font-size: 1.0625rem;
+  }
+
+  .hero-shot img {
+    max-height: none;
+    width: 100%;
+  }
+
+  .cell-large {
+    grid-row: auto;
+  }
+
+  .bento {
+    gap: 1rem;
+  }
+
+  .nav-links {
+    gap: 1rem;
+  }
+
+  .button-small {
+    min-height: 40px;
+    padding: 0 0.75rem;
+  }
+}
+
+/* Motion is only short color and press feedback. Turned off when the person asks for less. */
+
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transition: none;
+  }
+
+  .button:active {
+    transform: none;
+  }
+}
