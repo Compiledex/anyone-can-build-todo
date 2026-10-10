@@ -67,6 +67,8 @@ class SortTests(LoggedInTestCase):
         response = self.client.get(f"{self.url}?sort=-created_at")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(self.shown(response), ["Old", "New"])
+        # The default order is set by apply_list_query, not by Meta.ordering.
+        self.assertEqual(response.context["todos"].query.order_by, ("created_at", "pk"))
 
     def test_sort_menu_shows_current_choice(self):
         response = self.client.get(f"{self.url}?sort=due")
@@ -106,6 +108,8 @@ class SortTests(LoggedInTestCase):
         html = response.content.decode()
         sort_form = html[html.index('<form class="sort"') :]
         sort_form = sort_form[: sort_form.index("</form>")]
+        # GET: sorting only reads, and needs no CSRF token.
+        self.assertTrue(sort_form.startswith('<form class="sort" method="get">'))
         self.assertInHTML('<input type="hidden" name="q" value="milk">', sort_form)
         self.assertInHTML('<input type="hidden" name="status" value="open">', sort_form)
         search_form = html[html.index('<form class="search"') :]
