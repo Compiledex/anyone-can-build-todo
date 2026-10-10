@@ -109,7 +109,10 @@ class ListTests(LoggedInTestCase):
             done=True,
         )
         html = self.list_page().content.decode()
-        self.assertRegex(html, r'<span class="title">Buy milk</span>\s*<details')
+        # The title closes right after its text; the notes come later in the row.
+        self.assertRegex(
+            html, r'(?s)<span class="title">Buy milk</span>.*<details class="notes">'
+        )
 
     def test_list_escapes_description(self):
         Todo.objects.create(
