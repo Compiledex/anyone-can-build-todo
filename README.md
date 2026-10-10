@@ -80,8 +80,8 @@ You should see `OK`, and then one line for each layer of tests:
 
 ```
 Test layers
-  CUJ          10 passed
-  Integration  336 passed
+  CUJ          11 passed
+  Integration  338 passed
   Unit         63 passed
 ```
 
@@ -129,7 +129,7 @@ runs the same checks and the tests on every push.
 | `todos/recurrence.py` | Works out the next due date of a repeating to-do |
 | `todos/urls.py` | The addresses of the list and to-do pages |
 | `todos/forms.py` | The forms that check a to-do (with its tags), a step's title, a list's name, the username to share a list with, and the search text |
-| `todos/queries.py` | Picks the to-dos a list page shows: the search in the title, the notes and the tags |
+| `todos/queries.py` | Picks the to-dos a list page shows and their order, from the address: the search (in the title, the notes and the tags), the filter (All, Not done, Done), and the sort (Created, Due date, Priority, Title, or Manual, the order chosen by drag and drop); it also says when drag and the Move buttons may be shown (only in the Manual order, with no search and no filter) |
 | `todos/ordering.py` | Reads and saves the manual order of a list (drag and drop and the Move buttons) |
 | `todos/views.py` | What happens when each address is visited |
 | `todos/templates/base.html` | The frame every page shares: the colors, the style, who is logged in, the messages |
