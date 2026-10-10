@@ -1,7 +1,7 @@
 # Plan: Mac notifications for to-dos that are due
 
 Status: **approved again on 2026-10-10** — not started. The person changed how reminders are
-shown (see the next section). Read "New open questions" at the end before the work starts.
+shown (see the next section). The person's answers are in "Decided by the person" at the end.
 
 Builds on: **accounts** (wave 1: Django `User`, login everywhere), **lists** (wave 2: each to-do
 is in a `TodoList`, and the owner of a to-do is `todo.todo_list.owner`), **due date** (wave 2:
