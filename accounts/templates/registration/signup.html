@@ -1,15 +1,37 @@
-{% extends "base.html" %}
+{% extends "todos/site_base.html" %}
+{% load static %}
+{% comment %}
+  The sign-up page. Same frame and CSS as the landing page (todos/site_base.html and
+  site.css); its own layout is in accounts/static/accounts/auth.css.
+  The view (accounts/views.py) gives `form`, Django's UserCreationForm. Its help text,
+  like the password rules, is shown under each field.
+{% endcomment %}
 
 {% block title %}Sign up{% endblock %}
 
+{% block page_css %}<link rel="stylesheet" href="{% static 'accounts/auth.css' %}">{% endblock %}
+
+{% block nav %}
+        <a class="nav-link" href="{% url 'login' %}">Log in</a>
+{% endblock %}
+
 {% block content %}
-  <h1>Create an account</h1>
+    <section class="auth" aria-labelledby="auth-title">
+      <div class="container auth-grid">
+        <div class="auth-main">
+          <div class="auth-head">
+            <h1 id="auth-title">Create an account</h1>
+            <p class="auth-intro">Your first list, Inbox, is ready right away.</p>
+          </div>
 
-  <form class="account" method="post" action="{% url 'signup' %}">
-    {% csrf_token %}
-    {{ form.as_div }}
-    <button type="submit">Sign up</button>
-  </form>
-
-  <p>Already have an account? <a href="{% url 'login' %}">Log in</a></p>
+          <form class="auth-form" method="post" action="{% url 'signup' %}">
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form %}{% include "todos/_field.html" %}{% endfor %}
+            <button class="button button-primary" type="submit">Create an account</button>
+          </form>
+        </div>
+        {% include "registration/_auth_shot.html" %}
+      </div>
+    </section>
 {% endblock %}

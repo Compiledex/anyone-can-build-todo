@@ -3,12 +3,15 @@ from django.contrib.auth.decorators import login_not_required
 from django.urls import path
 
 from . import views
+from .forms import LoginForm
 
 # Not all of django.contrib.auth.urls: its password reset pages need email.
 urlpatterns = [
     path(
         "login/",
-        auth_views.LoginView.as_view(redirect_authenticated_user=True),
+        auth_views.LoginView.as_view(
+            redirect_authenticated_user=True, authentication_form=LoginForm
+        ),
         name="login",
     ),
     # Open to everyone, so "Log out" in a tab whose session already ended

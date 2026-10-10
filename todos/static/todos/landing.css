@@ -1,123 +1,9 @@
 /* The landing page (todos/templates/todos/landing.html). Only that page loads this file,
-   so the app pages do not change.
-
-   One theme rule: the page follows the system's light or dark mode, like the app.
-   One accent color (a calm blue, from the app's tag color), one gray family, and one
-   radius: everything that is rounded uses --radius. Every text color has at least
-   4.5 : 1 contrast on its background in both modes (WCAG AA). */
-
-:root {
-  color-scheme: light dark;
-  --bg: #f6f7f9;
-  --band: #e6edf6;
-  --text: #15181d;
-  --muted: #545b66;
-  --border: #d3d8e0;
-  --accent: #1f4f8f;
-  --accent-hover: #173d70;
-  --on-accent: #f6f7f9;
-  --radius: 8px;
-  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #0e1013;
-    --band: #172231;
-    --text: #e8eaee;
-    --muted: #a3aab5;
-    --border: #2d333b;
-    --accent: #8fb6ec;
-    --accent-hover: #b0cbf2;
-    --on-accent: #0e1013;
-  }
-}
-
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--text);
-  font-family: var(--font);
-  font-size: 1.0625rem;
-  line-height: 1.6;
-  -webkit-font-smoothing: antialiased;
-}
-
-img {
-  display: block;
-  max-width: 100%;
-  height: auto;
-}
-
-h1,
-h2,
-h3 {
-  margin: 0;
-  line-height: 1.15;
-  letter-spacing: -0.015em;
-  text-wrap: balance;
-}
-
-h1 {
-  font-size: clamp(2.25rem, 1.5rem + 2.4vw, 3.5rem);
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1.08;
-}
-
-h2 {
-  font-size: clamp(1.625rem, 1.3rem + 1vw, 2.25rem);
-  font-weight: 650;
-}
-
-h3 {
-  font-size: 1.125rem;
-  font-weight: 650;
-}
-
-p {
-  margin: 0;
-  max-width: 62ch;
-}
-
-figure {
-  margin: 0;
-}
-
-figcaption {
-  margin-top: 0.75rem;
-  font-size: 0.9375rem;
-}
-
-.muted {
-  color: var(--muted);
-}
-
-a {
-  color: var(--accent);
-  text-underline-offset: 0.2em;
-}
-
-/* Focus: the same ring for every link and button, in the accent color. */
-a:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: var(--radius);
-}
+   after the shared todos/static/todos/tokens.css and site.css. The colors and sizes are in tokens.css,
+   the header, the footer and the buttons in site.css; this file only places the landing page's
+   sections. It sets no color token, so the pages cannot drift apart. */
 
 /* Layout */
-
-.container {
-  max-width: 72rem;
-  margin: 0 auto;
-  padding: 0 1.5rem;
-}
 
 .section {
   padding: 5rem 0;
@@ -138,102 +24,8 @@ a:focus-visible {
   color: var(--muted);
 }
 
-/* Navigation: one line, 64px high. */
+/* The light and dark screenshot has the same thin frame as .shot img in site.css. */
 
-.site-nav {
-  border-bottom: 1px solid var(--border);
-}
-
-.nav-inner {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  height: 64px;
-}
-
-.wordmark {
-  color: var(--text);
-  font-weight: 700;
-  letter-spacing: -0.01em;
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 1.25rem;
-}
-
-.nav-link {
-  color: var(--text);
-  text-decoration: none;
-  white-space: nowrap;
-}
-
-.nav-link:hover {
-  color: var(--accent);
-  text-decoration: underline;
-}
-
-/* Buttons: links that look like buttons. Never wrap. */
-
-.button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 48px;
-  padding: 0 1.25rem;
-  border: 1px solid var(--accent);
-  border-radius: var(--radius);
-  font-weight: 600;
-  text-decoration: none;
-  white-space: nowrap;
-  transition:
-    background-color 150ms ease-out,
-    color 150ms ease-out,
-    transform 150ms ease-out;
-}
-
-.button:active {
-  transform: translateY(1px);
-}
-
-.button-primary {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.button-primary:hover {
-  background: var(--accent-hover);
-  border-color: var(--accent-hover);
-}
-
-.button-secondary {
-  background: transparent;
-  color: var(--accent);
-}
-
-.button-secondary:hover {
-  background: var(--band);
-}
-
-.button-small {
-  min-height: 40px;
-  padding: 0 1rem;
-  font-size: 0.9375rem;
-}
-
-.actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-}
-
-/* Screenshots: a thin frame, so a white screenshot stands apart from the page. */
-
-.shot img,
 .compare-frame {
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -405,35 +197,14 @@ a:focus-visible {
   text-align: center;
 }
 
-.closing .actions {
+.closing .cta-row {
   justify-content: center;
   margin-top: 0.75rem;
-}
-
-.site-footer {
-  padding: 2rem 0;
-  border-top: 1px solid var(--border);
-  font-size: 0.9375rem;
-}
-
-.footer-inner {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 0.5rem 1.5rem;
 }
 
 /* Under 768px: every section is one column. */
 
 @media (max-width: 767px) {
-  body {
-    font-size: 1rem;
-  }
-
-  .container {
-    padding: 0 1rem;
-  }
-
   .section,
   .band {
     padding: 3.5rem 0;
@@ -471,26 +242,5 @@ a:focus-visible {
 
   .bento {
     gap: 1rem;
-  }
-
-  .nav-links {
-    gap: 1rem;
-  }
-
-  .button-small {
-    min-height: 40px;
-    padding: 0 0.75rem;
-  }
-}
-
-/* Motion is only short color and press feedback. Turned off when the person asks for less. */
-
-@media (prefers-reduced-motion: reduce) {
-  .button {
-    transition: none;
-  }
-
-  .button:active {
-    transform: none;
   }
 }

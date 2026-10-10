@@ -1,0 +1,53 @@
+{% load static %}<!doctype html>
+{% comment %}
+  The shared frame of the pages a visitor sees: the landing page, and the login and
+  sign-up pages. It has the <head>, the header, the footer, and the CSS in
+  todos/static/todos/tokens.css (the one place for colors, sizes and the font), then
+  todos/static/todos/site.css (the header, footer, buttons and fields).
+  The logged-in app pages use base.html instead, which does not change.
+
+  Blocks: title, meta (more <meta> tags), page_css (the page's own CSS, after site.css),
+  nav (the links on the right of the header), content (the <main>).
+  Django's messages, if there are any, show at the top of <main>, above the content.
+{% endcomment %}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  {% block meta %}{% endblock %}
+  <title>{% block title %}To-do list{% endblock %}</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="{% static 'todos/tokens.css' %}">
+  <link rel="stylesheet" href="{% static 'todos/site.css' %}">
+  {% block page_css %}{% endblock %}
+</head>
+<body>
+  <header class="site-nav">
+    <div class="container nav-inner">
+      <a class="wordmark" href="{% url 'todo_list' %}">To-do list</a>
+      <nav class="nav-links" aria-label="Account">
+        {% block nav %}{% endblock %}
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    {% if messages %}
+      <div class="container messages" role="status">
+        {% for message in messages %}
+          <p class="message{% if message.tags %} {{ message.tags }}{% endif %}">{{ message }}</p>
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span class="wordmark">To-do list</span>
+      <span class="muted">A small to-do app, made with Django.</span>
+    </div>
+  </footer>
+</body>
+</html>
