@@ -188,6 +188,18 @@ class FormFieldTests(TestCase):
             with self.subTest(url=url):
                 self.assertTemplateUsed(self.client.get(url), "todos/_field.html")
 
+    def test_labels_have_no_colon(self):
+        cases = [
+            (LOGIN_URL, ["Username", "Password"]),
+            (SIGNUP_URL, ["Username", "Password", "Password confirmation"]),
+        ]
+        for url, labels in cases:
+            page = self.client.get(url).content.decode()
+            for label in labels:
+                with self.subTest(url=url, label=label):
+                    self.assertIn(f">{label}</label>", page)
+                    self.assertNotIn(f"{label}:</label>", page)
+
     def test_every_input_has_a_label(self):
         for url in [LOGIN_URL, SIGNUP_URL]:
             with self.subTest(url=url):
