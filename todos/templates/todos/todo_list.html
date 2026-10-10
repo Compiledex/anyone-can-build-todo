@@ -121,9 +121,9 @@
       {% include "todos/_todo_item.html" %}
     {% empty %}
       {% if filtering %}
-        <li>No to-dos match{% if q %} “{{ q }}”{% endif %}.</li>
+        <li class="empty">No to-dos match{% if q %} “{{ q }}”{% endif %}.</li>
       {% else %}
-        <li>Nothing to do yet. Add something above.</li>
+        <li class="empty">Nothing to do yet. Add something above.</li>
       {% endif %}
     {% endfor %}
   </ul>

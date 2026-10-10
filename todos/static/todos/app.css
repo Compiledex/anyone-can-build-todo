@@ -752,6 +752,15 @@ form.add-step input {
   min-height: var(--control-height-compact);
 }
 
+/* No to-dos, or none that match: one calm gray line, not a row. */
+ul.todos > li.empty {
+  display: block;
+  padding: var(--space-6) 0;
+  border-bottom: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
 /* Drag and drop (reorder.js): the row being dragged. */
 ul.todos > li.dragging {
   background: var(--drag-bg);
@@ -841,6 +850,12 @@ form.leave {
   border-radius: var(--radius);
   background: var(--band);
   color: var(--text);
+}
+
+/* messages.error (a bad step title, an unknown username): red on a pale red. */
+.message.error {
+  background: var(--danger-bg);
+  color: var(--danger);
 }
 
 /* ---- Under 768px ---- */
