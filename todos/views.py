@@ -11,7 +11,7 @@ from django.views.decorators.http import require_GET, require_http_methods, requ
 
 from .forms import ShareForm, SubtaskForm, TodoForm, TodoListForm, TodoQueryForm
 from .models import Subtask, Todo, TodoList
-from .queries import apply_list_query, list_query
+from .queries import DEFAULT_SORT, apply_list_query, chosen_sort, list_query
 
 # A view that reads or changes a list or its to-dos finds the list with
 #   get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
@@ -78,7 +78,7 @@ def render_list_page(request, the_list, form):
     errors of a bad add.
     """
     is_owner = the_list.owner_id == request.user.id
-    # Search and filter (and later sort) from the address. Only GET is read,
+    # Search, filter and sort from the address. Only GET is read,
     # so an invalid add (a POST) shows the whole list.
     query_form = TodoQueryForm(request.GET)
     # All tags and all steps in one query each, not one query per row.
@@ -113,6 +113,11 @@ def render_list_page(request, the_list, form):
             "list_url": list_url,
             "back_url": back_url,
             "filter_links": filter_links,
+            # The order shown, always a key of SORT_OPTIONS (#15 uses "manual").
+            "current_sort": chosen_sort(query_form),
+            "default_sort": DEFAULT_SORT,
+            # "Show all" clears the search and the filter, but keeps the order.
+            "show_all_query": list_query(data, q="", status=""),
             # A search or a filter is set: "No to-dos match" and "Show all".
             "filtering": bool(q or status),
             # Always the whole list: "Clear completed" deletes all of these.

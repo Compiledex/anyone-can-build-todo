@@ -7,7 +7,24 @@ that would be every user's to-dos.
 
 from urllib.parse import urlencode
 
-from django.db.models import Q
+from django.db.models import F, Q
+from django.db.models.functions import Lower
+
+DEFAULT_SORT = "created"
+
+# The only orders a list page can have. key: (label in the menu, the order).
+# The key from the address is only used to look up an entry here; the text
+# from a request never goes to order_by itself. Every order ends with
+# "created_at", "pk", so to-dos with equal values always keep the same order.
+SORT_OPTIONS = {
+    "created": ("Created", ("created_at", "pk")),
+    # No date is the least urgent, so last (SQLite would put NULL first).
+    "due": ("Due date", (F("due_date").asc(nulls_last=True), "created_at", "pk")),
+    # Priority is 1 Low, 2 Medium, 3 High, never empty: biggest first.
+    "priority": ("Priority", (F("priority").desc(), "created_at", "pk")),
+    # Lower ignores case, but only for A-Z on SQLite.
+    "title": ("Title", (Lower("title"), "created_at", "pk")),
+}
 
 
 def search(todos, q):
@@ -36,16 +53,26 @@ def filter_by_status(todos, status):
     return todos
 
 
+def chosen_sort(form):
+    """The sort key from a checked TodoQueryForm, or the default.
+
+    It is always a key of SORT_OPTIONS: the ChoiceField accepts nothing else.
+    """
+    return form.cleaned_data.get("sort") or DEFAULT_SORT
+
+
 def apply_list_query(todos, form):
-    """Apply every valid field of a TodoQueryForm to `todos`.
+    """Apply every valid field of a TodoQueryForm to `todos`, then sort them.
 
     A field that is not valid is left out of cleaned_data, so it is ignored;
-    the other fields still work.
+    the other fields still work. It always sorts, also for the default, so the
+    page never depends on the model's Meta.ordering.
     """
     form.is_valid()
     data = form.cleaned_data
     todos = search(todos, data.get("q", ""))
-    return filter_by_status(todos, data.get("status", ""))
+    todos = filter_by_status(todos, data.get("status", ""))
+    return todos.order_by(*SORT_OPTIONS[chosen_sort(form)][1])
 
 
 def list_query(data, **changes):

@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 
 from .models import Subtask, Todo, TodoList
+from .queries import SORT_OPTIONS
 from .tags import parse_tags
 
 
@@ -161,7 +162,8 @@ class TodoQueryForm(forms.Form):
     """What the list page shows, read from the address (`request.GET`).
 
     Only reads, never saves. `q` is the search text; `status` is the filter
-    ("open" or "done"; empty means all). Sort adds its field here too.
+    ("open" or "done"; empty means all); `sort` is the order (a key of
+    SORT_OPTIONS; empty or unknown means the default).
     apply_list_query in todos/queries.py uses it.
     """
 
@@ -171,3 +173,10 @@ class TodoQueryForm(forms.Form):
     q = forms.CharField(required=False, max_length=200)
     # Any other value is not valid, so it is left out of cleaned_data: all to-dos.
     status = forms.ChoiceField(choices=STATUS_CHOICES, required=False)
+    # Only the keys of SORT_OPTIONS are valid. Queries.py must never import
+    # forms.py, or the two files would import each other.
+    sort = forms.ChoiceField(
+        label="Sort by",
+        required=False,
+        choices=[(key, label) for key, (label, _order) in SORT_OPTIONS.items()],
+    )
