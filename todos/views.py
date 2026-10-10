@@ -60,6 +60,8 @@ def redirect_back(request, default):
     refuses other sites, "//evil.example", backslashes and "javascript:".
     """
     next_url = request.POST.get("next", "")
+    # The "/" rule already refuses every absolute URL (http://...), even one to
+    # this site; require_https is only a second guard for that case.
     if next_url.startswith("/") and url_has_allowed_host_and_scheme(
         next_url,
         allowed_hosts={request.get_host()},

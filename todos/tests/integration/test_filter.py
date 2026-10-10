@@ -65,6 +65,17 @@ class FilterTests(LoggedInTestCase):
             response, f'<a href="{self.url}?q=milk&amp;status=done">Done</a>', html=True
         )
 
+    def test_filter_links_drop_unknown_params(self):
+        # Only TodoQueryForm fields go into the links, never junk from the address.
+        response = self.client.get(f"{self.url}?q=milk&foo=bar")
+        self.assertContains(
+            response, f'<a href="{self.url}?q=milk&amp;status=done">Done</a>', html=True
+        )
+        html = response.content.decode()
+        nav = html[html.index('<nav class="filter"') :]
+        nav = nav[: nav.index("</nav>")]
+        self.assertNotIn("foo=", nav)
+
     def test_current_filter_is_marked(self):
         # html=True compares every attribute, so `<a href=...>All</a>` does not
         # match a link that has aria-current.
@@ -130,6 +141,8 @@ class RedirectBackTests(LoggedInTestCase):
         response = self.client.get(f"{self.url}?q=milk&status=open")
         hidden = f'<input type="hidden" name="next" value="{self.url}?q=milk&amp;status=open">'
         self.assertContains(response, hidden, count=2, html=True)  # Done, Delete.
+        # The & is escaped in the HTML.
+        self.assertNotContains(response, f'value="{self.url}?q=milk&status')
 
     def test_toggle_returns_to_filtered_view(self):
         next_url = f"{self.url}?status=open"
@@ -171,6 +184,12 @@ class RedirectBackTests(LoggedInTestCase):
                 response = self.toggle({"next": value}, secure=True)
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response["Location"], self.url)
+
+    def test_absolute_next_to_own_site_is_ignored(self):
+        # Not secure, so require_https does not refuse it: the "/" rule does.
+        response = self.toggle({"next": f"http://testserver{self.url}?status=open"})
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], self.url)
 
     def test_unsafe_next_on_delete_is_ignored(self):
         response = self.client.post(
