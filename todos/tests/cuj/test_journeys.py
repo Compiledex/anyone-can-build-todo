@@ -546,3 +546,56 @@ class ReorderJourneyTests(BrowserTestCase):
         expect(page.locator("li.dragging")).to_have_count(0)
         page.wait_for_timeout(300)  # A request would be sent at once.
         self.assertEqual(sent, [])
+
+
+def overlaps(a, b):
+    """True when two boxes from bounding_box() cover some of the same pixels."""
+    return (
+        a["x"] < b["x"] + b["width"]
+        and b["x"] < a["x"] + a["width"]
+        and a["y"] < b["y"] + b["height"]
+        and b["y"] < a["y"] + a["height"]
+    )
+
+
+class RowLayoutTests(BrowserTestCase):
+    def test_a_full_row_stays_readable(self):
+        """A to-do with a long title and every label: nothing on top of each other."""
+        page = self.page
+        user = make_user_with_inbox()
+        the_list = user.todo_lists.get()
+        rent = the_list.todos.create(
+            title="Pay the electricity bill and the rent",
+            priority=3,  # High
+            due_date=timezone.localdate() + timedelta(days=3),
+            repeat="weekly",
+        )
+        rent.set_tags(["home", "money"])
+        self.log_in_as(user)
+
+        # 1280 is a laptop, 390 a phone. The manual order adds the handle and Move.
+        for width in [1280, 390]:
+            for sort in ["", "?sort=manual"]:
+                for scheme in ["light", "dark"]:
+                    with self.subTest(width=width, sort=sort, scheme=scheme):
+                        page.set_viewport_size({"width": width, "height": 800})
+                        page.emulate_media(color_scheme=scheme)
+                        page.goto(
+                            f"{self.live_server_url}{the_list.get_absolute_url()}{sort}"
+                        )
+                        row = page.locator(f"#todo-{rent.pk}")
+                        expect(row.locator(".repeat")).to_contain_text("Repeats every")
+
+                        title = row.locator(".title").bounding_box()
+                        priority = row.locator(".priority").bounding_box()
+                        self.assertFalse(overlaps(title, priority), (title, priority))
+                        # The title's words fit inside its own box.
+                        self.assertTrue(
+                            row.locator(".title").evaluate(
+                                "el => el.scrollWidth <= el.clientWidth"
+                            )
+                        )
+
+                        done = row.get_by_role("button", name="Done").bounding_box()
+                        delete = row.get_by_role("button", name="Delete").bounding_box()
+                        self.assertEqual(done["y"], delete["y"], (done, delete))

@@ -63,7 +63,16 @@
     ul.todos > li, ul.members > li { display: flex; align-items: center; gap: 0.5rem;
                                      padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
     ul.todos > li { flex-wrap: wrap; } /* So the steps can take their own line. */
-    li .title, li .main { flex: 1; min-width: 0; }
+    /* One to-do row: the text on the left (.main: the title, then .meta and the tags under it),
+       the buttons on the right (.actions). The text gets at least 12rem; when the row is too
+       narrow for both, the buttons move under the text as one group, never one by one. */
+    ul.todos > li > .main { flex: 1 1 12rem; min-width: 0; }
+    li .title { display: block; overflow-wrap: anywhere; }
+    li .meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.5rem;
+               margin-top: 0.25rem; font-size: 0.9rem; }
+    ul.todos > li > .actions { display: flex; flex-wrap: nowrap; align-items: center; gap: 0.5rem;
+                               margin-left: auto; }
+    ul.members > li > .title { flex: 1; min-width: 0; }
     .notes { font-size: 0.9rem; color: var(--muted); }
     .repeat { font-size: 0.9rem; color: var(--muted); }
     .notes p { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
