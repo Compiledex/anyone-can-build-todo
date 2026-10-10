@@ -187,6 +187,8 @@ class ColorSchemeTests(BrowserTestCase):
         for scheme in ["light", "dark"]:
             with self.subTest(scheme=scheme):
                 page.emulate_media(color_scheme=scheme)
+                # Colors change with a short transition: read them after it.
+                page.wait_for_function("document.getAnimations().length === 0")
                 colors = page.evaluate(
                     r"""() => {
                         const color = (selector, property) =>
@@ -210,6 +212,9 @@ class ColorSchemeTests(BrowserTestCase):
                             error: color(".errorlist", "color"),
                             fieldEdge: color(
                                 "form.add input[name=title]", "borderTopColor"
+                            ),
+                            invalidEdge: color(
+                                "form.add input[aria-invalid=true]", "borderTopColor"
                             ),
                             filterGroup: color("nav.filter", "backgroundColor"),
                             filterLine: color(
@@ -269,6 +274,11 @@ class ColorSchemeTests(BrowserTestCase):
                 )
                 self.assertGreaterEqual(
                     contrast(colors["fieldEdge"], colors["background"]), UI_CONTRAST
+                )
+                # The field with the error has a red edge, in the error's color.
+                self.assertEqual(colors["invalidEdge"], colors["error"], colors)
+                self.assertGreaterEqual(
+                    contrast(colors["invalidEdge"], colors["background"]), UI_CONTRAST
                 )
                 self.assertEqual(ring["style"], "solid")
                 self.assertGreaterEqual(

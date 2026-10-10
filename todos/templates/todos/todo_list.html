@@ -22,70 +22,92 @@
     {% endif %}
   </nav>
 
-  <h1>{{ the_list.name }}</h1>
-  {# Only for a clean page. The views check who may do what. #}
-  {% if is_owner %}
-    <p class="list-actions">
-      <a href="{% url 'list_rename' the_list.pk %}">Rename</a>
-      <a href="{% url 'list_delete' the_list.pk %}">Delete list</a>
-    </p>
-  {% else %}
-    <p class="list-actions">Shared by {{ the_list.owner.username }}</p>
-  {% endif %}
+  <div class="list-head">
+    <h1>{{ the_list.name }}</h1>
+    {# Only for a clean page. The views check who may do what. #}
+    {% if is_owner %}
+      <p class="list-actions">
+        <a href="{% url 'list_rename' the_list.pk %}">Rename</a>
+        <a class="delete" href="{% url 'list_delete' the_list.pk %}">Delete list</a>
+      </p>
+    {% else %}
+      <p class="list-actions muted">Shared by {{ the_list.owner.username }}</p>
+    {% endif %}
+  </div>
 
-  {% if form.errors %}
-    <div class="form-errors">
-      {{ form.non_field_errors }}
-      {{ form.title.errors }}
-      {{ form.due_date.errors }}
-      {{ form.repeat.errors }}
-      {{ form.priority.errors }}
-    </div>
-  {% endif %}
-
+  {# Each field: a visible label above it, then its error under it. #}
+  {# The inputs written here are wrapped by their label, so they need no id. #}
   <form class="add" method="post" action="{% url 'todo_add' the_list.pk %}">
     {% csrf_token %}
-    <input name="title" aria-label="New to-do" placeholder="What needs doing?" maxlength="200"
-           required autofocus value="{{ form.title.value|default_if_none:'' }}"
-           {% if form.title.errors %}aria-invalid="true" aria-describedby="{{ form.title.auto_id }}_error"{% endif %}>
-    <input type="date" name="due_date" aria-label="Due date"
-           value="{{ form.due_date.value|default_if_none:'' }}"
-           {% if form.due_date.errors %}aria-invalid="true" aria-describedby="{{ form.due_date.auto_id }}_error"{% endif %}>
-    {{ form.repeat }}
-    {{ form.priority }}
-    <button class="button button-primary" type="submit">Add</button>
+    {{ form.non_field_errors }}
+    <div class="field">
+      <label>New to-do
+        <input name="title" aria-label="New to-do" placeholder="What needs doing?" maxlength="200"
+               required autofocus value="{{ form.title.value|default_if_none:'' }}"
+               {% if form.title.errors %}aria-invalid="true" aria-describedby="{{ form.title.auto_id }}_error"{% endif %}>
+      </label>
+      {{ form.title.errors }}
+    </div>
+    <div class="add-row">
+      <div class="field due">
+        <label>Due date
+          <input type="date" name="due_date" aria-label="Due date"
+                 value="{{ form.due_date.value|default_if_none:'' }}"
+                 {% if form.due_date.errors %}aria-invalid="true" aria-describedby="{{ form.due_date.auto_id }}_error"{% endif %}>
+        </label>
+        {{ form.due_date.errors }}
+      </div>
+      <div class="field">
+        {{ form.repeat.label_tag }}
+        {{ form.repeat }}
+        {{ form.repeat.errors }}
+      </div>
+      <div class="field">
+        {{ form.priority.label_tag }}
+        {{ form.priority }}
+        {{ form.priority.errors }}
+      </div>
+      <button class="button button-primary" type="submit">Add</button>
+    </div>
   </form>
 
-  {# GET: a search only reads. With no action, it stays on this list. #}
-  <form class="search" method="get" role="search">
-    <input type="search" name="q" aria-label="Search to-dos" placeholder="Search"
-           maxlength="200" value="{{ query_form.q.value|default_if_none:'' }}">
-    {# A new search keeps the filter. `status` is cleaned: only "open" or "done". #}
-    {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
-    {# And the order. current_sort is always a key of SORT_OPTIONS. #}
-    {% if current_sort != default_sort %}<input type="hidden" name="sort" value="{{ current_sort }}">{% endif %}
-    <button class="button button-secondary" type="submit">Search</button>
-    {# Clears the search and the filter, keeps the order. #}
-    {% if filtering %}<a href="{{ list_url }}{{ show_all_query }}">Show all</a>{% endif %}
-  </form>
-  {{ query_form.q.errors }}
+  {# Search, sort and filter: one bar, in this order. #}
+  <div class="find">
+    {# GET: a search only reads. With no action, it stays on this list. #}
+    <form class="search" method="get" role="search">
+      <div class="field">
+        <label>Search to-dos
+          <input type="search" name="q" aria-label="Search to-dos" placeholder="Search"
+                 maxlength="200" value="{{ query_form.q.value|default_if_none:'' }}">
+        </label>
+        {{ query_form.q.errors }}
+      </div>
+      {# A new search keeps the filter. `status` is cleaned: only "open" or "done". #}
+      {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+      {# And the order. current_sort is always a key of SORT_OPTIONS. #}
+      {% if current_sort != default_sort %}<input type="hidden" name="sort" value="{{ current_sort }}">{% endif %}
+      <button class="button button-secondary" type="submit">Search</button>
+      {# Clears the search and the filter, keeps the order. #}
+      {% if filtering %}<a href="{{ list_url }}{{ show_all_query }}">Show all</a>{% endif %}
+    </form>
 
-  {# GET: sorting only reads. Its own form, so the button says "Sort", not "Search". #}
-  {# It keeps the search and the filter, from the cleaned values. #}
-  <form class="sort" method="get">
-    {{ query_form.sort.label_tag }} {{ query_form.sort }}
-    {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
-    {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
-    <button class="button button-secondary" type="submit">Sort</button>
-  </form>
+    {# GET: sorting only reads. Its own form, so the button says "Sort", not "Search". #}
+    {# It keeps the search and the filter, from the cleaned values. #}
+    <form class="sort" method="get">
+      <div class="field">{{ query_form.sort.label_tag }} {{ query_form.sort }}</div>
+      {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+      {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+      <button class="button button-secondary" type="submit">Sort</button>
+    </form>
 
-  {# Links, not a form: each keeps the search and changes only the status. #}
-  {# list_url, not request.path: after a bad add the address is .../add/. #}
-  <nav class="filter" aria-label="Filter">
-    {% for link in filter_links %}
-      <a href="{{ list_url }}{{ link.query }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a>
-    {% endfor %}
-  </nav>
+    {# Links, not a form: each keeps the search and changes only the status. #}
+    {# list_url, not request.path: after a bad add the address is .../add/. #}
+    <nav class="filter" aria-label="Filter">
+      {% for link in filter_links %}
+        <a href="{{ list_url }}{{ link.query }}"{% if link.current %} aria-current="page"{% endif %}>{{ link.label }}</a>
+      {% endfor %}
+    </nav>
+  </div>
 
   {# Reordering only when every to-do is shown: manual order, no search, no filter. #}
   {% if can_reorder %}
@@ -135,9 +157,11 @@
       {% else %}
         <p class="muted">Only you can see this list.</p>
       {% endif %}
-      <form class="add" method="post" action="{% url 'list_share' the_list.pk %}">
+      <form class="share" method="post" action="{% url 'list_share' the_list.pk %}">
         {% csrf_token %}
-        {{ share_form.username }}
+        <div class="field">
+          <label>Username {{ share_form.username }}</label>
+        </div>
         <button class="button button-primary" type="submit">Share</button>
       </form>
     </section>

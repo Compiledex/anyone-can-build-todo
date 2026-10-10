@@ -298,9 +298,9 @@ textarea:focus-visible {
 }
 
 /* An invalid field keeps its red edge, also with the focus ring around it. */
-[aria-invalid="true"],
-[aria-invalid="true"]:hover,
-[aria-invalid="true"]:focus-visible {
+:is(input, select, textarea)[aria-invalid="true"],
+:is(input, select, textarea)[aria-invalid="true"]:hover,
+:is(input, select, textarea)[aria-invalid="true"]:focus-visible {
   border-color: var(--danger);
 }
 
@@ -363,6 +363,184 @@ form.form-actions {
 .form-actions > a:hover {
   background: var(--band);
   color: var(--text);
+}
+
+/* ---- The list menu (nav.lists) ---- */
+
+nav.lists {
+  display: grid;
+  gap: var(--space-2);
+  font-size: 0.9375rem;
+}
+
+nav.lists .menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+}
+
+.menu-label {
+  color: var(--muted);
+}
+
+/* A list's name is typed by a person: one long word must still wrap. */
+nav.lists a {
+  min-width: 0;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+  color: var(--text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: border-color var(--ease);
+}
+
+nav.lists a:hover {
+  border-bottom-color: var(--border);
+  color: var(--text);
+}
+
+nav.lists a[aria-current="page"] {
+  border-bottom-color: var(--accent);
+  font-weight: 650;
+}
+
+/* "+ New list", the last link of "My lists". */
+#my-lists > a:last-child {
+  color: var(--accent);
+}
+
+/* ---- The list's name, with Rename and Delete list (or "Shared by ...") ---- */
+
+.list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-6) 0 var(--space-5);
+}
+
+.list-actions {
+  display: flex;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.list-actions a {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: background-color var(--ease);
+}
+
+.list-actions a:hover {
+  background: var(--band);
+}
+
+.list-actions a.delete {
+  color: var(--danger);
+}
+
+/* ---- The add form: "New to-do" on one line, then Due date, Repeat, Priority, Add ---- */
+
+form.add {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+/* Add lines up with the fields: one label line (0.875rem x 1.5) plus the gap. */
+.add-row > .button {
+  margin-top: calc(1.3125rem + var(--space-1));
+}
+
+/* ---- The find bar: search, sort, filter (in this order in the HTML) ---- */
+
+.find {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+form.search,
+form.sort {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+form.search .field {
+  flex: 1;
+}
+
+/* "Show all": a plain link (a test reads the whole tag), next to Search. */
+form.search > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height-small);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+
+form.sort select {
+  width: auto;
+}
+
+/* The filter: three links in one box. The current one has the --band fill and,
+   because the fill alone is too faint (1.2 : 1), a 2px accent line under it. */
+nav.filter {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+nav.filter a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height-compact);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-label);
+  color: var(--muted);
+  font-size: 0.9375rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--ease),
+    color var(--ease);
+}
+
+nav.filter a:hover {
+  background: var(--band);
+  color: var(--text);
+}
+
+nav.filter a[aria-current="page"] {
+  background: var(--band);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* "Clear the filter to change the order." */
+.find + .muted {
+  margin-top: var(--space-4);
 }
 
 /* ---- The to-do row (ul.todos > li) ----
@@ -580,6 +758,76 @@ ul.todos > li.dragging {
   outline: 2px dashed var(--control);
 }
 
+/* ---- Clear completed: asks once more before it deletes ---- */
+
+details.clear-completed {
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+details.clear-completed summary {
+  width: fit-content;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+details.clear-completed summary:hover {
+  color: var(--text);
+}
+
+details.clear-completed p {
+  margin: var(--space-3) 0;
+}
+
+/* ---- Sharing (the owner) and Leave this list (a member) ---- */
+
+.sharing {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+ul.members {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+ul.members > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+ul.members > li > .title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+form.share {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+form.share .field {
+  flex: 1;
+}
+
+form.leave {
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
 /* ---- Messages, at the top of the page ---- */
 
 .messages {
@@ -627,35 +875,42 @@ ul.todos > li.dragging {
     flex-wrap: wrap;
     margin-top: var(--space-2);
   }
+
+  .list-head {
+    margin-top: var(--space-5);
+  }
+
+  /* Due date on its own line, Repeat and Priority side by side, then Add. */
+  .add-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .add-row .due,
+  .add-row > .button {
+    grid-column: 1 / -1;
+  }
+
+  .add-row > .button {
+    margin-top: 0;
+  }
+
+  /* The find bar: search, sort and filter on top of each other. */
+  .find {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  form.sort .field {
+    flex: 1;
+  }
+
+  form.sort select {
+    width: 100%;
+  }
+
+  nav.filter {
+    justify-self: start;
+  }
 }
-
-/* ---- Not redesigned yet (the next commits replace these) ---- */
-
-nav.lists { margin: 1rem 0; }
-nav.lists .menu { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 0 0 0.5rem; }
-.menu-label, .muted { color: var(--muted); }
-nav.lists a[aria-current="page"], nav.filter a[aria-current="page"] { font-weight: bold; text-decoration: none; }
-nav.filter { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; margin-bottom: 1rem;
-             background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
-nav.filter a { padding: 0 0.75rem; border-radius: var(--radius-label); color: var(--muted); text-decoration: none; }
-/* The fill alone is too faint (1.2 : 1), so the current one also gets an accent line. */
-nav.filter a[aria-current="page"] { background: var(--band); color: var(--text);
-                                    box-shadow: inset 0 -2px 0 var(--accent); }
-.list-actions { display: flex; gap: 1rem; margin-top: -0.5rem; }
-form.add { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
-form.add input { flex: 1; padding: 0.5rem; font-size: 1rem; }
-form.add input[type=date] { flex: 0 0 auto; }
-form.add select { padding: 0.5rem; font-size: 1rem; }
-form.search, form.sort { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
-form.search input { flex: 1; padding: 0.5rem; font-size: 1rem; }
-ul.members { list-style: none; padding: 0; }
-.sharing { margin-top: 2rem; }
-ul.members > li { display: flex; align-items: center; gap: 0.5rem;
-                  padding: 0.5rem 0; border-bottom: 1px solid var(--border); }
-ul.members > li > .title { flex: 1; min-width: 0; }
-details.clear-completed { margin-top: 1.5rem; padding: 0.5rem; border: 1px solid var(--border); }
-details.clear-completed summary { cursor: pointer; color: var(--muted); }
-details.clear-completed p { margin: 0.5rem 0; }
 
 /* ---- Touch: under a finger, row and step buttons are 44px tall, 8px apart ---- */
 
