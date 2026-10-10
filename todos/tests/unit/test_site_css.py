@@ -12,6 +12,7 @@ from django.test import SimpleTestCase
 SITE_CSS = Path(settings.BASE_DIR, "todos/static/todos/site.css")
 PAGE_CSS = [
     Path(settings.BASE_DIR, "todos/static/todos/landing.css"),
+    Path(settings.BASE_DIR, "accounts/static/accounts/auth.css"),
 ]
 # A custom property being set, like `--accent: #1f4f8f;`.
 SETS_A_TOKEN = re.compile(r"--[\w-]+\s*:")

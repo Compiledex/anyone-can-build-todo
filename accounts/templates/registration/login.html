@@ -1,16 +1,37 @@
-{% extends "base.html" %}
+{% extends "todos/site_base.html" %}
+{% load static %}
+{% comment %}
+  The login page. Same frame and CSS as the landing page (todos/site_base.html and
+  site.css); its own layout is in accounts/static/accounts/auth.css.
+  Django's LoginView gives `form` and `next`.
+{% endcomment %}
 
 {% block title %}Log in{% endblock %}
 
+{% block page_css %}<link rel="stylesheet" href="{% static 'accounts/auth.css' %}">{% endblock %}
+
+{% block nav %}
+        <a class="button button-secondary button-small" href="{% url 'signup' %}">Create an account</a>
+{% endblock %}
+
 {% block content %}
-  <h1>Log in</h1>
+    <section class="auth" aria-labelledby="auth-title">
+      <div class="container auth-grid">
+        <div class="auth-main">
+          <div class="auth-head">
+            <h1 id="auth-title">Log in</h1>
+            <p class="auth-intro">See your lists, and the lists people share with you.</p>
+          </div>
 
-  <form class="account" method="post" action="{% url 'login' %}">
-    {% csrf_token %}
-    {{ form.as_div }}
-    <input type="hidden" name="next" value="{{ next }}">
-    <button type="submit">Log in</button>
-  </form>
-
-  <p><a href="{% url 'signup' %}">Create an account</a></p>
+          <form class="auth-form" method="post" action="{% url 'login' %}">
+            {% csrf_token %}
+            {% if form.non_field_errors %}<div class="form-errors" role="alert">{{ form.non_field_errors }}</div>{% endif %}
+            {% for field in form %}{% include "registration/_field.html" %}{% endfor %}
+            <input type="hidden" name="next" value="{{ next }}">
+            <button class="button button-primary" type="submit">Log in</button>
+          </form>
+        </div>
+        {% include "registration/_auth_shot.html" %}
+      </div>
+    </section>
 {% endblock %}

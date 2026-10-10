@@ -229,7 +229,7 @@ class TwoPeopleTests(BrowserTestCase):
         page.get_by_label("Username").fill(username)
         page.get_by_label(PASSWORD).fill(TEST_PASSWORD)
         page.get_by_label("Password confirmation").fill(TEST_PASSWORD)
-        page.get_by_role("button", name="Sign up").click()
+        page.get_by_role("button", name="Create an account").click()
         expect(page.get_by_text(f"Logged in as {username}")).to_be_visible()
 
     def log_out(self):

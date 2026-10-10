@@ -81,9 +81,9 @@ You should see `OK`, and then one line for each layer of tests:
 
 ```
 Test layers
-  CUJ          15 passed
-  Integration  376 passed
-  Unit         82 passed
+  CUJ          20 passed
+  Integration  389 passed
+  Unit         84 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
@@ -205,7 +205,8 @@ runs the same checks and the tests on every push.
 | `config/settings.py` | Settings for the whole project |
 | `config/urls.py` | Sends each address to the right app |
 | `accounts/` | Sign up, log in and log out, with Django's own accounts |
-| `accounts/templates/registration/` | The login and sign-up pages |
+| `accounts/templates/registration/` | The login and sign-up pages, in the same style as the landing page |
+| `accounts/static/accounts/auth.css` | Where the login and sign-up pages put the form and the picture |
 | `accounts/tests/helpers.py` | Helpers the tests share: test users, and a test that starts logged in |
 | `todos/models.py` | The `TodoList` and `Todo` tables in the database; each list has an owner and can be shared with members, each to-do is in a list and has an optional due date, the day it was last shown in a reminder, optional notes, a priority (Low, Medium or High), tags, a repeat rule (Never, Daily, Weekly or Monthly), and a place in the list's manual order; the `Tag` table holds each person's tags; the `Subtask` table holds the steps inside a to-do |
 | `todos/tags.py` | Cleans the tags a person types, like "work, #Home", and checks their limits |
@@ -220,8 +221,10 @@ runs the same checks and the tests on every push.
 | `todos/views.py` | What happens when each address is visited |
 | `todos/templates/base.html` | The frame every page shares: the colors, the style, who is logged in, the messages |
 | `todos/templates/todos/todo_list.html` | The page you see: one list |
+| `todos/templates/todos/site_base.html` | The frame of the pages a visitor sees (landing, login, sign-up): the header and the footer |
+| `todos/static/todos/site.css` | The one style of those pages: colors, font, buttons, form fields |
 | `todos/templates/todos/landing.html` | The landing page: what a visitor who is not logged in sees at `/` |
-| `todos/static/todos/landing.css` | The style of the landing page only |
+| `todos/static/todos/landing.css` | Where the landing page puts its sections |
 | `todos/static/todos/landing/` | The landing page's pictures: screenshots of the app, light and dark, with invented sample data |
 | `todos/templates/todos/list_form.html` | The page to make or rename a list |
 | `todos/templates/todos/list_confirm_delete.html` | The page that asks before a list is deleted |
