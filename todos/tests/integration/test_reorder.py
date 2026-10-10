@@ -182,6 +182,17 @@ class ReorderTests(LoggedInTestCase):
         self.assertContains(response, "Move up: Third")
         self.assertNotContains(response, "Move down: Third")
 
+    def test_move_labels_are_escaped(self):
+        self.add('<b>"x')  # Last, so it has a "Move up" button.
+        response = self.client.get(self.manual_url)
+        self.assertContains(response, 'aria-label="Move up: &lt;b&gt;&quot;x"')
+        self.assertContains(response, 'title="Move up: &lt;b&gt;&quot;x"')
+        self.assertNotContains(response, '<b>"x')
+
+    def test_new_todo_goes_last_even_with_a_position_given(self):
+        todo = self.add("Fourth", position=1)  # The biggest in the list is 3.
+        self.assertEqual(Todo.objects.get(pk=todo.pk).position, 4)
+
 
 class FillPositionMigrationTests(LoggedInTestCase):
     def test_fill_migration_numbers_each_list(self):
