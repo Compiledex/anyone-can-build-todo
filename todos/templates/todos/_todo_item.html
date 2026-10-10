@@ -23,10 +23,13 @@
   <a href="{% url 'todo_edit' todo.pk %}" aria-label="Edit {{ todo.title }}">Edit</a>
   <form method="post" action="{% url 'todo_toggle' todo.pk %}">
     {% csrf_token %}
+    {# Back to this same address (search, filter) after the click. #}
+    <input type="hidden" name="next" value="{{ back_url }}">
     <button type="submit">{% if todo.done %}Undo{% else %}Done{% endif %}</button>
   </form>
   <form method="post" action="{% url 'todo_delete' todo.pk %}">
     {% csrf_token %}
+    <input type="hidden" name="next" value="{{ back_url }}">
     <button type="submit">Delete</button>
   </form>
   {# The steps of one to-do, inside its <li>. Opens and closes with no JavaScript. #}

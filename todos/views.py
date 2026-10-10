@@ -1,15 +1,17 @@
 from django.contrib import messages
 from django.db import transaction
+from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.defaultfilters import date as format_date
 from django.template.defaultfilters import pluralize
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import url_has_allowed_host_and_scheme
 from django.views.decorators.http import require_GET, require_http_methods, require_POST
 
 from .forms import ShareForm, SubtaskForm, TodoForm, TodoListForm, TodoQueryForm
 from .models import Subtask, Todo, TodoList
-from .queries import apply_list_query
+from .queries import apply_list_query, list_query
 
 # A view that reads or changes a list or its to-dos finds the list with
 #   get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
@@ -50,6 +52,23 @@ def back_to_steps(todo):
     return redirect(f"{url}?open={todo.pk}#todo-{todo.pk}")
 
 
+def redirect_back(request, default):
+    """Go back to the safe address in POST "next", or else to `default`.
+
+    Only a path on this site: it must start with "/" (a bare word like "foo"
+    would make redirect() look for a URL name and crash), and Django's check
+    refuses other sites, "//evil.example", backslashes and "javascript:".
+    """
+    next_url = request.POST.get("next", "")
+    if next_url.startswith("/") and url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        return HttpResponseRedirect(next_url)
+    return redirect(default)
+
+
 def render_list_page(request, the_list, form):
     """The list page: this list's to-dos, the add form, and the person's lists.
 
@@ -57,14 +76,29 @@ def render_list_page(request, the_list, form):
     errors of a bad add.
     """
     is_owner = the_list.owner_id == request.user.id
-    # Search (and later filter and sort) from the address. Only GET is read,
+    # Search and filter (and later sort) from the address. Only GET is read,
     # so an invalid add (a POST) shows the whole list.
     query_form = TodoQueryForm(request.GET)
     # All tags and all steps in one query each, not one query per row.
     todos = apply_list_query(
         the_list.todos.prefetch_related("tags", "subtasks"), query_form
     )
-    q = query_form.cleaned_data.get("q", "")  # Filled by apply_list_query.
+    data = query_form.cleaned_data  # Filled by apply_list_query.
+    q = data.get("q", "")
+    status = data.get("status", "")
+    list_url = the_list.get_absolute_url()
+    # Where Done, Undo and Delete go back to: this list, with the same query.
+    # Not request.get_full_path(): after a bad add that is .../add/ (POST only).
+    back_url = f"{list_url}?{request.GET.urlencode()}" if request.GET else list_url
+    # Each link keeps the other values (the search) and changes only status.
+    filter_links = [
+        {
+            "label": label,
+            "query": list_query(data, status=value),
+            "current": status == value,
+        }
+        for value, label in [("", "All"), ("open", "Not done"), ("done", "Done")]
+    ]
     return render(
         request,
         "todos/todo_list.html",
@@ -73,7 +107,12 @@ def render_list_page(request, the_list, form):
             "todos": todos,
             "query_form": query_form,
             "q": q,
-            "searching": bool(q),
+            "status": status,
+            "list_url": list_url,
+            "back_url": back_url,
+            "filter_links": filter_links,
+            # A search or a filter is set: "No to-dos match" and "Show all".
+            "filtering": bool(q or status),
             # Always the whole list: "Clear completed" deletes all of these.
             "done_count": the_list.todos.filter(done=True).count(),
             "my_lists": request.user.todo_lists.all(),
@@ -201,15 +240,15 @@ def todo_toggle(request, pk):
                     f"The next copy, due {format_date(copy.due_date, 'j M Y')}, "
                     "was removed.",
                 )
-    return redirect(todo.todo_list)
+    return redirect_back(request, todo.todo_list.get_absolute_url())
 
 
 @require_POST
 def todo_delete(request, pk):
     todo = get_visible_todo(request.user, pk)
-    the_list = todo.todo_list
+    the_list = todo.todo_list  # Read before the delete.
     todo.delete()
-    return redirect(the_list)
+    return redirect_back(request, the_list.get_absolute_url())
 
 
 @require_http_methods(["GET", "POST"])
