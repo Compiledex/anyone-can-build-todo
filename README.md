@@ -81,8 +81,8 @@ You should see `OK`, and then one line for each layer of tests:
 ```
 Test layers
   CUJ          11 passed
-  Integration  361 passed
-  Unit         81 passed
+  Integration  363 passed
+  Unit         82 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
@@ -141,7 +141,8 @@ the Terminal. These steps change your Mac's settings, so you do them yourself (n
    plutil -lint ~/Library/LaunchAgents/com.anyone-can-build-todo.reminders.plist
    ```
 
-   `plutil -lint` must say `OK`.
+   `plutil -lint` must say `OK`. The project folder's path must not contain `&` or `|`: `sed`
+   reads them as special characters, and the paths in the file would be wrong.
 6. **Turn it on.** An error from `bootout` the first time is normal.
 
    ```bash
