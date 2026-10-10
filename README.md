@@ -81,8 +81,8 @@ You should see `OK`, and then one line for each layer of tests:
 ```
 Test layers
   CUJ           9 passed
-  Integration  307 passed
-  Unit         56 passed
+  Integration  318 passed
+  Unit         59 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,

@@ -61,10 +61,22 @@
            maxlength="200" value="{{ query_form.q.value|default_if_none:'' }}">
     {# A new search keeps the filter. `status` is cleaned: only "open" or "done". #}
     {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+    {# And the order. current_sort is always a key of SORT_OPTIONS. #}
+    {% if current_sort != default_sort %}<input type="hidden" name="sort" value="{{ current_sort }}">{% endif %}
     <button type="submit">Search</button>
-    {% if filtering %}<a href="{{ list_url }}">Show all</a>{% endif %}
+    {# Clears the search and the filter, keeps the order. #}
+    {% if filtering %}<a href="{{ list_url }}{{ show_all_query }}">Show all</a>{% endif %}
   </form>
   {{ query_form.q.errors }}
+
+  {# GET: sorting only reads. Its own form, so the button says "Sort", not "Search". #}
+  {# It keeps the search and the filter, from the cleaned values. #}
+  <form class="sort" method="get">
+    {{ query_form.sort.label_tag }} {{ query_form.sort }}
+    {% if q %}<input type="hidden" name="q" value="{{ q }}">{% endif %}
+    {% if status %}<input type="hidden" name="status" value="{{ status }}">{% endif %}
+    <button type="submit">Sort</button>
+  </form>
 
   {# Links, not a form: each keeps the search and changes only the status. #}
   {# list_url, not request.path: after a bad add the address is .../add/. #}

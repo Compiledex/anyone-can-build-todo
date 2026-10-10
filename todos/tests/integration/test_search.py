@@ -136,8 +136,8 @@ class SearchTests(LoggedInTestCase):
         self.add("Buy milk")
         response = self.search('"><script>x</script>')
         self.assertNotContains(response, "<script>x</script>")
-        # Once in the search box, once in the "no match" message.
-        self.assertContains(response, "&quot;&gt;&lt;script&gt;", count=2)
+        # In the search box, the sort form's hidden q, and the "no match" message.
+        self.assertContains(response, "&quot;&gt;&lt;script&gt;", count=3)
         self.assertContains(response, NO_MATCH)
 
     def test_too_long_search_shows_error_and_whole_list(self):
