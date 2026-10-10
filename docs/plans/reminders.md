@@ -1,122 +1,261 @@
-# Plan: email reminders for to-dos that are due
+# Plan: Mac notifications for to-dos that are due
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **approved, changed on 2026-10-10** — not started. The person changed how reminders are
+shown (see the next section). Read "New open questions" at the end before the work starts.
 
 Builds on: **accounts** (wave 1: Django `User`, login everywhere), **lists** (wave 2: each to-do
 is in a `TodoList`, and the owner of a to-do is `todo.todo_list.owner`), **due date** (wave 2:
-`Todo.due_date`) and **sharing** (wave 3: other people can add to-dos to a list).
+`Todo.due_date`), **sharing** (wave 3: other people can add to-dos to a list) and **recurring**
+(wave 4: `Todo.make_next_copy`).
+
+## Changed on 2026-10-10
+
+What changed, and why:
+
+- **The site runs on the person's own Mac**, not on a server on the internet. GitHub Pages was
+  ruled out: it can only show fixed files, and it cannot run Django.
+- **A reminder is now a macOS notification** (the small box in the top right corner of the
+  screen), **not an email**. So everything about email is gone from this plan: no SMTP, no
+  `EMAIL_*` settings, no email addresses, no "an admin sets the address", no console-backend
+  check.
+- **The Mac's time zone is `Asia/Tokyo`**, the same as `TIME_ZONE` in `config/settings.py`.
+- Because of these three changes, this plan now also decides: **whose** to-dos the notification
+  shows (a new option `--user`), **how** the app shows a notification safely (`osascript`), what
+  happens **when it is not a Mac**, and **how the command runs every morning** (launchd instead
+  of cron).
+
+What stays from the approved plan: a management command `send_reminders`; only to-dos **due
+today** and **not done**; a field `reminded_on` so the same to-do is not reminded twice; the date
+"today" is `timezone.localdate()`; the logic is in functions that take a fixed date, so tests can
+use any day; tests first.
 
 ## Goal
 
-Once a day, the app sends each user **one email** that lists their to-dos that are **due today**
-and **not done**. A user with nothing due today gets no email.
+Once a day, in the morning, the Mac shows **one notification** that lists the person's to-dos that
+are **due today** and **not done**. If nothing is due today, there is no notification.
 
-The app cannot wake itself up. A **scheduler** on the server starts the sending once a day. A
-scheduler is a program that runs a command at a fixed time; on Linux it is called **cron**. The
-app only gives cron one command to run: `python manage.py send_reminders`.
+The app cannot wake itself up. A **scheduler** starts it once a day. A scheduler is a program that
+runs a command at a fixed time. On a Mac, the scheduler is called **launchd**. The app only gives
+launchd one command to run: `python manage.py send_reminders --user <username>`.
 
 ## Decisions
+
+### What is reminded
 
 - **A management command.** A management command is a command you run with
   `python manage.py <name>`, like `migrate`. Django has this built in. We add one called
   `send_reminders`. No Celery, no new package.
-- **"Due today", not "due tomorrow".** The email comes in the morning and says what to do today.
-  This matches the due date plan, where "due today" is not yet overdue. Overdue to-dos are not in
-  the email: the list page already shows them in red.
-- **"Today" is the date in `TIME_ZONE`** (`Asia/Tokyo` in `config/settings.py`). The command uses
-  `timezone.localdate()`, the same as `Todo.is_overdue`. Users have no time zone of their own, so
-  everyone gets "today" in Tokyo. The server clock is usually in UTC; that does not matter for the
-  code, but it matters for the cron time (see "What you must set up on the server").
-- **The owner is the list's owner.** The lists plan removed `Todo.owner`; the owner of a to-do is
-  `todo.todo_list.owner`. So every query goes through the list: `todo_list__owner`. (If the merged
-  lists code kept a `Todo.owner` field, still use `todo_list__owner`, because sharing says no code
-  may filter to-dos by `Todo.owner` any more.)
-- **Where the email address comes from: only an admin sets it.** The accounts plan has **no email
-  address** on sign-up, and no page to change one. Django's `User` already has an `email` field;
-  an admin can fill it in `/admin/`. Only users with an email address get reminders. This also
-  means nobody can type a stranger's address and make the app send them emails, because admins are
-  trusted. A page where a person types (and confirms) their own address is a separate task. See
-  "Open questions".
-- **A new field `reminded_on` stops double emails.** It is the date the last reminder for this
-  to-do was sent. The command skips a to-do when `reminded_on` is already today. So if cron runs
-  twice in one day, or a person runs the command by hand, nobody gets the same email twice.
-  - If the due date is later changed to another day (with the edit feature), `reminded_on` is
-    older than the new date, so the to-do is reminded again on its new day. No extra code needed.
-  - `reminded_on` is set **only after the email was sent**, one user at a time. If sending fails,
-    the to-do is not marked, and the next run tries again (the same day only, because only "due
-    today" is sent).
-  - **Known limit, on purpose:** if the program stops in the tiny moment after the email was sent
-    but before `reminded_on` was saved (the server restarts, for example), the next run sends that
-    one user's email again. A second email is better than a lost one. Two runs at the **same**
-    moment could also both send; cron runs it once a day, so we accept this.
-- **Only the owner gets the email.** People a list is shared with (sharing, wave 3) do not get a
-  reminder, even for to-dos they added. That keeps one clear rule: one email per owner, with the
-  to-dos in their own lists.
-- **Users without an email address are skipped.** No error. Their to-dos are not marked, and the
-  command's output counts them ("skipped 1 user with no email address"). Inactive users
-  (`is_active=False`) are skipped too.
-- **One failed email does not stop the others.** If sending to one user raises any error
-  (`except Exception`: the mail server says no, the network is down, ...), the command writes the
-  error, goes on with the next user, and at the end exits with an error (a `CommandError`), so
-  cron's log shows that something went wrong.
-- **Sending can never hang forever.** Django waits for the mail server with no time limit by
-  default (`EMAIL_TIMEOUT = None`). We set `EMAIL_TIMEOUT = 30` (seconds), so a broken mail server
-  gives an error instead of a cron job that never ends.
-- **No "sent" when nothing was sent.** On a live server (`DEBUG` is `False`) with no mail server
-  set, the console backend would only print the emails, and the command would still mark the
-  to-dos as reminded: the reminders would be lost without a sign. So the command **refuses to
-  run** in that case, with a `CommandError` ("Email is not set up: set DJANGO_EMAIL_HOST"), before
-  it sends or marks anything.
-- **Plain text email, built in Python.** No HTML email, and no template. A Django template escapes
-  `&` to `&amp;` even in a `.txt` file, which would look wrong in a plain text email.
-  - The **subject** holds only a number ("To-do list: 2 to-dos due today"), never a to-do title,
-    so a title can never break the email's header lines. (Django also refuses a header with a line
-    break in it, with `BadHeaderError`.)
-  - In the **body**, each title is put on **one line**: line breaks and tabs in a title become
-    single spaces (`" ".join(todo.title.split())`). A form's text box cannot send a line break,
-    but a hand-made `POST` can. Without this, a person a list is shared with could add a "to-do"
-    whose title is many lines of fake text, and the app would email it to the owner.
-- **Email settings come from environment variables**, like the secret key. With no
-  `DJANGO_EMAIL_HOST` set (on a laptop), Django's **console backend** is used: the email is printed
-  in the terminal, not sent. A **backend** is the part of Django that actually delivers email.
-- **Tests need no email setting.** Django's test runner always switches to the **locmem
-  backend**, which keeps sent emails in a Python list, `django.core.mail.outbox`. Nothing is sent
-  for real. (Checked: `setup_test_environment` does this, our `LayeredTestRunner` calls it through
-  `super()`, and with `--parallel` each worker process calls it too.)
+- **"Due today", not "due tomorrow".** The notification comes in the morning and says what to do
+  today. This matches the due date plan, where "due today" is not yet overdue. Overdue to-dos are
+  not in the notification: the list page already shows them in red.
+- **"Today" is the date in `TIME_ZONE`** (`Asia/Tokyo`). The command uses
+  `timezone.localdate()`, the same as `Todo.is_overdue`. The Mac's own time zone is also
+  Tokyo, so the 08:00 in launchd (the Mac's clock) and "today" in the app (Tokyo) always agree.
+  Japan has no summer time, so this never moves.
+
+### Whose to-dos: the option `--user`
+
+The app has several users, but a notification shows on **one Mac**, for the one person sitting at
+it. So the command must know **which user** it is for.
+
+- **The command has one option, `--user <username>`, and it is required.** Without it, the
+  command stops with an error. We do not guess a user (for example "the first user"): a guess
+  could show one person's to-dos on another person's screen.
+- **An unknown user, or a switched-off user** (`is_active=False`), gives a `CommandError` (an
+  error that stops the command and prints the reason): `No active user named "bob".` Nothing is
+  shown and nothing is marked. The same message for both, so the command does not tell which
+  usernames exist.
+- **Only the user's own lists** (`todo_list__owner=user`), **not the lists shared with them.**
+  Reasons:
+  1. `reminded_on` is **one date per to-do**, not one per person. If a to-do could be reminded
+     to two people (the owner and a member), the first one's run marks it, and the second person
+     never sees it. With "own lists only", every to-do has exactly **one** person who can be
+     reminded of it (its list's owner), so one date per to-do is always right.
+  2. It keeps the rule of the approved plan: "only the owner is reminded".
+  3. It is the smallest change. Shared lists can come later, with a small table "this to-do was
+     shown to this person on this day". See "New open questions".
+- **To-dos a member added to the owner's list are included.** They are in the owner's own list,
+  so the owner is reminded of them. This is why the title clean-up below matters: another person
+  can choose these titles.
+- `TodoList.objects.visible_to(user)` is **not** used here, on purpose. It is for pages, where a
+  member must see the shared list. The plan says this in a comment in the code, so a later change
+  does not "fix" it by mistake.
+
+### How the notification is shown: `osascript`, safely
+
+macOS has a program `/usr/bin/osascript`. It runs a small **AppleScript** program (AppleScript is
+the Mac's own script language). The AppleScript command `display notification` shows a
+notification. Python starts `osascript` with `subprocess.run` (Python's way to start another
+program and wait for it).
+
+**The danger: AppleScript injection.** A to-do title is text a person typed, and on a shared list
+it can be typed by **another person**. If we built the AppleScript program by gluing the title
+into it, like `'display notification "' + title + '"'`, then a title like
+`" & do shell script "rm -rf ~` would end our text early and add its own AppleScript command. That
+command could run any program on the Mac. This is called **injection**: user text becomes code.
+
+**The safe way:** the AppleScript program is a **fixed text in our code**, and it never changes.
+The title and the text of the notification are given to it as **separate arguments** (an argument
+is one item in the list of words a program is started with). AppleScript reads them with
+`on run argv` (`argv` is the list of arguments). An argument is always only text, never code,
+whatever it contains.
+
+```python
+# todos/reminders.py
+OSASCRIPT = "/usr/bin/osascript"
+# Fixed AppleScript. The title and the text come in as arguments (argv), so
+# a to-do title is never read as code. Never build this text from user data.
+SCRIPT_LINES = [
+    "on run argv",
+    "display notification (item 2 of argv) with title (item 1 of argv)",
+    "end run",
+]
+TIMEOUT_SECONDS = 30
+
+
+def show_notification(title, text):
+    args = [OSASCRIPT]
+    for line in SCRIPT_LINES:
+        args += ["-e", line]
+    args += [title, text]
+    try:
+        subprocess.run(args, check=True, timeout=TIMEOUT_SECONDS, capture_output=True)
+    except (OSError, subprocess.SubprocessError) as error:
+        raise NotificationError(...) from error
+```
+
+- **A list of arguments, never `shell=True`.** With `shell=True`, Python would give one long
+  line to the **shell** (the program that reads commands in the Terminal), and the shell has its
+  own injection problems. With a list, no shell is used.
+- **The full path `/usr/bin/osascript`.** launchd starts programs with a very short `PATH` (the
+  list of folders where the computer looks for programs). The full path always works on a Mac.
+- **`check=True`**: if `osascript` ends with an error code, Python raises
+  `CalledProcessError`.
+- **`timeout=30`**: if `osascript` does not end within 30 seconds, Python stops it and raises
+  `TimeoutExpired`. So the command can never hang forever. (Showing a notification takes less
+  than a second.)
+- **`capture_output=True`** keeps `osascript`'s own error text, so the command can print it.
+- Both arguments start with our own fixed words ("To-do list: ..." and the first title line, which
+  starts with "- "), so an argument never starts with `-` and `osascript` never reads it as one of
+  its own options.
+- `OSError` covers "the program is not there" (`FileNotFoundError`). `SubprocessError` covers
+  `CalledProcessError` and `TimeoutExpired`. All of them become one error of our own,
+  `NotificationError`, with a short reason.
+
+### The text of the notification
+
+A notification has little room, and macOS cuts long text. So the text is short and built in
+Python by `notification_text(todos)`, which returns `(title, text)`:
+
+- **The title holds only a number:** `To-do list: 1 to-do due today` or
+  `To-do list: 3 to-dos due today`. Never a to-do title.
+- **The text:** at most **3** to-do titles, **one line each**, in the order of the list
+  (`todo_list`, then `position`, the manual order). Each line starts with `- `.
+- **Each title on one line:** line breaks and tabs become single spaces
+  (`" ".join(todo.title.split())`), and other invisible control characters are removed (only
+  characters where `str.isprintable()` is true are kept). A form's text box cannot send a line
+  break, but a hand-made `POST` can. Without this, a member of a shared list could add a "to-do"
+  whose title is many lines of fake text.
+- **A long title is cut:** at most 60 characters per line; a longer title becomes its first 59
+  characters and `…`.
+- **More than 3 to-dos:** a last line says how many are not shown: `and 2 more`.
+- **What is cut is still reminded.** All to-dos counted in the title are marked as reminded,
+  also the ones in "and 2 more". The person sees the number and opens the site for the rest.
+- `&`, `"` and `<` stay as they are. There is no HTML here, so nothing is escaped.
+
+### When `reminded_on` is set
+
+- **A new field `reminded_on`** is the date the to-do was last shown in a notification. The
+  command skips a to-do when `reminded_on` is already today. So if launchd runs it twice in one
+  day, or the person runs it by hand, the same notification does not come twice.
+- **It is set only after `osascript` worked** (it ended without error and in time). If
+  `osascript` fails or times out, nothing is marked, and the next run that day tries again.
+- If the due date is later changed to another day, `reminded_on` is older than the new date, so
+  the to-do is reminded again on its new day. No extra code.
+- **No database transaction around `osascript`.** A transaction would lock the database for
+  writing while we wait up to 30 seconds, and the website would have to wait too. We read the
+  to-dos, show the notification, and then save `reminded_on` in one quick `update()`.
+- **Known limit, on purpose:** if the program stops in the tiny moment after the notification but
+  before `reminded_on` is saved, the next run shows it again. Two notifications are better than a
+  lost one. Two runs at the **same** moment could also both show it; launchd runs it once a day,
+  so we accept this.
+
+### Not a Mac, or no `osascript`: an error, not a printout
+
+When `osascript` is not there (for example on Linux, where the GitHub checks run), the command
+**stops with a `CommandError`** (`Could not show the notification: ...`) and marks nothing.
+
+Why an error and not "print the text instead": printing is not a reminder. If the command printed
+the text and then marked the to-dos, the reminders would be lost without a sign. If it printed
+and did not mark, a "success" would be different on a Mac and on Linux, and that is confusing.
+An error is clear, and launchd's log shows it.
+
+**The tests never start the real `osascript`.** Every test that can reach it replaces
+`todos.reminders.subprocess.run` with a fake (`unittest.mock.patch`), in `setUp`, so a test can
+never show a real notification on the Mac or fail on Linux.
+
+### Recurring copies start with no `reminded_on`
+
+Checked on `main`: `Todo.make_next_copy` makes the copy with `Todo.objects.create(...)` and names
+each copied field (`todo_list`, `title`, `description`, `priority`, `repeat`, `due_date`,
+`repeated_from`), then the tags and steps. `reminded_on` is not in that list, so the copy gets
+the default, `None`. **No code change is needed.** We add one test, so a later change to
+`make_next_copy` cannot copy it by mistake. The comment in `make_next_copy` already says a new
+field that a copy should keep is added there; `reminded_on` must **not** be.
+
+### Running every morning: launchd, not cron
+
+- **launchd** is the Mac's own scheduler. A **LaunchAgent** is a small settings file (a
+  **plist**, an XML file) in `~/Library/LaunchAgents/` that tells launchd: "run this command for
+  this user at this time".
+- **Why not cron:** cron (the other scheduler) skips a job when the Mac is asleep at that time.
+  launchd's `StartCalendarInterval` runs a missed job **when the Mac wakes up** (several missed
+  days become one run). A laptop is often asleep at 08:00.
+- **If the Mac is shut down** (not asleep) at 08:00, launchd does not run it later. Run the
+  command by hand that day, or keep the Mac asleep instead of off.
+- A LaunchAgent runs only while the person is logged in. That is fine: a notification needs a
+  logged-in person anyway.
+- **The repo ships a template** (a file with blanks to fill in):
+  `deploy/macos/com.anyone-can-build-todo.reminders.plist`. **The person installs it**, with the
+  commands in "What you must set up on your Mac". Installing it changes the Mac's settings, so the
+  agent (the AI) must never do it.
+
+### No make target
+
+We add **no** `make` target. Reasons: launchd starts `uv` directly, not `make`; the command by
+hand is one short line (`uv run python manage.py send_reminders --user alice`); and a make target
+that installs the plist would change the Mac's settings, which only the person should do. The
+README shows the command.
 
 ## Not part of this task
 
-- A page where a person types their own email address, and a confirmation email that proves the
-  address is theirs. Until that exists, only an admin sets addresses (see Decisions).
-- A setting where a user turns reminders on or off, or picks a time. Everyone with an email
-  address and a to-do due today gets one. To stop them, an admin clears the address.
+- Email, SMTP and email addresses (dropped on 2026-10-10).
+- Reminders for lists shared **with** the user (see "New open questions").
+- More than one user per Mac in one run. Each person runs their own LaunchAgent with their own
+  `--user`.
+- A setting in the website to turn reminders on or off, or pick a time. The time is in the plist.
 - A time zone per user.
 - Reminders for overdue to-dos, or "due tomorrow".
-- A link to the site in the email. It needs a new setting for the site's address; it can be added
-  later.
-- Reminders for members of a shared list.
-- Reminders for subtasks (wave 4, same wave). Recurring to-dos (wave 4, same wave) work without
-  extra code: the copy gets a new due date, and the recurring plan copies only the fields in its
-  table, so the copy starts with `reminded_on = None`. If recurring is merged first, add
-  `reminded_on` to its "not copied" column.
-- HTML email, more than one email per user per day, push notifications.
-- Starting cron from the app. The person who runs the server must set it up (see below).
+- Clicking the notification to open the site. `display notification` cannot do that.
+- Reminders for steps (subtasks).
+- Running on Linux or Windows.
 
 ## Changes to files
 
 | File | Change |
 |---|---|
-| `todos/models.py` | New field `reminded_on = models.DateField(null=True, blank=True, editable=False)` |
-| `todos/migrations/00xx_todo_reminded_on.py` | Made by `makemigrations`. Existing to-dos get `reminded_on = NULL` (never reminded). |
-| `todos/reminders.py` (new) | `reminder_message(todos)` and `send_reminders(today)`: the logic |
+| `todos/models.py` | New field `reminded_on = models.DateField(null=True, blank=True, editable=False)` on `Todo`. `make_next_copy` does not change. |
+| `todos/migrations/0017_todo_reminded_on.py` | Made by `makemigrations todos --name todo_reminded_on`, after `0016_fill_todo_position`. Existing to-dos get `reminded_on = NULL` (never reminded). |
+| `todos/reminders.py` (new) | `due_today(user, today)`, `notification_text(todos)`, `show_notification(title, text)`, `NotificationError`, and `send_reminders(user, today)`: the logic |
 | `todos/management/__init__.py`, `todos/management/commands/__init__.py` (new, empty) | Django finds commands only in this folder layout |
-| `todos/management/commands/send_reminders.py` (new) | The command. It checks that email is set up, calls `send_reminders(timezone.localdate())` and prints the result |
-| `config/settings.py` | Email settings from environment variables |
-| `todos/tests/unit/test_reminders.py` (new) | Unit tests for `reminder_message` |
+| `todos/management/commands/send_reminders.py` (new) | The command: reads `--user`, finds the active user, calls `send_reminders(user, timezone.localdate())`, prints the result |
+| `deploy/macos/com.anyone-can-build-todo.reminders.plist` (new) | The LaunchAgent template, with blanks to fill in |
+| `todos/tests/unit/test_reminders.py` (new) | Unit tests for `notification_text` and `show_notification` |
 | `todos/tests/integration/test_reminders.py` (new) | Integration tests for `send_reminders` and the command |
-| `README.md`, `AGENTS.md` | New files, new environment variables, how an admin sets an email address, the cron setup |
+| `README.md`, `AGENTS.md` | The new files and field, the command, and the launchd setup |
 
 `editable=False` hides `reminded_on` from forms and the admin form. Nobody should set it by hand.
+`config/settings.py` does **not** change.
 
 ## Steps
 
@@ -131,238 +270,295 @@ Write the tests in the tables in step 8. Run `make test` and show that they fail
 Add the field `reminded_on` (see the table above). Then:
 
 ```bash
-uv run python manage.py makemigrations
+uv run python manage.py makemigrations todos --name todo_reminded_on
 uv run python manage.py migrate
 ```
 
+Check that the new file is `0017_todo_reminded_on.py` and depends on `0016_fill_todo_position`.
+
 ### 3. The logic — new file `todos/reminders.py`
 
-Two functions, so the tests can pass a fixed date, like `is_overdue(today=...)`:
+Functions that take the user and a fixed date, so the tests can choose the day:
 
 ```python
-from itertools import groupby
+def due_today(user, today):
+    """The to-dos in this user's OWN lists that are due today, not done, not yet reminded.
 
-from django.core.mail import send_mail
-
-from .models import Todo
-
-
-def reminder_message(todos):
-    """The subject and body of one reminder email."""
-    count = len(todos)
-    noun = "to-do" if count == 1 else "to-dos"
-    subject = f"To-do list: {count} {noun} due today"
-    # " ".join(title.split()) puts each title on one line, whatever it contains.
-    titles = [f"- {' '.join(todo.title.split())}" for todo in todos]
-    lines = [f"Due today ({count}):", ""] + titles
-    return subject, "\n".join(lines) + "\n"
-
-
-def send_reminders(today):
-    """Email each user their to-dos due on `today`. Returns counts for the output."""
-    todos = (
-        Todo.objects.filter(
-            due_date=today, done=False, todo_list__owner__is_active=True
-        )
+    Own lists only, not visible_to(user): reminded_on is one date per to-do,
+    so each to-do must have only one person who can be reminded of it.
+    """
+    return list(
+        Todo.objects.filter(todo_list__owner=user, due_date=today, done=False)
         .exclude(reminded_on=today)
-        .select_related("todo_list__owner")
-        .order_by("todo_list__owner_id", "created_at")
+        .order_by("todo_list__created_at", "todo_list_id", "position", "created_at", "pk")
     )
-    ...
+
+
+def send_reminders(user, today):
+    """Show one notification with these to-dos. Returns how many were shown.
+
+    Raises NotificationError, and marks nothing, when osascript fails.
+    """
+    todos = due_today(user, today)
+    if not todos:
+        return 0
+    title, text = notification_text(todos)
+    show_notification(title, text)  # raises NotificationError on failure
+    Todo.objects.filter(pk__in=[todo.pk for todo in todos]).update(reminded_on=today)
+    return len(todos)
 ```
 
-`.exclude(reminded_on=today)` keeps to-dos where `reminded_on` is empty (`NULL`): Django writes
-the SQL so that `NULL` is not excluded. The test `test_never_reminded_todo_is_sent` checks it.
+Plus `notification_text`, `show_notification` and `NotificationError`, as in "Decisions".
 
-`send_reminders` then, for each owner (with `groupby` on `todo.todo_list.owner_id`; turn each
-group into a `list` first, because a `groupby` group can be read only once):
-
-- no email address: count the user as skipped, go on;
-- otherwise `send_mail(subject, body, None, [owner.email])`. `None` means "use
-  `DEFAULT_FROM_EMAIL`";
-- if `send_mail` raises an error (`except Exception`): remember the user and the error, go on;
-- if it worked: `Todo.objects.filter(pk__in=[...]).update(reminded_on=today)`, right away, before
-  the next user.
-
-It returns the numbers: emails sent, to-dos in them, users skipped, and the list of errors.
+`.exclude(reminded_on=today)` keeps to-dos where `reminded_on` is empty (`NULL`): Django writes the
+SQL so that `NULL` is not excluded. The test `test_never_reminded_todo_is_shown` checks it.
 
 ### 4. The command — `todos/management/commands/send_reminders.py`
 
-A `BaseCommand` with a `help` text. The command has no options. `handle()`:
+A `BaseCommand` with a `help` text. `add_arguments` adds `--user`, with `required=True` and a
+help text. `handle()`:
 
-1. If `settings.DEBUG` is `False` and `settings.EMAIL_BACKEND` is the console backend, raise
-   `CommandError("Email is not set up: set DJANGO_EMAIL_HOST")`. Nothing is sent or marked.
-2. Call `send_reminders(timezone.localdate())`.
-3. Write one line with `self.stdout.write(...)`, for example
-   `Sent 2 reminders (5 to-dos). Skipped 1 user with no email address.`
-4. If there were errors, write one line per error (the username and the error, never the
-   password or other settings) and raise `CommandError`.
+1. Find the user: `User.objects.filter(username=..., is_active=True).first()`. If there is none,
+   raise `CommandError('No active user named "<name>".')`.
+2. Call `send_reminders(user, timezone.localdate())`.
+3. If it raises `NotificationError`, raise `CommandError("Could not show the notification: ...")`
+   with the short reason.
+4. Write one line with `self.stdout.write(...)`: `Showed 1 notification (3 to-dos) for alice.`, or
+   `No to-dos due today for alice.` The line never contains a to-do title, so the log file stays
+   free of the person's to-dos.
 
-### 5. Settings — `config/settings.py`
+### 5. The launchd template — `deploy/macos/com.anyone-can-build-todo.reminders.plist`
 
-```python
-# Email. On a laptop, emails are printed in the terminal. On a live server, set
-# DJANGO_EMAIL_HOST and the other variables, so they are sent for real.
-EMAIL_HOST = os.environ.get("DJANGO_EMAIL_HOST", "")
-EMAIL_PORT = int(os.environ.get("DJANGO_EMAIL_PORT", "587"))
-EMAIL_HOST_USER = os.environ.get("DJANGO_EMAIL_HOST_USER", "")
-EMAIL_HOST_PASSWORD = os.environ.get("DJANGO_EMAIL_HOST_PASSWORD", "")
-EMAIL_USE_TLS = True  # Port 587 with STARTTLS: the usual setting for mail services.
-EMAIL_TIMEOUT = 30  # Seconds. Without it, a broken mail server can make the command hang.
-DEFAULT_FROM_EMAIL = os.environ.get("DJANGO_DEFAULT_FROM_EMAIL", "todo@localhost")
-EMAIL_BACKEND = (
-    "django.core.mail.backends.smtp.EmailBackend"
-    if EMAIL_HOST
-    else "django.core.mail.backends.console.EmailBackend"
-)
+The blanks are written in capitals between `__`, and the person replaces them (see "What you must
+set up on your Mac"):
+
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.anyone-can-build-todo.reminders</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>__UV_PATH__</string>
+        <string>run</string>
+        <string>python</string>
+        <string>manage.py</string>
+        <string>send_reminders</string>
+        <string>--user</string>
+        <string>__USERNAME__</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>__REPO_PATH__</string>
+    <key>StartCalendarInterval</key>
+    <dict>
+        <key>Hour</key>
+        <integer>8</integer>
+        <key>Minute</key>
+        <integer>0</integer>
+    </dict>
+    <key>StandardOutPath</key>
+    <string>__HOME__/Library/Logs/anyone-can-build-todo-reminders.log</string>
+    <key>StandardErrorPath</key>
+    <string>__HOME__/Library/Logs/anyone-can-build-todo-reminders.log</string>
+</dict>
+</plist>
 ```
 
-**SMTP** is the standard way to send email to a mail server. **TLS** keeps the password secret
-on the way to the mail server. The password is never in the code.
+- **Full paths everywhere.** launchd does not understand `~` and has a short `PATH`.
+- **No `--no-dev`.** `uv run --no-dev` would remove the test packages from the project's `.venv`
+  folder, and then `make test` would break.
+- **The log is outside the repo** (`~/Library/Logs/`), so it never shows in `git status`. The
+  Mac's Console app can also show it.
+- No environment variables are needed: on the Mac, the settings' laptop defaults are used, the
+  same as for `make run`.
 
 ### 6. Checks
 
-The migration check in `make check` and `check.yml` already catches a missing migration. Nothing
-to change.
+The migration check in `make check` and `check.yml` already catches a missing migration. The tests
+run on Linux in GitHub, and they never start `osascript` (it is replaced in every test), so they
+pass there. Nothing to change.
 
 ### 7. Docs
 
-- `AGENTS.md`: add `todos/reminders.py` and the command to the table, and add the new field to the
-  `models.py` row.
-- `README.md`: add the email variables to the "Put it on the internet" table; a short note "To get
-  reminders, an admin opens the user in `/admin/` and fills in Email address"; and a new section
-  "Reminders" with the cron setup below. Update the test numbers.
+- `AGENTS.md`: add `todos/reminders.py`, the command and `deploy/macos/` to the table; add
+  `reminded_on` to the `models.py` row ("not copied by `make_next_copy`"); a rule line "Never build
+  AppleScript from user text; pass it as `argv`".
+- `README.md`: a new section "Reminders on your Mac" with the steps of "What you must set up on
+  your Mac" below, and the new files in "How it is put together". Update the test numbers.
 
 ### 8. Tests
 
 No CUJ test: there is no browser in this feature.
 
-**Unit** — `todos/tests/unit/test_reminders.py`, `SimpleTestCase`, with `Todo(...)` made in memory
-and never saved:
+**Every test that can reach `osascript` replaces `todos.reminders.subprocess.run`** with a
+`unittest.mock.patch`, started in `setUp` (`self.addCleanup(patcher.stop)`). A test that wants a
+failure sets `side_effect` on the fake.
+
+**Unit** — `todos/tests/unit/test_reminders.py`, `SimpleTestCase` (no database), with
+`Todo(title=...)` made in memory and never saved:
 
 | Test | What it checks |
 |---|---|
-| `test_subject_says_one_todo` | One to-do: subject is exactly `To-do list: 1 to-do due today`. |
-| `test_subject_says_many_todos` | Two to-dos: subject is exactly `To-do list: 2 to-dos due today`. |
-| `test_body_lists_titles_in_order` | Each title on its own line, in the order given. |
-| `test_body_does_not_escape_title` | A title `Tom & Jerry` stays `Tom & Jerry`, not `&amp;`. |
-| `test_title_with_line_breaks_stays_on_one_line` | A title `Buy\nmilk\r\nnow` is the line `- Buy milk now`, and the body has exactly one line per to-do after the header. |
+| `test_title_says_one_todo` | One to-do: the title is exactly `To-do list: 1 to-do due today`. |
+| `test_title_says_many_todos` | Two to-dos: the title is exactly `To-do list: 2 to-dos due today`. |
+| `test_title_never_contains_a_todo_title` | A to-do titled `Secret plan`: the notification title does not contain `Secret plan`. |
+| `test_text_lists_titles_in_order` | Titles `A`, `B`: the text is exactly `- A\n- B`. |
+| `test_title_with_line_breaks_stays_on_one_line` | A title `Buy\nmilk\r\n\tnow`: the text is exactly `- Buy milk now`. |
+| `test_control_characters_are_removed` | A title `Ring\x07bell`: the text is exactly `- Ringbell`. |
+| `test_long_title_is_cut` | A title of 80 `x`: the line is `- ` plus 59 `x` plus `…` (60 characters after `- `). A title of exactly 60 characters is not cut. |
+| `test_more_than_three_says_how_many_more` | Five to-dos `A` to `E`: the text is exactly `- A\n- B\n- C\nand 2 more`, and the title says `5 to-dos`. |
+| `test_text_does_not_escape` | A title `Tom & "Jerry" <3` stays exactly the same in the text. |
+| `test_runs_osascript_with_fixed_script_and_argv` | `show_notification("T", "X")`: the fake `run` got exactly `["/usr/bin/osascript", "-e", "on run argv", "-e", "display notification (item 2 of argv) with title (item 1 of argv)", "-e", "end run", "T", "X"]`. |
+| `test_title_cannot_inject_applescript` | A to-do titled `" & do shell script "x`, through `notification_text` and `show_notification`: the last argv item is exactly `- " & do shell script "x` (one item, unchanged); the three `-e` script items are exactly the fixed lines; no other argv item contains `do shell script`. |
+| `test_no_shell_with_check_and_timeout` | The fake `run` got `check=True` and `timeout=30`, and `shell` was not given or is `False`. |
+| `test_timeout_raises_notification_error` | The fake raises `subprocess.TimeoutExpired`: `show_notification` raises `NotificationError`. |
+| `test_failed_osascript_raises_notification_error` | The fake raises `subprocess.CalledProcessError(1, ...)`: `NotificationError`. |
+| `test_missing_osascript_raises_notification_error` | The fake raises `FileNotFoundError`: `NotificationError`. |
 
-**Integration** — `todos/tests/integration/test_reminders.py`, `TestCase` (a database, and
-`mail.outbox`). These do not use the test client, because a command has no address; they test
-the logic with the database, which is the lowest layer where the rules show. Each user gets a
-list (`TodoList`) and the to-dos go in it.
+**Integration** — `todos/tests/integration/test_reminders.py`, `TestCase` (a database). These do
+not use the test client, because a command has no address; they test the logic with the database,
+which is the lowest layer where the rules show. Users are made with `make_user()` from
+`accounts/tests/helpers.py`, each with a `TodoList`.
 
-Most tests call `send_reminders(date(2026, 10, 9))`. The command tests call
-`call_command("send_reminders", stdout=out)` with `out = io.StringIO()`, and **replace
-`django.utils.timezone.now`** (with `unittest.mock.patch`) by a fixed time, so they never depend
-on the real date. (`timezone.localdate()` asks `timezone.now()` for the time, so this works.)
+Most tests call `send_reminders(alice, date(2026, 10, 10))`. The command tests call
+`call_command("send_reminders", "--user", "alice", stdout=out)` with `out = io.StringIO()`, and
+**replace `django.utils.timezone.now`** (with `unittest.mock.patch`) by a fixed time, so they never
+depend on the real date. (`timezone.localdate()` asks `timezone.now()` for the time, so this
+works.)
 
-**Each "nothing is sent" test also has one to-do that _is_ sent**, and checks that only that
-title is in the email. Without it, a `send_reminders` that sends nothing at all would pass.
+**Each "not shown" test also has one to-do that _is_ shown**, and checks that only that title is
+in the notification text (the last argv item of the fake `run`). Without it, a `send_reminders`
+that shows nothing at all would pass.
 
 | Test | What it checks |
 |---|---|
-| `test_one_email_per_user` | A has two to-dos due today, B has one: exactly two emails, one to each address, A's email holds both of A's titles. |
-| `test_email_has_only_that_users_todos` | A's email does not contain B's title, and B's does not contain A's. |
-| `test_done_todo_is_not_reminded` | A has one done and one not-done to-do due today: one email, with only the not-done title. |
-| `test_only_todos_due_today` | To-dos due yesterday, tomorrow, with no due date, and one due today: one email, with only today's title. |
-| `test_no_email_when_nothing_is_due` | Nothing due: `mail.outbox` is empty, and the result says 0 sent. |
-| `test_never_reminded_todo_is_sent` | A to-do with `reminded_on = None`, due today: it is sent (checks the `NULL` case of `exclude`). |
-| `test_sets_reminded_on` | After sending, the to-do's `reminded_on` is today (read again from the database). |
-| `test_second_run_same_day_sends_nothing` | Run once: one email (check it). Run again: still one email in `mail.outbox`. |
-| `test_moved_due_date_is_reminded_again` | `reminded_on` is an earlier day and `due_date` is today: an email is sent. |
-| `test_user_without_email_is_skipped` | A has no email address, B has one: one email, to B. A's to-do keeps `reminded_on = None`, and the result counts 1 skipped. |
-| `test_inactive_user_is_skipped` | An inactive user with an email address gets no email; an active user does. |
-| `test_shared_todo_reminds_only_owner` | A shares a list with B (both have email addresses). B adds a to-do due today to A's list: one email, to A, with that title. B gets none. |
-| `test_failed_send_is_not_marked_and_others_still_sent` | `todos.reminders.send_mail` is replaced so it raises `SMTPException` for A's address only: B still gets the email (B's to-do marked), A's to-do keeps `reminded_on = None`, and the result has one error. |
-| `test_failed_user_is_tried_again` | After the failure above, a second run with a working `send_mail` sends A's email. |
-| `test_command_prints_counts` | One to-do due on the fixed date: the output contains `Sent 1 reminder (1 to-do).` |
-| `test_command_fails_when_a_send_fails` | With a failing `send_mail`, the command raises `CommandError`. |
-| `test_command_refuses_console_backend_on_live_server` | With `@override_settings(DEBUG=False, EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend")`: `CommandError`, and the to-do's `reminded_on` stays `None`. |
-| `test_command_uses_tokyo_date` | `timezone.now` is replaced with 2026-10-09 23:30 UTC, which is 2026-10-10 08:30 in Tokyo. A to-do due 2026-10-10 is reminded; one due 2026-10-09 is not. |
+| `test_shows_todos_due_today` | Alice has two to-dos due today: `run` was called once; the text holds both titles; the result is 2. |
+| `test_only_due_today` | To-dos due yesterday, tomorrow, with no due date, and one due today: the text holds only today's title. |
+| `test_done_todo_is_not_shown` | One done and one not-done, both due today: the text holds only the not-done title. |
+| `test_other_users_todos_not_shown` | Bob has a to-do due today in his own list: Alice's text does not hold it, and holds her own. |
+| `test_list_shared_with_user_not_shown` | Bob shares his list with Alice (`members.add`); a to-do due today in it is not in Alice's text; her own to-do is; the shared to-do keeps `reminded_on = None`. |
+| `test_member_added_todo_in_own_list_is_shown` | Alice shares her list with Bob; Bob's to-do in Alice's list, due today, is in Alice's text. |
+| `test_nothing_due_shows_nothing` | Nothing due: `run` was not called, the result is 0, and a to-do due tomorrow keeps `reminded_on = None`. |
+| `test_never_reminded_todo_is_shown` | A to-do with `reminded_on = None`, due today: it is shown (checks the `NULL` case of `exclude`). |
+| `test_sets_reminded_on` | After a good run, the to-do's `reminded_on` is 2026-10-10 (read again from the database). |
+| `test_second_run_same_day_shows_nothing` | Run once: `run` called once (check it). Run again: `run` is still called only once, and the result is 0. |
+| `test_moved_due_date_is_reminded_again` | `reminded_on` is 2026-10-09 and `due_date` is 2026-10-10: it is shown. |
+| `test_failed_osascript_marks_nothing` | The fake raises `CalledProcessError`: `send_reminders` raises `NotificationError`, and the to-do keeps `reminded_on = None`. |
+| `test_timeout_marks_nothing` | The fake raises `TimeoutExpired`: `NotificationError`, and `reminded_on` stays `None`. |
+| `test_failed_run_is_tried_again` | After the failure above, a second run with a working fake shows it and marks it. |
+| `test_recurring_copy_starts_unreminded` | A daily to-do due 2026-10-10 with `reminded_on` 2026-10-10 is marked done and `make_next_copy(date(2026, 10, 10))` runs: the copy's `reminded_on` is `None`. |
+| `test_command_needs_user_option` | `call_command("send_reminders")` without `--user` raises `CommandError`, and `run` was not called. |
+| `test_command_unknown_user` | `--user nobody`: `CommandError` with `No active user named "nobody".`, and `run` was not called. |
+| `test_command_inactive_user` | Alice with `is_active=False` and a to-do due today: the same `CommandError`, `run` not called, `reminded_on` stays `None`. |
+| `test_command_prints_count` | One to-do due on the fixed date: the output is `Showed 1 notification (1 to-do) for alice.`, and does not contain the to-do's title. |
+| `test_command_prints_nothing_due` | Nothing due: the output is `No to-dos due today for alice.` |
+| `test_command_fails_when_osascript_fails` | The fake raises `CalledProcessError`: `CommandError` starting with `Could not show the notification`, and `reminded_on` stays `None`. |
+| `test_command_fails_without_osascript` | The fake raises `FileNotFoundError` (as on Linux): `CommandError`, and `reminded_on` stays `None`. |
+| `test_command_uses_tokyo_date` | `timezone.now` is replaced with 2026-10-09 23:30 UTC, which is 2026-10-10 08:30 in Tokyo. A to-do due 2026-10-10 is shown; one due 2026-10-09 is not. |
 
 The test dates are fixed, so the tests give the same answer on any computer, at any time of day.
 
 **Show each important test failing first** (rule in `AGENTS.md`). For example: remove
-`.exclude(reminded_on=today)` and see `test_second_run_same_day_sends_nothing` fail; remove the
-title clean-up and see `test_title_with_line_breaks_stays_on_one_line` fail; remove the console
-check and see `test_command_refuses_console_backend_on_live_server` fail.
+`.exclude(reminded_on=today)` and see `test_second_run_same_day_shows_nothing` fail; build the
+script with the title glued in and see `test_title_cannot_inject_applescript` fail; mark the
+to-dos before `show_notification` and see `test_failed_osascript_marks_nothing` fail; use
+`visible_to(user)` and see `test_list_shared_with_user_not_shown` fail.
 
 ### 9. Before the commit
 
 - Run `make check`.
-- On a laptop: in `/admin/`, give your user an email address. Make a to-do due today, run
-  `uv run python manage.py send_reminders`, and see the email printed in the terminal. Run it
-  again and see `Sent 0 reminders`.
+- On the Mac: make a to-do due today in one of your own lists. Run
+  `uv run python manage.py send_reminders --user <your username>` and see the notification. Run it
+  again and see `No to-dos due today for <your username>.`
 
-## What you must set up on the server
+## What you must set up on your Mac
 
-The app cannot do these things by itself. The person who runs the server must do them.
+The app cannot do these things by itself, and the AI must not do them for you: they change your
+Mac's settings. You do them once, in the Terminal.
 
-1. **An email account that can send by SMTP.** For example a mail service like Postmark,
-   Mailgun, or SendGrid, or your email provider's SMTP. Set these environment variables:
-   `DJANGO_EMAIL_HOST`, `DJANGO_EMAIL_PORT` (usually `587`), `DJANGO_EMAIL_HOST_USER`,
-   `DJANGO_EMAIL_HOST_PASSWORD`, `DJANGO_DEFAULT_FROM_EMAIL` (an address the mail service lets you
-   send from). Without `DJANGO_EMAIL_HOST` on a live server, the command stops with an error.
-   Note: the mail service sees the to-do titles in the emails.
-2. **Email addresses for the users.** In `/admin/`, open each user who wants reminders and fill in
-   "Email address".
-3. **A daily job that runs the command.** The job must run on the **same machine and database**
-   as the website, with the **same environment variables** (cron does not read the website's
-   variables by itself), including `DJANGO_DEBUG=False`.
-   - On a Linux server with cron, run `crontab -e` and add one line. Cron uses the server's clock.
-     Check it with `date`; it is usually UTC. 23:00 UTC is 08:00 the next morning in Tokyo (Japan
-     has no summer time, so this never moves):
+1. **Try the command by hand first.** In the project folder:
 
-     ```
-     0 23 * * * cd /path/to/anyone-can-build-todo && /full/path/to/uv run --no-dev python manage.py send_reminders >> reminders.log 2>&1
-     ```
+   ```bash
+   uv run python manage.py send_reminders --user <your username>
+   ```
 
-     Use the full path to `uv` (find it with `which uv`), because cron has a very short `PATH`.
-   - On a hosting service, use its "scheduled task" or "cron job" feature with the same command.
-     **Warning:** the database is a SQLite file. Some services (for example Render) run a cron job
-     on a separate machine that cannot see the website's disk. There, the job would not find the
-     to-dos. Such a service needs a shared database (like PostgreSQL), which is its own task.
-     Services where the job runs next to the website's files (for example PythonAnywhere's
-     "Tasks") work as they are.
-4. **Check it once.** Run the command by hand on the server, and look in `reminders.log` the next
-   day.
+   Make a to-do due today first, or you only see `No to-dos due today`.
+2. **Allow the notification.** The first time, macOS may not show it, or may ask. Open
+   **System Settings → Notifications**, find **Script Editor** (notifications from `osascript`
+   show under that name), and turn on **Allow notifications**. Also check that a Focus mode
+   (like Do Not Disturb) is not hiding it.
+3. **Fill in the template.** Find the values:
 
-## Open questions
+   ```bash
+   which uv      # for __UV_PATH__, for example /Users/you/.local/bin/uv
+   pwd           # in the project folder, for __REPO_PATH__
+   echo $HOME    # for __HOME__
+   ```
 
-1. **Is "only an admin sets email addresses" enough for now?** It is safe and small, but people
-   cannot turn reminders on by themselves. The other choice is a "My email" page with a
-   confirmation email, as its own task before this one.
-2. **Where will the site run?** The cron setup depends on the hosting service (see the warning
-   about SQLite above).
-3. **Is 08:00 in Tokyo the right time?** It is only the cron line; the code does not change.
+   Copy the template and replace the four blanks (`__UV_PATH__`, `__REPO_PATH__`, `__HOME__`,
+   `__USERNAME__`) in a text editor:
 
-## Review
+   ```bash
+   cp deploy/macos/com.anyone-can-build-todo.reminders.plist ~/Library/LaunchAgents/
+   open -e ~/Library/LaunchAgents/com.anyone-can-build-todo.reminders.plist
+   plutil -lint ~/Library/LaunchAgents/com.anyone-can-build-todo.reminders.plist
+   ```
 
-What changed in this review, and why:
+   `plutil -lint` checks that the file is a correct plist. It must say `OK`.
+4. **Turn it on** (this tells launchd about the file):
 
-- Owner path changed from `Todo.owner` to `todo_list__owner`: the shared names say the owner is
-  `todo.todo_list.owner` after lists; the old query would crash.
-- Email addresses now come only from the admin: the accounts plan has no email at all, so the old
-  plan would have sent to almost nobody, and "confirmation belongs to accounts" was wrong.
-- The command refuses to run on a live server with the console backend: otherwise to-dos were
-  marked "reminded" while nothing was sent (silent lost reminders).
-- Added `EMAIL_TIMEOUT = 30`: Django's default is no time limit, so a broken mail server could
-  hang the cron job.
-- Titles are put on one line in the body: a shared-list member could otherwise make the app email
-  the owner many lines of fake text.
-- Wrote down the known double-send case (crash between send and save, two runs at once) and chose
-  "a second email is better than a lost one".
-- Tests: every "nothing sent" test now has a to-do that is sent (so an empty `send_reminders`
-  cannot pass); command tests now fix the time (they used the real date); added tests for `NULL`
-  `reminded_on`, line breaks in titles, a retry after failure, and the console-backend check.
-- Recurring: noted that `reminded_on` is not copied to the next copy.
-- Removed the open question "where does the owner live" (the shared names decide it).
+   ```bash
+   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.anyone-can-build-todo.reminders.plist
+   ```
 
-## Decided by the person (2026-10-09)
+5. **Test it now**, without waiting for 08:00, and read the log:
 
-The plan is **approved**.
+   ```bash
+   launchctl kickstart -k gui/$(id -u)/com.anyone-can-build-todo.reminders
+   cat ~/Library/Logs/anyone-can-build-todo-reminders.log
+   ```
 
-- Only an admin sets email addresses, in /admin/, for now.
-- Hosting is decided later, before wave 4. The cron job must run on the same machine as the SQLite file.
+   `launchctl print gui/$(id -u)/com.anyone-can-build-todo.reminders` shows its state.
+6. **If the log says `Operation not permitted`:** macOS protects the `Documents` folder from
+   programs started in the background. Either move the project out of `Documents` (for example to
+   `~/code/`), or allow it in **System Settings → Privacy & Security**. See "New open questions".
+7. **To change or stop it:** turn it off, edit the file, and turn it on again:
+
+   ```bash
+   launchctl bootout gui/$(id -u)/com.anyone-can-build-todo.reminders
+   ```
+
+   To stop it for good, run `bootout` and delete the file from `~/Library/LaunchAgents/`.
+
+## Decided by the person
+
+### Still true from 2026-10-09
+
+- The plan is approved: a management command `send_reminders`, to-dos due today and not done,
+  `reminded_on` so nothing is reminded twice, "today" is `timezone.localdate()` in Tokyo.
+- The scheduled job must run on the same machine as the SQLite file. (It now does: both are on the
+  Mac.)
+
+No longer true: "only an admin sets email addresses" (there is no email any more), and "hosting is
+decided later" (it is decided: the person's Mac).
+
+### Decided on 2026-10-10
+
+- The site runs locally on the person's Mac (macOS), not on a server. GitHub Pages was ruled out,
+  because it cannot run Django.
+- A reminder is a macOS notification on that Mac, not an email. No SMTP, no email settings, no
+  email addresses.
+- The Mac's time zone is `Asia/Tokyo`, the same as `TIME_ZONE`.
+
+## New open questions
+
+1. **Shared lists:** should the notification also show to-dos due today in lists shared **with**
+   the person? This plan says no (own lists only), because `reminded_on` is one date per to-do.
+   Yes needs a small new table ("shown to this person on this day") instead of `reminded_on`.
+2. **The `Documents` folder:** the project is in `~/Documents/GitHub/`. macOS may block launchd
+   from reading it. Do you want to move the project (for example to `~/code/`), or allow access in
+   System Settings? We find out at step 5 of the Mac setup.
+3. **Is 08:00 the right time?** It is only the `Hour` and `Minute` in the plist; the code does not
+   change.
