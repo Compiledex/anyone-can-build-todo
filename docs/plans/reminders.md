@@ -117,11 +117,13 @@ def show_notification(title, text):
     args = [OSASCRIPT]
     for line in SCRIPT_LINES:
         args += ["-e", line]
-    args += [title, text]
+    # "--" ends osascript's own options. Without it, an argument that starts
+    # with "-" (like "-e ...") would be read as more AppleScript code.
+    args += ["--", title, text]
     try:
         subprocess.run(args, check=True, timeout=TIMEOUT_SECONDS, capture_output=True)
     except (OSError, subprocess.SubprocessError) as error:
-        raise NotificationError(...) from error
+        raise NotificationError(reason(error)) from error
 ```
 
 - **A list of arguments, never `shell=True`.** With `shell=True`, Python would give one long
@@ -134,13 +136,24 @@ def show_notification(title, text):
 - **`timeout=30`**: if `osascript` does not end within 30 seconds, Python stops it and raises
   `TimeoutExpired`. So the command can never hang forever. (Showing a notification takes less
   than a second.)
-- **`capture_output=True`** keeps `osascript`'s own error text, so the command can print it.
-- Both arguments start with our own fixed words ("To-do list: ..." and the first title line, which
-  starts with "- "), so an argument never starts with `-` and `osascript` never reads it as one of
-  its own options.
+- **`--` before the title and the text.** `osascript` reads an argument that starts with `-` as
+  one of its own **options** (settings for the program). It was tested: after
+  `-e 'end run'`, the arguments `-e` `x` make `osascript` run `x` as AppleScript. Our text starts
+  with `- ` (the first title line), and a to-do title can start with `-e`. `--` means "no more
+  options after this", so everything after it is only text for `argv`.
+- **`capture_output=True`** keeps `osascript`'s output away from the log (see the reason below).
 - `OSError` covers "the program is not there" (`FileNotFoundError`). `SubprocessError` covers
   `CalledProcessError` and `TimeoutExpired`. All of them become one error of our own,
-  `NotificationError`, with a short reason.
+  `NotificationError`.
+- **The reason in `NotificationError`** is only the name of the Python error and, for
+  `CalledProcessError`, the exit code (the number a program gives back when it ends; 0 means it
+  worked). For example `CalledProcessError (exit code 1)`, `TimeoutExpired (after 30 seconds)`,
+  `FileNotFoundError`. **`osascript`'s error text (`stderr`) is never printed**: it can repeat
+  parts of the notification text, so to-do titles would end up in the log file.
+- **Known limit: success does not mean "seen".** `osascript` ends with exit code 0 even when
+  notifications for it are turned off, not yet allowed, or hidden by a Focus mode (like Do Not
+  Disturb). The app cannot know this. Then the to-dos are marked as reminded, but nothing showed.
+  This is why step 1 of "What you must set up on your Mac" is to allow notifications first.
 
 ### The text of the notification
 
@@ -151,14 +164,19 @@ Python by `notification_text(todos)`, which returns `(title, text)`:
   `To-do list: 3 to-dos due today`. Never a to-do title.
 - **The text:** at most **3** to-do titles, **one line each**, in the order of the list
   (`todo_list`, then `position`, the manual order). Each line starts with `- `.
-- **Each title on one line:** line breaks and tabs become single spaces
-  (`" ".join(todo.title.split())`), and other invisible control characters are removed (only
-  characters where `str.isprintable()` is true are kept). A form's text box cannot send a line
-  break, but a hand-made `POST` can. Without this, a member of a shared list could add a "to-do"
-  whose title is many lines of fake text.
+- **Each title on one line, in this order:** first, every kind of space (line breaks, tabs, the
+  Japanese wide space U+3000, ...) becomes one normal space (`" ".join(todo.title.split())`); then
+  the other invisible control characters are removed (only characters where `str.isprintable()` is
+  true are kept). The order matters: `isprintable()` is false for a line break and for U+3000, so
+  doing it first would glue two words together. A form's text box cannot send a line break, but a
+  hand-made `POST` can. Without this, a member of a shared list could add a "to-do" whose title is
+  many lines of fake text.
 - **A long title is cut:** at most 60 characters per line; a longer title becomes its first 59
   characters and `…`.
 - **More than 3 to-dos:** a last line says how many are not shown: `and 2 more`.
+- **A banner shows only about 2 or 3 lines.** So "and 2 more" (and sometimes the third title) may
+  be visible only when the person opens the notification in **Notification Center** (click the
+  date and time in the top right corner). The title with the number is always visible.
 - **What is cut is still reminded.** All to-dos counted in the title are marked as reminded,
   also the ones in "and 2 more". The person sees the number and opens the site for the rest.
 - `&`, `"` and `<` stay as they are. There is no HTML here, so nothing is escaped.
@@ -190,9 +208,15 @@ the text and then marked the to-dos, the reminders would be lost without a sign.
 and did not mark, a "success" would be different on a Mac and on Linux, and that is confusing.
 An error is clear, and launchd's log shows it.
 
-**The tests never start the real `osascript`.** Every test that can reach it replaces
-`todos.reminders.subprocess.run` with a fake (`unittest.mock.patch`), in `setUp`, so a test can
-never show a real notification on the Mac or fail on Linux.
+There is **no separate "is this a Mac?" check** in the code. "Not a Mac" shows up as
+`FileNotFoundError` from `subprocess.run`, because `/usr/bin/osascript` is not there. So there is
+only one thing to replace in tests: `subprocess.run`.
+
+**The tests never start the real `osascript`.** One shared helper, `FakeOsascriptMixin` in the new
+file `todos/tests/helpers.py`, replaces `todos.reminders.subprocess.run` with a fake
+(`unittest.mock.patch`) in `setUp`, and keeps it as `self.run`. Both test files use it. A test
+that wants "not a Mac" sets `self.run.side_effect = FileNotFoundError(...)`. So a test can never
+show a real notification on the Mac or fail on Linux.
 
 ### Recurring copies start with no `reminded_on`
 
@@ -222,10 +246,10 @@ field that a copy should keep is added there; `reminded_on` must **not** be.
 
 ### No make target
 
-We add **no** `make` target. Reasons: launchd starts `uv` directly, not `make`; the command by
-hand is one short line (`uv run python manage.py send_reminders --user alice`); and a make target
-that installs the plist would change the Mac's settings, which only the person should do. The
-README shows the command.
+We add **no** `make` target. Reasons: launchd starts the project's Python directly, not `make`; the
+command by hand is one short line (`uv run python manage.py send_reminders --user alice`); and a
+make target that installs the plist would change the Mac's settings, which only the person should
+do. The README shows the command.
 
 ## Not part of this task
 
@@ -250,6 +274,7 @@ README shows the command.
 | `todos/management/__init__.py`, `todos/management/commands/__init__.py` (new, empty) | Django finds commands only in this folder layout |
 | `todos/management/commands/send_reminders.py` (new) | The command: reads `--user`, finds the active user, calls `send_reminders(user, timezone.localdate())`, prints the result |
 | `deploy/macos/com.anyone-can-build-todo.reminders.plist` (new) | The LaunchAgent template, with blanks to fill in |
+| `todos/tests/helpers.py` (new) | `FakeOsascriptMixin`: replaces `todos.reminders.subprocess.run` in `setUp`, for both test files |
 | `todos/tests/unit/test_reminders.py` (new) | Unit tests for `notification_text` and `show_notification` |
 | `todos/tests/integration/test_reminders.py` (new) | Integration tests for `send_reminders` and the command |
 | `README.md`, `AGENTS.md` | The new files and field, the command, and the launchd setup |
@@ -341,9 +366,7 @@ set up on your Mac"):
     <string>com.anyone-can-build-todo.reminders</string>
     <key>ProgramArguments</key>
     <array>
-        <string>__UV_PATH__</string>
-        <string>run</string>
-        <string>python</string>
+        <string>__REPO_PATH__/.venv/bin/python</string>
         <string>manage.py</string>
         <string>send_reminders</string>
         <string>--user</string>
@@ -367,8 +390,13 @@ set up on your Mac"):
 ```
 
 - **Full paths everywhere.** launchd does not understand `~` and has a short `PATH`.
-- **No `--no-dev`.** `uv run --no-dev` would remove the test packages from the project's `.venv`
-  folder, and then `make test` would break.
+- **The project's own Python, not `uv run`.** `.venv/bin/python` is the Python that `make setup`
+  made, with this project's packages. In a background job, `uv run` could first change `.venv`,
+  rewrite `uv.lock`, or need the internet, and then fail while nobody is watching. Starting the
+  Python directly does none of this.
+- **The job runs whatever code is in the project folder now** (the branch that is checked out).
+  After you pull this feature, run `uv run python manage.py migrate` once, or the job fails
+  because the database has no `reminded_on` column.
 - **The log is outside the repo** (`~/Library/Logs/`), so it never shows in `git status`. The
   Mac's Console app can also show it.
 - No environment variables are needed: on the Mac, the settings' laptop defaults are used, the
@@ -384,7 +412,10 @@ pass there. Nothing to change.
 
 - `AGENTS.md`: add `todos/reminders.py`, the command and `deploy/macos/` to the table; add
   `reminded_on` to the `models.py` row ("not copied by `make_next_copy`"); a rule line "Never build
-  AppleScript from user text; pass it as `argv`".
+  AppleScript from user text; pass it as `argv`, and always put `--` before those arguments".
+- `AGENTS.md`, rule "Only my data, plus what is shared with me": add an **exception** in plain
+  words: "`todos/reminders.py` filters to-dos by `todo_list__owner` on purpose: `reminded_on` is
+  one date per to-do, so only the owner is reminded. It is not a view. Views never do this."
 - `README.md`: a new section "Reminders on your Mac" with the steps of "What you must set up on
   your Mac" below, and the new files in "How it is put together". Update the test numbers.
 
@@ -392,9 +423,10 @@ pass there. Nothing to change.
 
 No CUJ test: there is no browser in this feature.
 
-**Every test that can reach `osascript` replaces `todos.reminders.subprocess.run`** with a
-`unittest.mock.patch`, started in `setUp` (`self.addCleanup(patcher.stop)`). A test that wants a
-failure sets `side_effect` on the fake.
+**Every test class in both files uses `FakeOsascriptMixin`** (in `todos/tests/helpers.py`). Its
+`setUp` starts `patch("todos.reminders.subprocess.run")`, stops it with `self.addCleanup`, and
+keeps the fake as `self.run`. A test that wants a failure sets `self.run.side_effect`. "Not a
+Mac" is `self.run.side_effect = FileNotFoundError(...)`; there is nothing else to patch.
 
 **Unit** — `todos/tests/unit/test_reminders.py`, `SimpleTestCase` (no database), with
 `Todo(title=...)` made in memory and never saved:
@@ -406,12 +438,15 @@ failure sets `side_effect` on the fake.
 | `test_title_never_contains_a_todo_title` | A to-do titled `Secret plan`: the notification title does not contain `Secret plan`. |
 | `test_text_lists_titles_in_order` | Titles `A`, `B`: the text is exactly `- A\n- B`. |
 | `test_title_with_line_breaks_stays_on_one_line` | A title `Buy\nmilk\r\n\tnow`: the text is exactly `- Buy milk now`. |
+| `test_japanese_wide_space_becomes_one_space` | A title `牛乳　を買う` (with the wide space U+3000): the text is exactly `- 牛乳 を買う`, with one normal space. |
 | `test_control_characters_are_removed` | A title `Ring\x07bell`: the text is exactly `- Ringbell`. |
 | `test_long_title_is_cut` | A title of 80 `x`: the line is `- ` plus 59 `x` plus `…` (60 characters after `- `). A title of exactly 60 characters is not cut. |
 | `test_more_than_three_says_how_many_more` | Five to-dos `A` to `E`: the text is exactly `- A\n- B\n- C\nand 2 more`, and the title says `5 to-dos`. |
 | `test_text_does_not_escape` | A title `Tom & "Jerry" <3` stays exactly the same in the text. |
-| `test_runs_osascript_with_fixed_script_and_argv` | `show_notification("T", "X")`: the fake `run` got exactly `["/usr/bin/osascript", "-e", "on run argv", "-e", "display notification (item 2 of argv) with title (item 1 of argv)", "-e", "end run", "T", "X"]`. |
+| `test_runs_osascript_with_fixed_script_and_argv` | `show_notification("T", "X")`: the fake `run` got exactly `["/usr/bin/osascript", "-e", "on run argv", "-e", "display notification (item 2 of argv) with title (item 1 of argv)", "-e", "end run", "--", "T", "X"]`. |
 | `test_title_cannot_inject_applescript` | A to-do titled `" & do shell script "x`, through `notification_text` and `show_notification`: the last argv item is exactly `- " & do shell script "x` (one item, unchanged); the three `-e` script items are exactly the fixed lines; no other argv item contains `do shell script`. |
+| `test_dash_arguments_are_not_options` | `show_notification("-e x", '-e do shell script "y"')`: the argv is the fixed `-e` lines, then `"--"`, then exactly `"-e x"` and `'-e do shell script "y"'`, unchanged, as the last two items. |
+| `test_error_reason_has_no_stderr` | The fake raises `CalledProcessError(1, ..., stderr=b"Buy milk")`: the `NotificationError` text contains `CalledProcessError` and `1`, and does not contain `Buy milk`. |
 | `test_no_shell_with_check_and_timeout` | The fake `run` got `check=True` and `timeout=30`, and `shell` was not given or is `False`. |
 | `test_timeout_raises_notification_error` | The fake raises `subprocess.TimeoutExpired`: `show_notification` raises `NotificationError`. |
 | `test_failed_osascript_raises_notification_error` | The fake raises `subprocess.CalledProcessError(1, ...)`: `NotificationError`. |
@@ -464,12 +499,14 @@ The test dates are fixed, so the tests give the same answer on any computer, at 
 `.exclude(reminded_on=today)` and see `test_second_run_same_day_shows_nothing` fail; build the
 script with the title glued in and see `test_title_cannot_inject_applescript` fail; mark the
 to-dos before `show_notification` and see `test_failed_osascript_marks_nothing` fail; use
-`visible_to(user)` and see `test_list_shared_with_user_not_shown` fail.
+`visible_to(user)` and see `test_list_shared_with_user_not_shown` fail; remove the `"--"` and see
+`test_dash_arguments_are_not_options` fail.
 
 ### 9. Before the commit
 
 - Run `make check`.
-- On the Mac: make a to-do due today in one of your own lists. Run
+- On the Mac: allow notifications first (step 3 of "What you must set up on your Mac"). Make a
+  to-do due today in one of your own lists. Run
   `uv run python manage.py send_reminders --user <your username>` and see the notification. Run it
   again and see `No to-dos due today for <your username>.`
 
@@ -478,59 +515,83 @@ to-dos before `show_notification` and see `test_failed_osascript_marks_nothing` 
 The app cannot do these things by itself, and the AI must not do them for you: they change your
 Mac's settings. You do them once, in the Terminal.
 
-1. **Try the command by hand first.** In the project folder:
+1. **Move the project out of `Documents` (recommended).** macOS protects the `Documents` folder
+   from programs that start in the background. Then launchd cannot even go into the project
+   folder: the job fails **before** it starts, and the log file stays **empty**. So we recommend
+   moving the project, for example to `~/code/anyone-can-build-todo`. Two more reasons:
+   - The other way, giving Python **Full Disk Access** in System Settings, is not a good idea: it
+     gives **every** Python script on the Mac access to all your files, and it stops working when
+     Python is upgraded.
+   - If **iCloud "Desktop & Documents"** is turned on, iCloud copies the files in `Documents`,
+     and it can touch `db.sqlite3` while the app writes to it.
+
+   After a move, run `make setup` again in the new folder (it makes `.venv` there).
+2. **Get the database ready.** In the project folder, after you pull this feature:
+
+   ```bash
+   uv run python manage.py migrate
+   ```
+
+   The job runs whatever code is in the project folder. Without `migrate`, it fails, because the
+   database has no `reminded_on` column.
+3. **Allow notifications first.** Show one test notification:
+
+   ```bash
+   osascript -e 'display notification "Test" with title "To-do list"'
+   ```
+
+   Now **Script Editor** is in **System Settings → Notifications** (notifications from
+   `osascript` show under that name). Open it and turn on **Allow notifications**. Run the line
+   again and check that you see "Test". Also check that a Focus mode (like Do Not Disturb) is not
+   on. **Do this before step 4:** `osascript` reports "it worked" even when the notification is
+   not allowed, and then the app marks the to-dos as reminded although you saw nothing.
+4. **Try the command by hand.** Make a to-do due today in one of your own lists, then:
 
    ```bash
    uv run python manage.py send_reminders --user <your username>
    ```
 
-   Make a to-do due today first, or you only see `No to-dos due today`.
-2. **Allow the notification.** The first time, macOS may not show it, or may ask. Open
-   **System Settings → Notifications**, find **Script Editor** (notifications from `osascript`
-   show under that name), and turn on **Allow notifications**. Also check that a Focus mode
-   (like Do Not Disturb) is not hiding it.
-3. **Fill in the template.** Find the values:
+   **To try again** the same day: the shown to-dos are now marked, so a second run says
+   `No to-dos due today`. Make a **new** to-do due today, and run it again.
+5. **Fill in the template.** The template has three blanks: `__REPO_PATH__`, `__HOME__` and
+   `__USERNAME__`. In the project folder, this one command copies the template and fills them in
+   (`pwd` is the project folder; replace `alice` with your username on the site):
 
    ```bash
-   which uv      # for __UV_PATH__, for example /Users/you/.local/bin/uv
-   pwd           # in the project folder, for __REPO_PATH__
-   echo $HOME    # for __HOME__
-   ```
-
-   Copy the template and replace the four blanks (`__UV_PATH__`, `__REPO_PATH__`, `__HOME__`,
-   `__USERNAME__`) in a text editor:
-
-   ```bash
-   cp deploy/macos/com.anyone-can-build-todo.reminders.plist ~/Library/LaunchAgents/
-   open -e ~/Library/LaunchAgents/com.anyone-can-build-todo.reminders.plist
+   mkdir -p ~/Library/LaunchAgents
+   sed -e "s|__REPO_PATH__|$(pwd)|g" -e "s|__HOME__|$HOME|g" -e "s|__USERNAME__|alice|g" \
+     deploy/macos/com.anyone-can-build-todo.reminders.plist \
+     > ~/Library/LaunchAgents/com.anyone-can-build-todo.reminders.plist
    plutil -lint ~/Library/LaunchAgents/com.anyone-can-build-todo.reminders.plist
    ```
 
-   `plutil -lint` checks that the file is a correct plist. It must say `OK`.
-4. **Turn it on** (this tells launchd about the file):
+   `sed` replaces text in a file. `plutil -lint` checks that the file is a correct plist. It must
+   say `OK`.
+6. **Turn it on.** `bootout` first turns off an older copy, if there is one (otherwise
+   `bootstrap` fails with `Bootstrap failed: 5`). An error from `bootout` the first time is
+   normal.
 
    ```bash
+   launchctl bootout gui/$(id -u)/com.anyone-can-build-todo.reminders
    launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.anyone-can-build-todo.reminders.plist
    ```
 
-5. **Test it now**, without waiting for 08:00, and read the log:
+   On macOS 13 or newer, a message **"Background Items Added"** may come. Open **System Settings
+   → General → Login Items**, and check that the item is allowed under **Allow in the
+   Background**. If it is off, the job never runs.
+7. **Test it now**, without waiting for 08:00 (make a new to-do due today first):
 
    ```bash
    launchctl kickstart -k gui/$(id -u)/com.anyone-can-build-todo.reminders
    cat ~/Library/Logs/anyone-can-build-todo-reminders.log
+   launchctl print gui/$(id -u)/com.anyone-can-build-todo.reminders | grep "last exit code"
    ```
 
-   `launchctl print gui/$(id -u)/com.anyone-can-build-todo.reminders` shows its state.
-6. **If the log says `Operation not permitted`:** macOS protects the `Documents` folder from
-   programs started in the background. Either move the project out of `Documents` (for example to
-   `~/code/`), or allow it in **System Settings → Privacy & Security**. See "New open questions".
-7. **To change or stop it:** turn it off, edit the file, and turn it on again:
-
-   ```bash
-   launchctl bootout gui/$(id -u)/com.anyone-can-build-todo.reminders
-   ```
-
-   To stop it for good, run `bootout` and delete the file from `~/Library/LaunchAgents/`.
+   `last exit code = 0` means it worked. Another number with an **empty** log usually means
+   launchd could not go into the project folder (see step 1).
+8. **To change or stop it:** run the `bootout` line from step 6, change the file (or fill it in
+   again with step 5), and run `bootstrap` again. To stop it for good, run `bootout` and delete
+   the file from `~/Library/LaunchAgents/`.
 
 ## Decided by the person
 
@@ -557,8 +618,37 @@ decided later" (it is decided: the person's Mac).
 1. **Shared lists:** should the notification also show to-dos due today in lists shared **with**
    the person? This plan says no (own lists only), because `reminded_on` is one date per to-do.
    Yes needs a small new table ("shown to this person on this day") instead of `reminded_on`.
-2. **The `Documents` folder:** the project is in `~/Documents/GitHub/`. macOS may block launchd
-   from reading it. Do you want to move the project (for example to `~/code/`), or allow access in
-   System Settings? We find out at step 5 of the Mac setup.
+2. **Moving the project:** the plan recommends moving it out of `~/Documents/GitHub/` (for
+   example to `~/code/`), because macOS blocks background jobs there. Is that all right for you?
 3. **Is 08:00 the right time?** It is only the `Hour` and `Minute` in the plist; the code does not
    change.
+
+## Review
+
+What changed in the review of 2026-10-10, and why:
+
+- Added `--` before the title and the text: `osascript` reads an argument that starts with `-` as
+  its own option, so a title like `-e ...` could run AppleScript. Removed the wrong sentence "an
+  argument never starts with `-`" (the text starts with `- `). New test
+  `test_dash_arguments_are_not_options`; `AGENTS.md` gets the rule "always `--`".
+- Wrote down that `osascript` reports success even when notifications are off or hidden, and made
+  "allow notifications first" a setup step before the first real run. Said how to try again
+  after a run marked the to-dos.
+- The plist starts `.venv/bin/python` directly instead of `uv run`: in a background job, `uv run`
+  could change `.venv`, rewrite `uv.lock` or need the internet. Removed the wrong `--no-dev`
+  sentence. Added "run `migrate` after pulling", because the job runs the checked-out code.
+- `Documents`: the job can fail before it starts, with an empty log, so the setup now checks
+  `last exit code` with `launchctl print`. Moving the project is the default; Full Disk Access
+  for Python is advised against; iCloud sync of `db.sqlite3` is mentioned.
+- Title clean-up order: spaces first, then the `isprintable` filter, so a Japanese wide space
+  (U+3000) becomes one space instead of gluing words. New test.
+- `AGENTS.md` gets an exception to "only my data": `todos/reminders.py` filters by
+  `todo_list__owner` on purpose; views never do.
+- `NotificationError` holds only the error's name and exit code, never `osascript`'s `stderr`,
+  which could put to-do titles in the log. New test.
+- Tests share one `FakeOsascriptMixin` in `todos/tests/helpers.py`; "not a Mac" is a
+  `FileNotFoundError` from the fake, with no other check to patch.
+- Setup: "Allow in the Background" (macOS 13+), `bootout` before `bootstrap`,
+  `mkdir -p ~/Library/LaunchAgents`, and one `sed` command instead of a text editor.
+- Noted that a banner shows only 2 or 3 lines; "and N more" may only be seen in Notification
+  Center.
