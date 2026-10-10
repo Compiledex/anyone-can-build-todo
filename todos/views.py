@@ -1,4 +1,5 @@
 from django.contrib import messages
+from django.contrib.auth.decorators import login_not_required
 from django.db import transaction
 from django.http import HttpResponse, HttpResponseBadRequest, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
@@ -147,10 +148,18 @@ def render_list_page(request, the_list, form):
     )
 
 
+@login_not_required  # A visitor must see the landing page. It shows no user data.
 @require_GET
 def todo_list(request):
-    """Only sends the browser on: to the oldest own list, else to the oldest
-    list shared with the person, else to "New list"."""
+    """`/`. A visitor who is not logged in sees the landing page.
+
+    A logged-in person is only sent on: to the oldest own list, else to the
+    oldest list shared with them, else to "New list".
+    """
+    if not request.user.is_authenticated:
+        # Nothing from the database goes into this page, so it cannot show
+        # anyone's lists or to-dos.
+        return render(request, "todos/landing.html")
     the_list = (
         request.user.todo_lists.first()
         or TodoList.objects.visible_to(request.user).first()

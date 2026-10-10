@@ -10,7 +10,7 @@ LOGOUT_URL = "/accounts/logout/"
 
 
 def is_logged_in(client):
-    # `/` only sends the browser on: to a list when logged in, else to the login page.
+    # `/` sends a logged-in person to a list, and shows a visitor the landing page.
     response = client.get(reverse("todo_list"), follow=True)
     return "Logged in as" in response.content.decode()
 
@@ -143,10 +143,10 @@ class LogoutTests(TestCase):
     def test_logout_logs_out(self):
         response = self.client.post(LOGOUT_URL, {"next": "https://evil.example/"})
         self.assertRedirects(response, LOGIN_URL, fetch_redirect_response=False)
+        # Logged out, `/` is the landing page, not a list.
         response = self.client.get(reverse("todo_list"))
-        self.assertRedirects(
-            response, LOGIN_URL + "?next=/", fetch_redirect_response=False
-        )
+        self.assertTemplateUsed(response, "todos/landing.html")
+        self.assertNotContains(response, "Logged in as")
 
     def test_logout_when_already_logged_out_goes_to_login(self):
         response = Client().post(LOGOUT_URL)

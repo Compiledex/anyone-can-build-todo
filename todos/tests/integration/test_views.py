@@ -323,10 +323,12 @@ def open_view_names(patterns):
 class LoginRequiredTests(TestCase):
     """Nobody is logged in here."""
 
-    def test_anonymous_list_goes_to_login(self):
-        response = self.client.get("/")
+    def test_anonymous_page_goes_to_login(self):
+        # `/` is the landing page now (test_landing.py); every other page needs a login.
+        url = reverse("list_create")
+        response = self.client.get(url)
         self.assertRedirects(
-            response, "/accounts/login/?next=/", fetch_redirect_response=False
+            response, f"/accounts/login/?next={url}", fetch_redirect_response=False
         )
 
     def test_anonymous_cannot_add_toggle_or_delete(self):
@@ -349,11 +351,12 @@ class LoginRequiredTests(TestCase):
                 self.assertFalse(todo.done)
                 self.assertEqual(Todo.objects.count(), 1)
 
-    def test_only_login_and_signup_are_open(self):
+    def test_only_landing_login_and_signup_are_open(self):
         # A new page that needs no login must be added here on purpose.
+        # "todo_list" is `/`: the landing page for a visitor (no user data).
         self.assertEqual(
             open_view_names(get_resolver().url_patterns),
-            {"login", "logout", "signup"},
+            {"login", "logout", "signup", "todo_list"},
         )
 
     def test_admin_is_not_open(self):

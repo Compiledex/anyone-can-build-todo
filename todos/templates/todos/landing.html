@@ -1,0 +1,194 @@
+{% load static %}<!doctype html>
+{% comment %}
+  The landing page: what a visitor who is not logged in sees at `/`.
+  It shows no user data: nothing from the database goes into it.
+  Its CSS is in todos/static/todos/landing.css, so the app pages do not change.
+  The pictures are real screenshots of the app with invented sample data, in
+  todos/static/todos/landing/ (a light and a dark version of each).
+{% endcomment %}
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="A simple to-do list. Make lists, break to-dos into steps, set due dates, and share a list with the people you plan with.">
+  <title>To-do list: simple lists you can share</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="{% static 'todos/landing.css' %}">
+</head>
+<body>
+  <header class="site-nav">
+    <div class="container nav-inner">
+      <a class="wordmark" href="{% url 'todo_list' %}">To-do list</a>
+      <nav class="nav-links" aria-label="Account">
+        <a class="nav-link" href="{% url 'login' %}">Log in</a>
+        <a class="button button-primary button-small" href="{% url 'signup' %}">Create an account</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="container hero-grid">
+        <div class="hero-text">
+          <h1 id="hero-title">Simple to-do lists you can share</h1>
+          <p>Make lists, break to-dos into steps, set due dates, and share a list with the people you plan with.</p>
+          <div class="actions">
+            <a class="button button-primary" href="{% url 'signup' %}">Create an account</a>
+            <a class="button button-secondary" href="{% url 'login' %}">Log in</a>
+          </div>
+        </div>
+        <picture class="shot hero-shot">
+          <source srcset="{% static 'todos/landing/list-dark.webp' %}" media="(prefers-color-scheme: dark)" width="1088" height="1266">
+          <img src="{% static 'todos/landing/list-light.webp' %}" width="1088" height="1266" fetchpriority="high"
+               alt="The Home list: the menu of lists, the form to add a to-do, search and sort, and two to-dos with a priority, a due date and a tag. One is overdue, the other shows Steps: 2 of 5 done.">
+        </picture>
+      </div>
+    </section>
+
+    <section class="section sharing" aria-labelledby="sharing-title">
+      <div class="container">
+        <div class="section-head">
+          <h2 id="sharing-title">Several lists, shared when you want</h2>
+          <p>Keep home, work and the weekend trip apart. Share a list by username, and its members can add, edit and finish its to-dos.</p>
+        </div>
+        <div class="pair">
+          <figure>
+            <picture class="shot">
+              <source srcset="{% static 'todos/landing/share-owner-dark.webp' %}" media="(prefers-color-scheme: dark)" width="1088" height="466">
+              <img src="{% static 'todos/landing/share-owner-light.webp' %}" width="1088" height="466" loading="lazy" decoding="async"
+                   alt="The Sharing part of a list: two members, theo and ines, each with a Remove button, and a field to share the list with one more username.">
+            </picture>
+            <figcaption class="muted">You own the list: you see who is in it, and you can remove anyone.</figcaption>
+          </figure>
+          <figure>
+            <picture class="shot">
+              <source srcset="{% static 'todos/landing/share-member-dark.webp' %}" media="(prefers-color-scheme: dark)" width="1088" height="334">
+              <img src="{% static 'todos/landing/share-member-light.webp' %}" width="1088" height="334" loading="lazy" decoding="async"
+                   alt="The same list seen by theo, a member: it is under Shared with me, and the page says Shared by mara.">
+            </picture>
+            <figcaption class="muted">A member finds it under Shared with me, and can leave it at any time.</figcaption>
+          </figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="section steps" aria-labelledby="steps-title">
+      <div class="container split">
+        <picture class="shot">
+          <source srcset="{% static 'todos/landing/steps-dark.webp' %}" media="(prefers-color-scheme: dark)" width="1088" height="612">
+          <img src="{% static 'todos/landing/steps-light.webp' %}" width="1088" height="612" loading="lazy" decoding="async"
+               alt="The to-do Paint the hallway with its steps open: 2 of 5 done, the done steps crossed out, and a field to add one more step.">
+        </picture>
+        <div class="split-text">
+          <h2 id="steps-title">Break a big to-do into steps</h2>
+          <p>Open a to-do to add steps and tick them off one by one. The row shows how far you are, like 2 of 5 done.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="section dates" aria-labelledby="dates-title">
+      <div class="container">
+        <h2 id="dates-title">Due dates, repeats, priority and tags</h2>
+        <div class="grid-four">
+          <div>
+            <h3>Due dates</h3>
+            <p>Give a to-do a date. Once the day has passed, it says Overdue in red.</p>
+          </div>
+          <div>
+            <h3>Repeats</h3>
+            <p>Daily, weekly or monthly. Mark it done, and the next one is ready with its new date.</p>
+          </div>
+          <div>
+            <h3>Priority</h3>
+            <p>Mark a to-do Low, Medium or High, so the important ones stand out.</p>
+          </div>
+          <div>
+            <h3>Tags and notes</h3>
+            <p>Tag a to-do with words like work or home, and keep a few notes with it.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section find" aria-labelledby="find-title">
+      <div class="container">
+        <h2 id="find-title">Find a to-do, or put them in your order</h2>
+        <div class="bento">
+          <div class="cell cell-large">
+            <div class="cell-text">
+              <h3>Search, filter and sort</h3>
+              <p>Search titles, notes and tags. Show all, not done or done. Sort by date, priority, title or your own order.</p>
+            </div>
+            <picture class="cell-shot">
+              <source srcset="{% static 'todos/landing/find-dark.webp' %}" media="(prefers-color-scheme: dark)" width="1088" height="896">
+              <img src="{% static 'todos/landing/find-light.webp' %}" width="1088" height="896" loading="lazy" decoding="async"
+                   alt="A list showing only the to-dos that are not done, sorted by due date, with the overdue one first.">
+            </picture>
+          </div>
+          <div class="cell">
+            <div class="cell-text">
+              <h3>Your own order</h3>
+              <p>Drag a to-do by its handle, or use the arrow buttons to move it up or down.</p>
+            </div>
+            <picture class="cell-shot">
+              <source srcset="{% static 'todos/landing/order-dark.webp' %}" media="(prefers-color-scheme: dark)" width="1088" height="734">
+              <img src="{% static 'todos/landing/order-light.webp' %}" width="1088" height="734" loading="lazy" decoding="async"
+                   alt="A list in the Manual order: each to-do has a drag handle and arrow buttons to move it up or down.">
+            </picture>
+          </div>
+          <div class="cell cell-tinted">
+            <div class="cell-text">
+              <h3>The same order for everyone</h3>
+              <p>The order belongs to the list, so the people you share it with see it too.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="band" aria-labelledby="privacy-title">
+      <div class="container">
+        <h2 id="privacy-title">Only you and the people you share a list with can see it.</h2>
+        <p>Every page needs a login. Someone you have not shared a list with cannot open it, or even tell that it exists.</p>
+      </div>
+    </section>
+
+    <section class="section themes" aria-labelledby="themes-title">
+      <div class="container themes-grid">
+        <div class="section-head">
+          <h2 id="themes-title">Light or dark, like your system</h2>
+          <p>The app follows the light or dark setting of your computer or phone. Both are easy to read.</p>
+        </div>
+        <figure class="compare">
+          <div class="compare-frame">
+            <img src="{% static 'todos/landing/compare-light.webp' %}" width="1088" height="838" loading="lazy" decoding="async"
+                 alt="The Garden list in light mode.">
+            <img class="compare-dark" src="{% static 'todos/landing/compare-dark.webp' %}" width="1088" height="838" loading="lazy" decoding="async"
+                 alt="The same Garden list in dark mode.">
+          </div>
+          <figcaption class="muted">The same list: light mode on the left, dark mode on the right.</figcaption>
+        </figure>
+      </div>
+    </section>
+
+    <section class="section closing" aria-labelledby="closing-title">
+      <div class="container closing-inner">
+        <h2 id="closing-title">Start with one list</h2>
+        <p>When you sign up, your first list, Inbox, is ready for your first to-do.</p>
+        <div class="actions">
+          <a class="button button-primary" href="{% url 'signup' %}">Create an account</a>
+          <a class="button button-secondary" href="{% url 'login' %}">Log in</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <span class="wordmark">To-do list</span>
+      <span class="muted">A small to-do app, made with Django.</span>
+    </div>
+  </footer>
+</body>
+</html>
