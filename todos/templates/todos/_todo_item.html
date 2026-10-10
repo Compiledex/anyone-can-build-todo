@@ -1,5 +1,7 @@
 {% with overdue=todo.is_overdue %}
-<li id="todo-{{ todo.pk }}" class="{% if todo.done %}done{% elif overdue %}overdue{% endif %}">
+<li id="todo-{{ todo.pk }}" class="{% if todo.done %}done{% elif overdue %}overdue{% endif %}"{% if can_reorder %} data-id="{{ todo.pk }}"{% endif %}>
+  {# Only the handle is draggable, so the text and the "add step" box still work. #}
+  {% if can_reorder %}<span class="handle" draggable="true" aria-hidden="true">⠿</span>{% endif %}
   <div class="main">
     <span class="title">{{ todo.title }}</span>
     {% if todo.description %}
@@ -20,6 +22,15 @@
     {% elif todo.repeat == "weekly" %}<span class="repeat">Repeats every {{ todo.due_date|date:'l' }}</span>
     {% elif todo.repeat == "monthly" %}<span class="repeat">Repeats monthly</span>{% endif %}
   {% endif %}
+  {# Move up / Move down: the keyboard (and no JavaScript, and phone) way to reorder. #}
+  {# forloop is the loop in todo_list.html: the first row cannot go up, the last not down. #}
+  {% if can_reorder %}{% if not forloop.first or not forloop.last %}
+    <form class="move" method="post" action="{% url 'todo_move' todo.pk %}">
+      {% csrf_token %}
+      {% if not forloop.first %}<button type="submit" name="direction" value="up" aria-label="Move up: {{ todo.title }}" title="Move up: {{ todo.title }}">↑</button>{% endif %}
+      {% if not forloop.last %}<button type="submit" name="direction" value="down" aria-label="Move down: {{ todo.title }}" title="Move down: {{ todo.title }}">↓</button>{% endif %}
+    </form>
+  {% endif %}{% endif %}
   <a href="{% url 'todo_edit' todo.pk %}" aria-label="Edit {{ todo.title }}">Edit</a>
   <form method="post" action="{% url 'todo_toggle' todo.pk %}">
     {% csrf_token %}

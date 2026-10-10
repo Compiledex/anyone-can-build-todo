@@ -24,6 +24,8 @@ SORT_OPTIONS = {
     "priority": ("Priority", (F("priority").desc(), "created_at", "pk")),
     # Lower ignores case, but only for A-Z on SQLite.
     "title": ("Title", (Lower("title"), "created_at", "pk")),
+    # The order the people of the list chose by drag and drop or Move (#15).
+    "manual": ("Manual", ("position", "created_at", "pk")),
 }
 
 
@@ -59,6 +61,19 @@ def chosen_sort(form):
     It is always a key of SORT_OPTIONS: the ChoiceField accepts nothing else.
     """
     return form.cleaned_data.get("sort") or DEFAULT_SORT
+
+
+def can_reorder(form):
+    """True when the page may show drag handles and Move buttons.
+
+    Only in the manual order, with no search and no filter: then every to-do
+    of the list is shown, so a new order never has to guess where hidden rows
+    go. A form that is not valid never allows it.
+    """
+    if not form.is_valid():
+        return False
+    data = form.cleaned_data
+    return chosen_sort(form) == "manual" and not data["q"] and not data["status"]
 
 
 def apply_list_query(todos, form):

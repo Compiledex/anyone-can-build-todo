@@ -80,9 +80,9 @@ You should see `OK`, and then one line for each layer of tests:
 
 ```
 Test layers
-  CUJ           9 passed
-  Integration  318 passed
-  Unit         59 passed
+  CUJ          11 passed
+  Integration  338 passed
+  Unit         63 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
@@ -124,12 +124,13 @@ runs the same checks and the tests on every push.
 | `accounts/` | Sign up, log in and log out, with Django's own accounts |
 | `accounts/templates/registration/` | The login and sign-up pages |
 | `accounts/tests/helpers.py` | Helpers the tests share: test users, and a test that starts logged in |
-| `todos/models.py` | The `TodoList` and `Todo` tables in the database; each list has an owner and can be shared with members, each to-do is in a list and has an optional due date, optional notes, a priority (Low, Medium or High), tags, and a repeat rule (Never, Daily, Weekly or Monthly); the `Tag` table holds each person's tags; the `Subtask` table holds the steps inside a to-do |
+| `todos/models.py` | The `TodoList` and `Todo` tables in the database; each list has an owner and can be shared with members, each to-do is in a list and has an optional due date, optional notes, a priority (Low, Medium or High), tags, a repeat rule (Never, Daily, Weekly or Monthly), and a place in the list's manual order; the `Tag` table holds each person's tags; the `Subtask` table holds the steps inside a to-do |
 | `todos/tags.py` | Cleans the tags a person types, like "work, #Home", and checks their limits |
 | `todos/recurrence.py` | Works out the next due date of a repeating to-do |
 | `todos/urls.py` | The addresses of the list and to-do pages |
 | `todos/forms.py` | The forms that check a to-do (with its tags), a step's title, a list's name, the username to share a list with, and the search text |
-| `todos/queries.py` | Picks the to-dos a list page shows: the search in the title, the notes and the tags |
+| `todos/queries.py` | Picks the to-dos a list page shows and their order, from the address: the search (in the title, the notes and the tags), the filter (All, Not done, Done), and the sort (Created, Due date, Priority, Title, or Manual, the order chosen by drag and drop); it also says when drag and the Move buttons may be shown (only in the Manual order, with no search and no filter) |
+| `todos/ordering.py` | Reads and saves the manual order of a list (drag and drop and the Move buttons) |
 | `todos/views.py` | What happens when each address is visited |
 | `todos/templates/base.html` | The frame every page shares: the colors, the style, who is logged in, the messages |
 | `todos/templates/todos/todo_list.html` | The page you see: one list |
@@ -137,6 +138,7 @@ runs the same checks and the tests on every push.
 | `todos/templates/todos/list_confirm_delete.html` | The page that asks before a list is deleted |
 | `todos/templates/todos/_todo_item.html` | One row of the list |
 | `todos/templates/todos/todo_edit.html` | The page to edit one to-do |
+| `todos/static/todos/reorder.js` | Drag and drop to reorder the to-dos, in plain JavaScript |
 | `todos/tests/` | The tests, one folder per layer |
 | `config/test_runner.py` | Sorts the tests into layers and counts them |
 | `AGENTS.md` | Instructions for the AI assistant (Codex reads it; `CLAUDE.md` points Claude to it) |
