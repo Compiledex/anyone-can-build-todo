@@ -66,7 +66,8 @@ the search, the filter), then we put them in order.
   smallest change (no new field, no migration), and it works the same way as search and filter.
   What this means after each action:
   - **Done, Undo, Delete:** the order is kept. #13 puts the whole current address in a hidden
-    `next` field (`request.get_full_path`), so `sort=` is already in it. Nothing to add.
+    `next` field (`back_url`: the list address with the same query), so `sort=` is already
+    in it. Nothing to add.
   - **Add, Edit (#4), and the others that #13 did not change:** they go back to the plain list
     page, so the order goes back to the default. #13 decided the same for the filter. This is a
     known limit, not a bug.
@@ -242,7 +243,7 @@ add a `sort` argument. A missing or invalid `sort` is not in `cleaned_data` (and
 `""`), so it is left out of the address.
 
 **But "Show all" is not built by the helper.** #12 and #13 write it as `{{ request.path }}`, which
-drops `sort`. Change it to `{{ request.path }}{{ show_all_query }}` (the view line in step 5), so
+drops `sort`. Change it to `{{ list_url }}{{ show_all_query }}` (the view line in step 5), so
 "Show all" clears the search and the filter but keeps the order. The test
 `test_filter_links_and_show_all_keep_sort` checks both.
 
@@ -346,3 +347,12 @@ The plan is **approved**.
 - `test_link_helper_keeps_sort` only repeated #13's `test_list_query_keeps_unknown_future_fields`
   (the same rule, tested twice, and it could not fail after #13). Replaced it with the integration
   test `test_filter_links_and_show_all_keep_sort`, which fails if the page drops `sort`.
+
+## Post-merge note from #13
+
+- #13 does not use `request.path` or `request.get_full_path` on the list page. After a bad add,
+  the address is `/lists/<pk>/add/` (POST only), so those would lead to an error page. Instead,
+  the view gives the template `list_url` (the list address) and `back_url` (the list address
+  with the same query, so it already carries `sort`).
+- So "Show all" is `{{ list_url }}{{ show_all_query }}`, the filter links are
+  `{{ list_url }}{{ link.query }}`, and the hidden `next` in each row is `{{ back_url }}`.
