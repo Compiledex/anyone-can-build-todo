@@ -1,33 +1,26 @@
-{% load static %}<!doctype html>
+{% extends "todos/site_base.html" %}
+{% load static %}
 {% comment %}
   The landing page: what a visitor who is not logged in sees at `/`.
   It shows no user data: nothing from the database goes into it.
-  Its CSS is in todos/static/todos/landing.css, so the app pages do not change.
+  The <head>, header and footer come from todos/site_base.html, shared with the login
+  and sign-up pages. Its own CSS is in todos/static/todos/landing.css.
   The pictures are real screenshots of the app with invented sample data, in
   todos/static/todos/landing/ (a light and a dark version of each).
 {% endcomment %}
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light dark">
-  <meta name="description" content="A simple to-do list. Make lists, break to-dos into steps, set due dates, and share a list with the people you plan with.">
-  <title>To-do list: simple lists you can share</title>
-  <link rel="icon" href="data:,">
-  <link rel="stylesheet" href="{% static 'todos/landing.css' %}">
-</head>
-<body>
-  <header class="site-nav">
-    <div class="container nav-inner">
-      <a class="wordmark" href="{% url 'todo_list' %}">To-do list</a>
-      <nav class="nav-links" aria-label="Account">
+
+{% block meta %}<meta name="description" content="A simple to-do list. Make lists, break to-dos into steps, set due dates, and share a list with the people you plan with.">{% endblock %}
+
+{% block title %}To-do list: simple lists you can share{% endblock %}
+
+{% block page_css %}<link rel="stylesheet" href="{% static 'todos/landing.css' %}">{% endblock %}
+
+{% block nav %}
         <a class="nav-link" href="{% url 'login' %}">Log in</a>
         <a class="button button-primary button-small" href="{% url 'signup' %}">Create an account</a>
-      </nav>
-    </div>
-  </header>
+{% endblock %}
 
-  <main>
+{% block content %}
     <section class="hero" aria-labelledby="hero-title">
       <div class="container hero-grid">
         <div class="hero-text">
@@ -182,13 +175,4 @@
         </div>
       </div>
     </section>
-  </main>
-
-  <footer class="site-footer">
-    <div class="container footer-inner">
-      <span class="wordmark">To-do list</span>
-      <span class="muted">A small to-do app, made with Django.</span>
-    </div>
-  </footer>
-</body>
-</html>
+{% endblock %}

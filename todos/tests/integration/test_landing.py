@@ -22,8 +22,12 @@ DARK_MEDIA = "(prefers-color-scheme: dark)"
 EM_DASH, EN_DASH = "\u2014", "\u2013"
 
 
-def landing_css():
-    with open(finders.find("todos/landing.css"), encoding="utf-8") as file:
+# The CSS the landing page loads: the shared site.css, then its own landing.css.
+LANDING_CSS_FILES = ["todos/site.css", "todos/landing.css"]
+
+
+def static_text(path):
+    with open(finders.find(path), encoding="utf-8") as file:
         return file.read()
 
 
@@ -163,9 +167,10 @@ class LandingPageTests(TestCase):
         self.assertNotIn("@import", page)
 
     def test_landing_css_loads_nothing_from_other_sites(self):
-        css = landing_css()
-        for text in ["@import", "url(http", "url(//"]:
-            self.assertFalse(text in css, f"landing.css has {text}")
+        for path in LANDING_CSS_FILES:
+            css = static_text(path)
+            for text in ["@import", "url(http", "url(//"]:
+                self.assertFalse(text in css, f"{path} has {text}")
 
     def test_every_picture_has_a_dark_version(self):
         pictures = parts_of(self.client.get("/")).pictures
@@ -183,7 +188,8 @@ class LandingPageTests(TestCase):
 
     def test_no_long_dashes(self):
         page = self.client.get("/").content.decode()
-        for name, text in [("the page", page), ("landing.css", landing_css())]:
+        texts = [("the page", page)] + [(p, static_text(p)) for p in LANDING_CSS_FILES]
+        for name, text in texts:
             for dash in [EM_DASH, EN_DASH]:
                 self.assertFalse(dash in text, f"{name} has {dash!r}")
 

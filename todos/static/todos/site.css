@@ -1,0 +1,347 @@
+/* The shared design of the pages a visitor sees: the landing page and the login and
+   sign-up pages. They all extend todos/templates/todos/site_base.html, which loads this
+   file first. The logged-in app pages (base.html) do not use it.
+
+   This is the ONE place for the colors, the font, the header, the footer, the buttons,
+   the links, the form fields and the focus ring. A page's own CSS (landing.css, auth.css)
+   only places things on its page; it never sets a color token.
+
+   One theme rule: the page follows the system's light or dark mode, like the app.
+   One accent color (a calm blue, from the app's tag color), one gray family, and one
+   radius: everything that is rounded uses --radius. Every text color has at least
+   4.5 : 1 contrast on its background in both modes (WCAG AA), and every edge a person
+   must see (an input's border, the focus ring) at least 3 : 1. */
+
+:root {
+  color-scheme: light dark;
+  --bg: #f6f7f9;
+  --band: #e6edf6;
+  --text: #15181d;
+  --muted: #545b66;
+  --border: #d3d8e0;
+  --field-bg: #fcfcfd;
+  --field-border: #737b87;
+  --accent: #1f4f8f;
+  --accent-hover: #173d70;
+  --on-accent: #f6f7f9;
+  --error: #b42318;
+  --radius: 8px;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #0e1013;
+    --band: #172231;
+    --text: #e8eaee;
+    --muted: #a3aab5;
+    --border: #2d333b;
+    --field-bg: #15181d;
+    --field-border: #6f7885;
+    --accent: #8fb6ec;
+    --accent-hover: #b0cbf2;
+    --on-accent: #0e1013;
+    --error: #ff8f85;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+h1,
+h2,
+h3 {
+  margin: 0;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+
+h1 {
+  font-size: clamp(2.25rem, 1.5rem + 2.4vw, 3.5rem);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+  line-height: 1.08;
+}
+
+h2 {
+  font-size: clamp(1.625rem, 1.3rem + 1vw, 2.25rem);
+  font-weight: 650;
+}
+
+h3 {
+  font-size: 1.125rem;
+  font-weight: 650;
+}
+
+p {
+  margin: 0;
+  max-width: 62ch;
+}
+
+figure {
+  margin: 0;
+}
+
+figcaption {
+  margin-top: 0.75rem;
+  font-size: 0.9375rem;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 0.2em;
+}
+
+/* Focus: the same ring for every link, button and field, in the accent color. */
+a:focus-visible,
+button:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: var(--radius);
+}
+
+/* Layout */
+
+.container {
+  max-width: 72rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+
+/* Navigation: one line, 64px high. */
+
+.site-nav {
+  border-bottom: 1px solid var(--border);
+}
+
+.nav-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  height: 64px;
+}
+
+.wordmark {
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+}
+
+.nav-link {
+  color: var(--text);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.nav-link:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* Buttons: a link or a <button> that looks like a button. Never wraps. */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: 0 1.25rem;
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color 150ms ease-out,
+    color 150ms ease-out,
+    transform 150ms ease-out;
+}
+
+/* A <button> does not inherit the font by itself. */
+button.button {
+  font-family: inherit;
+  font-size: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button-primary {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button-primary:hover {
+  background: var(--accent-hover);
+  border-color: var(--accent-hover);
+}
+
+.button-secondary {
+  background: transparent;
+  color: var(--accent);
+}
+
+.button-secondary:hover {
+  background: var(--band);
+}
+
+.button-small {
+  min-height: 40px;
+  padding: 0 1rem;
+  font-size: 0.9375rem;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+/* Screenshots: a thin frame, so a white screenshot stands apart from the page. */
+
+.shot img {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+/* Form fields: the label above, then the input, its error, and its help text. */
+
+.field {
+  display: grid;
+  gap: 0.375rem;
+}
+
+.field label {
+  font-weight: 600;
+}
+
+.field input {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 0.875rem;
+  border: 1px solid var(--field-border);
+  border-radius: var(--radius);
+  background: var(--field-bg);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem; /* 16px or more, so a phone does not zoom in. */
+  transition: border-color 150ms ease-out;
+}
+
+.field input:hover {
+  border-color: var(--text);
+}
+
+.field input:focus-visible {
+  outline-offset: 2px;
+  border-color: var(--accent);
+}
+
+.field input[aria-invalid="true"] {
+  border-color: var(--error);
+}
+
+.helptext {
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.45;
+}
+
+.helptext ul {
+  margin: 0;
+  padding-left: 1.125rem;
+}
+
+.errorlist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--error);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.site-footer {
+  padding: 2rem 0;
+  border-top: 1px solid var(--border);
+  font-size: 0.9375rem;
+}
+
+.footer-inner {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1.5rem;
+}
+
+/* Under 768px */
+
+@media (max-width: 767px) {
+  body {
+    font-size: 1rem;
+  }
+
+  .container {
+    padding: 0 1rem;
+  }
+
+  .nav-links {
+    gap: 1rem;
+  }
+
+  .button-small {
+    min-height: 40px;
+    padding: 0 0.75rem;
+  }
+}
+
+/* Motion is only short color and press feedback. Turned off when the person asks for less. */
+
+@media (prefers-reduced-motion: reduce) {
+  .button,
+  .field input {
+    transition: none;
+  }
+
+  .button:active {
+    transform: none;
+  }
+}
