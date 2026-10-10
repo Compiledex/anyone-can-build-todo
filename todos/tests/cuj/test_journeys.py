@@ -13,6 +13,9 @@ RGB = re.compile(r"rgb\((\d+), (\d+), (\d+)\)")
 
 # WCAG AA: normal text needs at least this contrast ratio with its background.
 AA_CONTRAST = 4.5
+# WCAG AA for things that are not text: the edge of a field, a focus ring, a line
+# that marks the current choice.
+UI_CONTRAST = 3.0
 
 
 def luminance(css_color):
@@ -169,11 +172,23 @@ class ColorSchemeTests(BrowserTestCase):
         page.get_by_role("button", name="Save").click()
         expect(page.locator("li .tag")).to_have_text("#home")
 
+        # An error under a field: a date the browser would never send.
+        page.evaluate(
+            """() => {
+                const due = document.querySelector("form.add input[name=due_date]");
+                due.type = "text";
+                due.value = "31-02-2026";
+            }"""
+        )
+        page.get_by_label("New to-do").fill("Bad date")
+        page.get_by_role("button", name="Add", exact=True).click()
+        expect(page.get_by_text("Enter a valid date.")).to_be_visible()
+
         for scheme in ["light", "dark"]:
             with self.subTest(scheme=scheme):
                 page.emulate_media(color_scheme=scheme)
                 colors = page.evaluate(
-                    """() => {
+                    r"""() => {
                         const color = (selector, property) =>
                             getComputedStyle(document.querySelector(selector))[property];
                         return {
@@ -186,9 +201,33 @@ class ColorSchemeTests(BrowserTestCase):
                             doneHigh: color("li.done .priority-3", "color"),
                             tag: color("li .tag", "color"),
                             tag_background: color("li .tag", "backgroundColor"),
+                            meta: color("li:not(.done) .meta", "color"),
+                            link: color("nav.lists a[aria-current]", "color"),
+                            button: color("form.add button[type=submit]", "color"),
+                            buttonBackground: color(
+                                "form.add button[type=submit]", "backgroundColor"
+                            ),
+                            error: color(".errorlist", "color"),
+                            fieldEdge: color(
+                                "form.add input[name=title]", "borderTopColor"
+                            ),
+                            filterGroup: color("nav.filter", "backgroundColor"),
+                            filterLine: color(
+                                "nav.filter a[aria-current]", "boxShadow"
+                            ).match(/rgb\([^)]*\)/)?.[0] ?? "none",
                         };
                     }"""
                 )
+                # The focus ring, on a field the keyboard is on.
+                field = page.locator("form.add input[name=title]")
+                field.focus()
+                ring = field.evaluate(
+                    """el => ({
+                        color: getComputedStyle(el).outlineColor,
+                        style: getComputedStyle(el).outlineStyle,
+                    })"""
+                )
+                field.blur()
                 background = luminance(colors["background"])
                 if scheme == "dark":
                     self.assertLess(background, 0.1, colors)
@@ -219,6 +258,26 @@ class ColorSchemeTests(BrowserTestCase):
                 )
                 if scheme == "dark":
                     self.assertLess(luminance(colors["tag_background"]), 0.1, colors)
+                for name in ["meta", "link", "error"]:
+                    self.assertGreaterEqual(
+                        contrast(colors[name], colors["background"]), AA_CONTRAST, name
+                    )
+                # An error is red, not the normal text color.
+                self.assertNotEqual(colors["error"], colors["text"], colors)
+                self.assertGreaterEqual(
+                    contrast(colors["button"], colors["buttonBackground"]), AA_CONTRAST
+                )
+                self.assertGreaterEqual(
+                    contrast(colors["fieldEdge"], colors["background"]), UI_CONTRAST
+                )
+                self.assertEqual(ring["style"], "solid")
+                self.assertGreaterEqual(
+                    contrast(ring["color"], colors["background"]), UI_CONTRAST
+                )
+                # The current filter: its line, not only its fill, stands out.
+                self.assertGreaterEqual(
+                    contrast(colors["filterLine"], colors["filterGroup"]), UI_CONTRAST
+                )
 
 
 class TwoPeopleTests(BrowserTestCase):

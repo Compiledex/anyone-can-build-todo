@@ -1,18 +1,25 @@
 /* The look of the logged-in app pages (base.html and the pages that extend it).
-   The colors are tokens; for now they are set in base.html. */
+   base.html loads tokens.css (the colors, sizes and font, shared with the landing,
+   login and sign-up pages), then this file. This file sets no token: it only uses
+   them with var(). It never loads site.css (the visitor pages' CSS). */
 
-body { font-family: system-ui, sans-serif; max-width: 32rem; margin: 2rem auto; padding: 0 1rem;
+body { font-family: var(--font); max-width: 32rem; margin: 2rem auto; padding: 0 1rem;
        background: var(--bg); color: var(--text); }
 a { color: var(--text); }
 nav.lists { margin: 1rem 0; }
 nav.lists .menu { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin: 0 0 0.5rem; }
 .menu-label, .muted { color: var(--muted); }
 nav.lists a[aria-current="page"], nav.filter a[aria-current="page"] { font-weight: bold; text-decoration: none; }
-nav.filter { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; margin-bottom: 1rem; }
+nav.filter { display: inline-flex; flex-wrap: wrap; gap: 2px; padding: 3px; margin-bottom: 1rem;
+             background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); }
+nav.filter a { padding: 0 0.75rem; border-radius: var(--radius-label); color: var(--muted); text-decoration: none; }
+/* The fill alone is too faint (1.2 : 1), so the current one also gets an accent line. */
+nav.filter a[aria-current="page"] { background: var(--band); color: var(--text);
+                                    box-shadow: inset 0 -2px 0 var(--accent); }
 .list-actions { display: flex; gap: 1rem; margin-top: -0.5rem; }
 .messages { margin-bottom: 1rem; }
 .message { margin: 0 0 0.5rem; padding: 0.5rem; border: 1px solid var(--border); }
-.errorlist { list-style: none; padding: 0; margin: 0 0 0.5rem; }
+.errorlist { list-style: none; padding: 0; margin: 0 0 0.5rem; color: var(--danger); font-weight: 600; }
 header.site { display: flex; justify-content: space-between; align-items: center; gap: 0.5rem;
               padding-bottom: 0.5rem; border-bottom: 1px solid var(--border); color: var(--muted); }
 form.account div, form.edit div { margin-bottom: 0.75rem; }
@@ -20,6 +27,12 @@ form.account label, form.edit label { display: block; margin-bottom: 0.25rem; }
 form.account input, form.edit input { box-sizing: border-box; width: 100%; padding: 0.5rem; font-size: 1rem; }
 form.account .helptext, form.account .helptext ul { color: var(--muted); font-size: 0.85rem; }
 form.add { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-bottom: 1.5rem; }
+/* Fields: a --control edge (3 : 1 on the page), red when invalid. */
+input:not([type=hidden]), select, textarea { border: 1px solid var(--control); border-radius: var(--radius);
+                           background: var(--surface); color: var(--text); }
+[aria-invalid="true"] { border-color: var(--danger); }
+/* Focus: only the outline, in the accent color. */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 form.add input { flex: 1; padding: 0.5rem; font-size: 1rem; }
 form.add input[type=date] { flex: 0 0 auto; }
 form.add select { padding: 0.5rem; font-size: 1rem; }
@@ -45,8 +58,8 @@ ul.members > li > .title { flex: 1; min-width: 0; }
 .notes p { margin: 0.25rem 0 0; overflow-wrap: anywhere; }
 li .tags { display: flex; flex-wrap: wrap; gap: 0.25rem; margin-top: 0.25rem; }
 .tag { font-size: 0.8rem; padding: 0.1rem 0.4rem; border-radius: 0.6rem;
-       background: var(--tag-bg); color: var(--tag-text); white-space: nowrap; }
-.overdue time, .overdue-label { color: var(--overdue); }
+       background: var(--band); color: var(--tag-text); white-space: nowrap; }
+.overdue time, .overdue-label { color: var(--danger); }
 li.done .title { text-decoration: line-through; color: var(--muted); }
 /* Steps. Only .step-title is crossed out, so a done to-do does not cross out its steps. */
 details.steps { flex-basis: 100%; font-size: 0.9rem; }

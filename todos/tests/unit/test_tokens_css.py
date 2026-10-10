@@ -40,8 +40,23 @@ COLORS = [
     "--accent-hover",
     "--on-accent",
     "--danger",
+    "--danger-hover",
+    "--on-danger",
+    "--danger-bg",
+    "--priority-high",
+    "--tag-text",
+    "--drag-bg",
 ]
-NOT_COLORS = ["--radius", "--font", "--control-height", "--control-height-small"]
+NOT_COLORS = [
+    "--radius",
+    "--radius-label",
+    "--font",
+    "--control-height",
+    "--control-height-small",
+    "--control-height-compact",
+    "--control-height-touch",
+    "--ease",
+]
 
 
 def tokens_in(css):
