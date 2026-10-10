@@ -127,6 +127,10 @@ class Todo(models.Model):
     # everyone who sees the list. Not unique: equal numbers are allowed, and
     # then created_at and pk decide. Gaps (1, 2, 4) do not matter.
     position = models.PositiveIntegerField(default=0)
+    # The day this to-do was last shown in a Mac notification (todos/reminders.py),
+    # so it is not shown twice on one day. Never copied by make_next_copy: a copy
+    # starts never reminded. editable=False keeps it out of forms and the admin.
+    reminded_on = models.DateField(null=True, blank=True, editable=False)
 
     class Meta:
         ordering = ["created_at"]
