@@ -337,6 +337,23 @@ runs the same checks and the tests on every push.
 
 ## Put it on the internet
 
+> [!WARNING]
+> **Your data can disappear on a host.** All accounts, lists and to-dos are in one file,
+> `db.sqlite3`, in the project folder. Many hosts (for example Render's web services) throw away
+> every file the app wrote each time you deploy or the server restarts. Then the database starts
+> empty again, and everything is gone, without an error.
+>
+> Before you put real data online, check how your host keeps files:
+>
+> - Choose a host or plan with a **persistent disk** (storage that survives a deploy and a
+>   restart), and make sure `db.sqlite3` is on that disk. Today the app always keeps the file in
+>   the project folder; a setting to put it somewhere else is not built yet.
+> - Or use a hosted database such as PostgreSQL. That needs a small code change in
+>   `config/settings.py`, which is not built yet either.
+> - Either way, **make backups**: copy `db.sqlite3` somewhere safe regularly.
+>
+> On your own laptop this does not happen: `db.sqlite3` stays until you delete it.
+
 A live server needs three environment variables. Never put their real values in the code.
 
 | Variable | Value |
