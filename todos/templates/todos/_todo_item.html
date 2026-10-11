@@ -92,7 +92,7 @@
       {# After "Add step" (?open=<id>, no #), the cursor is here for the next step. #}
       <div class="field">
         <label>New step
-          <input name="title" aria-label="New step for {{ todo.title }}" maxlength="200" required{% if request.GET.open == opened %} autofocus{% endif %}>
+          <input name="title" aria-label="New step for {{ todo.title }}" maxlength="{{ step_max_length }}" required{% if request.GET.open == opened %} autofocus{% endif %}>
         </label>
       </div>
       <button class="button button-secondary button-compact" type="submit">Add step</button>
