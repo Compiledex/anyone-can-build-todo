@@ -1,3 +1,13 @@
+"""One function per address. Read the Rules in AGENTS.md first.
+
+Changes are POST only; then the browser goes back to the list. Add, edit and
+clear completed go to the plain list address (no search, filter or order).
+Toggle and delete go back to the posted `next` (see redirect_back), which the
+row's buttons build from back_url and an anchor (see anchors_after_removal and
+todos/_todo_item.html): Done/Undo to its own row, or with a filter (the row
+leaves the page) to the next row; Delete always to the next row.
+"""
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_not_required
 from django.db import transaction
