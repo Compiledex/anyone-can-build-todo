@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}{% if the_list %}Rename list{% else %}New list{% endif %}{% endblock %}
+{% block title %}{% if form.errors %}Error: {% endif %}{% if the_list %}Rename list{% else %}New list{% endif %} – To-do list{% endblock %}
 
 {% block content %}
   {% if the_list %}
@@ -11,6 +11,10 @@
     <form class="page-form" method="post" action="{% url 'list_create' %}">
   {% endif %}
     {% csrf_token %}
+    {% if form.errors %}
+      {# Focus goes here when the page opens, so a screen reader reads it first. #}
+      <p class="form-error-summary" role="alert" tabindex="-1" autofocus>Not saved. Fix what is marked below.</p>
+    {% endif %}
     {{ form.non_field_errors }}
     {% for field in form %}{% include "todos/_field.html" %}{% endfor %}
     <div class="form-actions">

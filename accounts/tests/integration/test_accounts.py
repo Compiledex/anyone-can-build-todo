@@ -1,4 +1,8 @@
 from django.contrib.auth import get_user_model
+from django.contrib.auth.password_validation import (
+    MinimumLengthValidator,
+    get_default_password_validators,
+)
 from django.test import Client, TestCase
 from django.urls import reverse
 
@@ -16,6 +20,29 @@ def is_logged_in(client):
 
 
 class SignupTests(TestCase):
+    def test_signup_help_is_plain(self):
+        response = self.client.get(SIGNUP_URL)
+        for text in [
+            "Up to 150 characters: letters, numbers and @ . + - _ (no spaces).",
+            "Use at least 8 characters. Not only numbers, not a common password,"
+            " and not too close to your username.",
+            "Type the same password again.",
+        ]:
+            with self.subTest(text=text):
+                self.assertContains(response, text)
+        self.assertNotContains(response, "Required.")
+        self.assertNotContains(response, "for verification")
+
+    def test_password_help_names_the_real_minimum(self):
+        (validator,) = [
+            v
+            for v in get_default_password_validators()
+            if isinstance(v, MinimumLengthValidator)
+        ]
+        response = self.client.get(SIGNUP_URL)
+        help_text = response.context["form"].fields["password1"].help_text
+        self.assertIn(f"at least {validator.min_length} characters", help_text)
+
     def test_signup_creates_user_and_logs_in(self):
         response = self.client.post(
             SIGNUP_URL,

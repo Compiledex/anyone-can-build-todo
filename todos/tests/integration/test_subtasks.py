@@ -36,16 +36,20 @@ class SubtaskTests(LoggedInTestCase):
     def make_step(self, title="Pack books", done=False, todo=None):
         return Subtask.objects.create(todo=todo or self.todo, title=title, done=done)
 
-    def back_url(self, todo=None):
+    def back_url(self, todo=None, fragment=True):
+        """Back to the list with the steps open. "Add step" has no fragment, so
+        the browser can put the cursor in the "New step" field (autofocus)."""
         todo = todo or self.todo
         url = reverse("list_detail", args=[todo.todo_list_id])
-        return f"{url}?open={todo.pk}#todo-{todo.pk}"
+        return f"{url}?open={todo.pk}" + (f"#todo-{todo.pk}" if fragment else "")
 
     # Add, toggle, delete
 
     def test_add_a_step(self):
         response = self.client.post(self.add_url(), {"title": "Pack books"})
-        self.assertRedirects(response, self.back_url(), fetch_redirect_response=False)
+        self.assertRedirects(
+            response, self.back_url(fragment=False), fetch_redirect_response=False
+        )
         step = Subtask.objects.get()
         self.assertEqual(step.title, "Pack books")
         self.assertEqual(step.todo, self.todo)
@@ -214,7 +218,9 @@ class SubtaskTests(LoggedInTestCase):
         client = self.client_for(carol)
 
         response = client.post(self.add_url(), {"title": "Book a van"})
-        self.assertRedirects(response, self.back_url(), fetch_redirect_response=False)
+        self.assertRedirects(
+            response, self.back_url(fragment=False), fetch_redirect_response=False
+        )
         step = Subtask.objects.get(todo=self.todo)
         self.assertEqual(step.title, "Book a van")
 
@@ -298,7 +304,9 @@ class SubtaskTests(LoggedInTestCase):
         second = Todo.objects.create(title="Pay rent", todo_list=self.todo_list)
         response = self.client.post(self.add_url(second), {"title": "Find the bill"})
         self.assertRedirects(
-            response, self.back_url(second), fetch_redirect_response=False
+            response,
+            self.back_url(second, fragment=False),
+            fetch_redirect_response=False,
         )
         page = self.list_page({"open": second.pk})
         self.assertContains(page, OPEN_DETAILS, count=1)
@@ -313,3 +321,49 @@ class SubtaskTests(LoggedInTestCase):
                 self.assertContains(response, "Move house")
                 self.assertNotContains(response, OPEN_DETAILS)
                 self.assertNotContains(response, "<script>")
+
+    def test_steps_summary_names_the_todo(self):
+        self.todo.title = '<b>"x'
+        self.todo.save()
+        response = self.list_page()
+        self.assertContains(
+            response,
+            '<summary>Add steps<span class="visually-hidden"> to '
+            "&lt;b&gt;&quot;x</span></summary>",
+        )
+        self.make_step("Pack books", done=True)
+        self.make_step("Book a van")
+        response = self.list_page()
+        self.assertContains(
+            response,
+            '<summary>Steps: 1 of 2 done<span class="visually-hidden"> in '
+            "&lt;b&gt;&quot;x</span></summary>",
+        )
+        self.assertNotContains(response, '<b>"x')
+
+    def test_after_add_step_the_step_field_has_autofocus(self):
+        second = Todo.objects.create(title="Pay rent", todo_list=self.todo_list)
+        response = self.client.post(self.add_url(), {"title": "Pack books"})
+        self.assertNotIn("#", response["Location"])
+        page = self.client.get(response["Location"]).content.decode()
+
+        def input_tag(label):
+            start = page.index(f'aria-label="{label}"')
+            return page[page.rindex("<input", 0, start) : page.index(">", start)]
+
+        self.assertIn("autofocus", input_tag("New step for Move house"))
+        self.assertNotIn("autofocus", input_tag(f"New step for {second.title}"))
+        self.assertNotIn("autofocus", input_tag("New to-do"))
+        self.assertEqual(page.count("autofocus"), 1)
+
+    def test_step_done_keeps_the_fragment(self):
+        # Done, Undo and Delete of a step keep the place and do not move the cursor.
+        step = self.make_step()
+        response = self.client.post(
+            reverse("subtask_toggle", args=[step.pk]), {"done": "1"}
+        )
+        self.assertRedirects(response, self.back_url(), fetch_redirect_response=False)
+        self.assertTrue(response["Location"].endswith(f"#todo-{self.todo.pk}"))
+        response = self.client.post(reverse("subtask_delete", args=[step.pk]))
+        self.assertRedirects(response, self.back_url(), fetch_redirect_response=False)
+        self.assertTrue(response["Location"].endswith(f"#todo-{self.todo.pk}"))

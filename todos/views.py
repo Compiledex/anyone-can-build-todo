@@ -56,13 +56,20 @@ def get_visible_subtask(user, pk):
     )
 
 
-def back_to_steps(todo):
+def back_to_steps(todo, *, to_new_step=False):
     """Back to the to-do's list, with this to-do's steps open.
 
     Built only from numbers in the database, never from the request, so it can
     never send the browser to another website.
+
+    to_new_step (after "Add step"): no #todo-<pk>, because a browser skips
+    autofocus when the address names an element. Then the "New step" field of
+    this to-do gets the cursor, and the browser scrolls to it. Step Done and
+    Delete keep the # (the page opens at the row, the cursor does not move).
     """
     url = reverse("list_detail", args=[todo.todo_list_id])
+    if to_new_step:
+        return redirect(f"{url}?open={todo.pk}")
     return redirect(f"{url}?open={todo.pk}#todo-{todo.pk}")
 
 
@@ -333,6 +340,9 @@ def todo_delete(request, pk):
 @require_http_methods(["GET", "POST"])
 def todo_edit(request, pk):
     todo = get_visible_todo(request.user, pk)
+    # Read before the form: a ModelForm copies a valid typed title into `todo`,
+    # even when another field fails and nothing is saved.
+    saved_title = todo.title
     if request.method == "POST":
         form = TodoForm(request.POST, instance=todo)
         if form.is_valid():
@@ -340,7 +350,11 @@ def todo_edit(request, pk):
             return redirect(todo.todo_list)
     else:
         form = TodoForm(instance=todo)
-    return render(request, "todos/todo_edit.html", {"form": form, "todo": todo})
+    return render(
+        request,
+        "todos/todo_edit.html",
+        {"form": form, "todo": todo, "saved_title": saved_title},
+    )
 
 
 @require_POST
@@ -427,7 +441,7 @@ def subtask_add(request, todo_pk):
         subtask.save()
     else:
         messages.error(request, "A step needs a title of 1 to 200 characters.")
-    return back_to_steps(todo)
+    return back_to_steps(todo, to_new_step=True)
 
 
 @require_POST

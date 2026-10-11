@@ -61,6 +61,49 @@ class ListTests(LoggedInTestCase):
         self.assertIn("autofocus", tag)
         self.assertIn('placeholder="What', tag)
 
+    def test_add_input_has_no_autofocus_when_steps_are_open(self):
+        # After "Add step" the step field gets the cursor; two autofocus fields
+        # would give it to "New to-do", the first one.
+        todo = Todo.objects.create(title="Buy milk", todo_list=self.todo_list)
+        response = self.client.get(self.todo_list.get_absolute_url(), {"open": todo.pk})
+        page = response.content.decode()
+        start = page.index('<input name="title" aria-label="New to-do"')
+        tag = page[start : page.index(">", start)].split()
+        self.assertIn("required", tag)
+        self.assertNotIn("autofocus", tag)
+
+    def test_row_buttons_name_their_todo(self):
+        Todo.objects.create(title='<b>"x', todo_list=self.todo_list)
+        Todo.objects.create(title="<i>y", todo_list=self.todo_list, done=True)
+        page = self.list_page().content.decode()
+        for name, text in [
+            ("Done: &lt;b&gt;&quot;x", "Done"),
+            ("Delete: &lt;b&gt;&quot;x", "Delete"),
+            ("Undo: &lt;i&gt;y", "Undo"),
+            ("Delete: &lt;i&gt;y", "Delete"),
+        ]:
+            with self.subTest(name=name):
+                # The visible word stays first and is still the button's text.
+                self.assertRegex(
+                    page, rf'aria-label="{re.escape(name)}">{text}</button>'
+                )
+        self.assertNotIn('<b>"x', page)
+
+    def test_done_todo_says_done_to_screen_readers(self):
+        Todo.objects.create(title="Buy milk", todo_list=self.todo_list, done=True)
+        Todo.objects.create(title="Call home", todo_list=self.todo_list)
+        page = self.list_page().content.decode()
+        self.assertIn(
+            '<span class="visually-hidden">Done: </span><span class="title">'
+            "Buy milk</span>",
+            page,
+        )
+        self.assertIn('<span class="title">Call home</span>', page)
+        self.assertNotIn(
+            '<span class="visually-hidden">Done: </span><span class="title">Call home',
+            page,
+        )
+
     def test_stored_title_is_escaped(self):
         Todo.objects.create(title="<b>x</b>", todo_list=self.todo_list)
         response = self.list_page()
@@ -634,12 +677,46 @@ class EditTests(LoggedInTestCase):
         self.assertEqual(self.todo.title, "Buy mlik")
         self.assertTrue(Todo.objects.filter(pk=self.todo.pk).exists())
 
-    def test_heading_is_fixed_and_title_is_escaped(self):
+    def test_heading_names_the_todo_and_escapes_it(self):
         self.todo.title = '"><script>x</script>'
         self.todo.save()
         response = self.client.get(self.url)
         self.assertNotContains(response, "<script>x")
-        self.assertContains(response, "<h1>Edit to-do</h1>")
+        self.assertContains(
+            response, "<h1>Edit “&quot;&gt;&lt;script&gt;x&lt;/script&gt;”</h1>"
+        )
+
+    def test_bad_edit_says_error_in_title_and_alert(self):
+        alert = (
+            '<p class="form-error-summary" role="alert" tabindex="-1" autofocus>'
+            "Not saved. Fix what is marked below.</p>"
+        )
+        response = self.client.get(self.url)
+        self.assertContains(response, "<title>Edit “Buy mlik” – To-do list</title>")
+        self.assertNotContains(response, "Error:")
+        self.assertNotContains(response, "form-error-summary")
+
+        response = self.client.post(self.url, self.edit_data(self.todo, title="   "))
+        self.assertContains(
+            response, "<title>Error: Edit “Buy mlik” – To-do list</title>"
+        )
+        self.assertContains(response, alert, count=1)
+
+    def test_title_and_heading_use_the_saved_title(self):
+        # The title is valid, the tags are not (11 tags): nothing is saved, and
+        # the page must not name the to-do by the typed title.
+        tags = ", ".join(f"t{n}" for n in range(11))
+        response = self.client.post(
+            self.url, self.edit_data(self.todo, title="Buy milk", tag_names=tags)
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "<h1>Edit “Buy mlik”</h1>")
+        self.assertContains(
+            response, "<title>Error: Edit “Buy mlik” – To-do list</title>"
+        )
+        self.assertContains(response, 'value="Buy milk"')  # The field keeps it.
+        self.todo.refresh_from_db()
+        self.assertEqual(self.todo.title, "Buy mlik")
 
     def test_edit_ignores_next(self):
         response = self.client.post(

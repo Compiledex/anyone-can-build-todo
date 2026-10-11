@@ -30,7 +30,7 @@ h2 {
   text-wrap: balance;
 }
 
-/* The list's name, "Edit to-do", "New list". A long name wraps, even one long word. */
+/* The list's name, "Edit “<title>”", "New list". A long name wraps, even one long word. */
 h1 {
   font-size: 1.75rem;
   overflow-wrap: anywhere;
@@ -329,6 +329,16 @@ form.page-form {
 
 .lead {
   margin-top: var(--space-3);
+}
+
+/* "Not saved. Fix what is marked below." over a form that failed. It takes the
+   focus when the page opens (autofocus), so it gets the focus ring too. */
+.form-error-summary {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--danger-bg);
+  color: var(--danger);
+  font-weight: 600;
 }
 
 .form-actions {
@@ -681,6 +691,15 @@ ul.todos > li > .actions form {
   display: contents;
 }
 
+/* Move up and Move down are one width, and a missing one leaves an empty slot
+   (.move-slot) of that width, so Edit, Done and Delete stay in place. */
+ul.todos > li > .actions .move .button,
+ul.todos > li > .actions .move-slot {
+  flex: none;
+  width: var(--control-height-compact);
+  padding: 0;
+}
+
 /* Notes and steps open and close with no JavaScript (<details>). */
 ul.todos details summary {
   width: fit-content;
@@ -776,18 +795,21 @@ details.clear-completed {
   border-radius: var(--radius);
 }
 
-details.clear-completed summary {
+details.clear-completed summary,
+details.leave summary {
   width: fit-content;
   color: var(--muted);
   font-size: 0.9375rem;
   cursor: pointer;
 }
 
-details.clear-completed summary:hover {
+details.clear-completed summary:hover,
+details.leave summary:hover {
   color: var(--text);
 }
 
-details.clear-completed p {
+details.clear-completed p,
+details.leave p {
   margin: var(--space-3) 0;
 }
 
@@ -831,7 +853,8 @@ form.share .field {
   flex: 1;
 }
 
-form.leave {
+/* Leave this list: asks once more, like Clear completed. */
+details.leave {
   margin-top: var(--space-7);
   padding-top: var(--space-5);
   border-top: 1px solid var(--border);
@@ -927,9 +950,11 @@ form.leave {
   }
 }
 
-/* ---- Touch: under a finger, row and step buttons are 44px tall, 8px apart ----
-   The selectors are as specific as the rules they change (ul.todos > li > .actions),
-   or the 4px gap of the laptop layout would win. */
+/* ---- Touch: under a finger, every small control is 44px tall, 8px apart ----
+   Row and step buttons, the add-step form, the summaries (notes, steps, Clear
+   completed, Leave this list), the filter links, the list menu, and Rename and
+   Delete list. The selectors are as specific as the rules they change
+   (ul.todos > li > .actions), or the 4px gap of the laptop layout would win. */
 
 @media (pointer: coarse) {
   ul.todos > li > .actions,
@@ -942,6 +967,42 @@ form.leave {
   form.add-step .button,
   form.add-step input {
     min-height: var(--control-height-touch);
+  }
+
+  ul.todos > li > .actions .move .button,
+  ul.todos > li > .actions .move-slot {
+    width: var(--control-height-touch);
+  }
+
+  /* A line height, not display: flex, so the open/closed triangle stays. */
+  ul.todos details summary,
+  details.clear-completed summary,
+  details.leave summary {
+    min-height: var(--control-height-touch);
+    line-height: var(--control-height-touch);
+  }
+
+  nav.filter {
+    gap: var(--space-2);
+  }
+
+  nav.filter a {
+    min-height: var(--control-height-touch);
+  }
+
+  nav.lists .menu {
+    row-gap: var(--space-2);
+  }
+
+  nav.lists a,
+  .list-actions a {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-height-touch);
+  }
+
+  .list-actions {
+    gap: var(--space-2);
   }
 }
 

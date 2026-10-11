@@ -83,7 +83,7 @@ class AuthPagesTests(BrowserTestCase):
         error_box = error.bounding_box()
         self.assertGreaterEqual(error_box["y"], field_box["y"] + field_box["height"])
         expect(field).to_have_accessible_description(
-            re.compile(r"Enter the same password as before.*This password is too short")
+            re.compile(r"Type the same password again.*This password is too short")
         )
 
     def test_auth_pages_are_readable_in_light_and_dark(self):

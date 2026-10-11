@@ -56,7 +56,7 @@ or share the list, and remove a member. Members do not see each other.
   <img src="todos/static/todos/landing/share-member-light.webp" width="720" alt="The same list seen by theo, a member: it is under Shared with me, and the page says Shared by mara.">
 </picture>
 
-A member finds the list under **Shared with me**, and can leave it at any time.
+A member finds the list under **Shared with me**, and can leave it at any time. "Leave this list" asks once more first, because only the owner can share the list again.
 
 ### Find a to-do, and sort them
 

@@ -614,6 +614,28 @@ class ShareTests(SharingTestCase):
 
 
 class LeaveRemoveTests(SharingTestCase):
+    def test_leave_asks_first(self):
+        response = self.client_for(self.bob).get(self.groceries.get_absolute_url())
+        page = response.content.decode()
+        leave = re.search(r'<details class="leave">(.*?)</details>', page, re.S)
+        self.assertIsNotNone(leave, 'No <details class="leave"> on the page')
+        leave = leave.group(1)
+        self.assertIn("<summary>Leave this list</summary>", leave)
+        form = re.search(
+            rf'<form method="post" action="{self.url("list_leave", self.groceries.pk)}">'
+            r"(.*?)</form>",
+            leave,
+            re.S,
+        )
+        self.assertIsNotNone(form, "The leave form is not inside the <details>")
+        self.assertIn("Yes, leave the list</button>", form.group(1))
+        self.assertIn("Only alice can share it with you again.", form.group(1))
+        # The menu captions have no colon.
+        self.assertIn('<span class="menu-label">My lists</span>', page)
+        self.assertIn('<span class="menu-label">Shared with me</span>', page)
+        self.assertNotIn("My lists:", page)
+        self.assertNotIn("Shared with me:", page)
+
     def test_member_leaves(self):
         response = self.client_for(self.bob).post(
             self.url("list_leave", self.groceries.pk)

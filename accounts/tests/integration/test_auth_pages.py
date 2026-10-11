@@ -262,7 +262,7 @@ class FormFieldTests(TestCase):
                 self.assertIn(help_id, attrs["aria-describedby"].split())
                 self.assertTrue(parts.text_by_id[help_id])
                 self.assertNotIn("aria-invalid", attrs)
-        # Django's own password rules, as helper text.
+        # The password rules, in plain words, as helper text.
         self.assertIn(
             "at least 8 characters", parts.text_by_id["id_password1_helptext"]
         )
