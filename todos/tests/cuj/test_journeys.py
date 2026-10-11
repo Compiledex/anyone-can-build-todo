@@ -947,3 +947,31 @@ class QuietDeleteTests(BrowserTestCase):
         focused = delete.evaluate(color)
         self.assertEqual(focused, hex_to_rgb(danger))
         self.assertNotEqual(focused, resting)
+
+
+# Every element with a transition that takes time, with its selector-like name.
+MOVING = """() => [...document.querySelectorAll("*")]
+    .filter(el => getComputedStyle(el).transitionDuration
+        .split(",").some(part => parseFloat(part) > 0))
+    .map(el => el.tagName.toLowerCase() + (el.className ? "." + el.className : ""))"""
+
+
+class ReducedMotionTests(BrowserTestCase):
+    def test_nothing_moves_when_the_person_asks_for_less_motion(self):
+        """With "reduce motion" on, no app or visitor page has a transition."""
+        user = make_user_with_inbox()
+        the_list = user.todo_lists.get()
+        the_list.todos.create(title="Water the plants", done=True)
+        the_list.todos.create(title="Feed the cat")
+        self.page.emulate_media(reduced_motion="reduce")
+        page = self.page
+        for address in ["/", LOGIN_PAGE, SIGNUP_PAGE]:
+            with self.subTest(address=address):
+                page.goto(self.live_server_url + address)
+                self.assertEqual(page.evaluate(MOVING), [])
+        self.log_in_as(user)
+        list_url = the_list.get_absolute_url()
+        for address in [list_url, f"{list_url}?status=open", "/lists/new/"]:
+            with self.subTest(address=address):
+                page.goto(self.live_server_url + address)
+                self.assertEqual(page.evaluate(MOVING), [])

@@ -947,13 +947,13 @@ form.leave {
 
 /* ---- Less motion, when the person asks for it ---- */
 
+/* Every element, with !important: a rule like `.field input` or `nav.lists a`
+   is more specific than a list of names here, and would keep its transition. */
 @media (prefers-reduced-motion: reduce) {
-  .button,
-  .form-actions > a,
-  input,
-  select,
-  textarea {
-    transition: none;
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
   }
 
   .button:active {
