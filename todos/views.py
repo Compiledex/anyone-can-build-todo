@@ -353,9 +353,12 @@ def todo_toggle(request, pk):
 @require_POST
 def todo_delete(request, pk):
     """Delete at once, and keep a snapshot in the session for the Undo button."""
-    todo = get_visible_todo(request.user, pk)
-    the_list = todo.todo_list  # Read before the delete.
+    # Read inside the transaction: a second Delete at the same time waits for
+    # the first (IMMEDIATE), then gets 404 instead of a stale copy with no tags
+    # and no steps, which would replace the good snapshot.
     with transaction.atomic():
+        todo = get_visible_todo(request.user, pk)
+        the_list = todo.todo_list  # Read before the delete.
         snapshot = undo.take_snapshot(todo, request.user, timezone.now())
         todo.delete()
     request.session[undo.SESSION_KEY] = snapshot  # Only the last delete.
@@ -384,10 +387,10 @@ def todo_undo_delete(request, pk):
             request, f"{todo.todo_list.get_absolute_url()}#todo-{todo.pk}"
         )
     del request.session[undo.SESSION_KEY]
-    visible_lists = TodoList.objects.visible_to(request.user)
-    the_list = visible_lists.filter(pk=snapshot["todo_list_id"]).first()
-    list_url = the_list.get_absolute_url() if the_list else reverse("todo_list")
     with transaction.atomic():
+        visible_lists = TodoList.objects.visible_to(request.user)
+        the_list = visible_lists.filter(pk=snapshot["todo_list_id"]).first()
+        list_url = the_list.get_absolute_url() if the_list else reverse("todo_list")
         existing = Todo.objects.filter(pk=pk).first()
         if existing is not None:
             if (

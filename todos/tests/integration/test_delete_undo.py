@@ -7,10 +7,12 @@ from unittest.mock import patch
 
 from django.contrib.messages import constants
 from django.contrib.messages.storage.cookie import CookieStorage
+from django.db import connection
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.tests.helpers import TEST_PASSWORD, LoggedInTestCase
+from todos import views
 from todos.models import Subtask, Tag, Todo, TodoList
 from todos.tests.helpers import add_todo, count_queries, shown_titles
 from todos.undo import SESSION_KEY, SNAPSHOT_FIELDS
@@ -77,6 +79,30 @@ class DeleteTests(DeleteUndoTestCase):
         self.assertIn('name="csrfmiddlewaretoken"', body)
         next_value = html.unescape(re.search(r'name="next" value="([^"]*)"', body)[1])
         self.assertTrue(next_value.endswith(f"#todo-{todo.pk}"), next_value)
+
+    def test_double_delete_does_not_replace_the_snapshot(self):
+        # Two Delete posts close together: the second read the to-do before the
+        # first one committed. It must read again inside its transaction (and
+        # get 404), not snapshot the stale copy with no tags and no steps.
+        todo = add_todo(self.todo_list, "Buy milk")
+        todo.set_tags(["shop"])
+        Subtask.objects.create(todo=todo, title="Find a bag")
+        stale = Todo.objects.get(pk=todo.pk)
+        self.delete(todo)
+        real = views.get_visible_todo
+        depth = len(connection.atomic_blocks)  # The test's own transaction.
+
+        def read_before_commit(user, pk):
+            if len(connection.atomic_blocks) == depth:
+                return stale  # Read before the other delete committed.
+            return real(user, pk)
+
+        with patch("todos.views.get_visible_todo", side_effect=read_before_commit):
+            response = self.delete(todo)
+        self.assertEqual(response.status_code, 404)
+        snapshot = self.client.session[SESSION_KEY]
+        self.assertEqual(snapshot["tags"], ["shop"])
+        self.assertEqual(snapshot["steps"], [["Find a bag", False]])
 
     def test_delete_still_deletes_at_once(self):
         todo = add_todo(self.todo_list, "Buy milk")
@@ -275,6 +301,40 @@ class UndoTests(DeleteUndoTestCase):
         self.assertFalse(Todo.objects.filter(pk=todo.pk).exists())
         self.assertEqual(self.undo(todo.pk).status_code, 302)
         self.assertTrue(Todo.objects.filter(pk=todo.pk).exists())
+
+    def test_stranger_gets_404_for_an_existing_todo(self):
+        # bob has no snapshot; alice's to-do exists but bob cannot see it.
+        todo = add_todo(self.todo_list, "Buy milk")
+        before = values(todo)
+        self.assertOtherUserGets404(reverse("todo_undo_delete", args=[todo.pk]))
+        self.assertEqual(values(todo), before)
+        self.assertEqual(Todo.objects.count(), 1)
+
+    def test_snapshot_of_another_user_is_not_offered_or_used(self):
+        todo = add_todo(self.todo_list, "Buy milk")
+        self.delete(todo)
+        session = self.client.session
+        snapshot = session[SESSION_KEY]
+        snapshot["user"] = self.other_user.pk
+        session[SESSION_KEY] = snapshot
+        session.save()
+        response = self.client.get(self.list_url)
+        self.assertContains(response, "Deleted “Buy milk”.")
+        self.assertEqual(self.undo_forms(response), [])
+        self.assertEqual(self.undo(todo.pk).status_code, 404)
+        self.assertFalse(Todo.objects.filter(pk=todo.pk).exists())
+
+    def test_undo_button_names_the_deleted_todo(self):
+        todo = add_todo(self.todo_list, "<b>x</b>")
+        response = self.client.post(
+            reverse("todo_delete", args=[todo.pk]), {"next": self.list_url}, follow=True
+        )
+        self.assertContains(
+            response,
+            '<button class="button button-secondary button-compact" type="submit" '
+            'aria-label="Undo delete: &lt;b&gt;x&lt;/b&gt;">Undo</button>',
+            html=True,
+        )
 
     def test_get_is_405(self):
         todo = add_todo(self.todo_list, "Buy milk")

@@ -415,5 +415,13 @@ What turned out different from the plan above:
 - Two extra integration tests: `test_member_can_undo` (the "something happens" case of the
   member test, on its own) and `test_no_undo_button_for_a_message_without_its_snapshot_after_login`
   (a message cookie tagged `undo-delete-7` in a fresh session).
+- After the code review: `todo_delete` reads the to-do inside its transaction (a second Delete
+  at the same time gets 404 instead of replacing the snapshot with a stale copy);
+  `todo_undo_delete` finds the list inside its transaction too; the Undo button's `aria-label`
+  is "Undo delete: <title>" (the context processor also gives `undo_delete_title`), so it is not
+  confused with a row's "Undo: <title>".
+- Known limit: on a filtered page (for example "Not done"), Undo goes back to `next`, the same
+  filtered page with `#todo-<id>`. If the restored to-do does not match the filter (it was done),
+  the row is not shown there and the page opens at the top. Accepted.
 - The integration tests read only the messages added by one request (`added_messages`), because
   the "Deleted" message is still unread when Undo is posted.

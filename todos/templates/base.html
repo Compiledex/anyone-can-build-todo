@@ -43,7 +43,7 @@
               <form class="undo" method="post" action="{% url 'todo_undo_delete' undo_delete_id %}">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ request.get_full_path }}#todo-{{ undo_delete_id }}">
-                <button class="button button-secondary button-compact" type="submit">Undo</button>
+                <button class="button button-secondary button-compact" type="submit" aria-label="Undo delete: {{ undo_delete_title }}">Undo</button>
               </form>
             {% endif %}
           </div>

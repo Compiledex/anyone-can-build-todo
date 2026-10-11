@@ -1155,7 +1155,7 @@ class DeleteAndUndoTests(BrowserTestCase):
         expect(page.get_by_text("Deleted “Call the bank”.")).to_be_visible()
         expect(rows).to_have_count(2)
 
-        page.get_by_role("button", name="Undo", exact=True).click()
+        page.get_by_role("button", name="Undo delete: Call the bank").click()
         expect(page.get_by_text("Restored “Call the bank”.")).to_be_visible()
         expect(rows).to_have_count(3)
         expect(rows.nth(0)).to_contain_text("Buy milk")
@@ -1164,4 +1164,6 @@ class DeleteAndUndoTests(BrowserTestCase):
         restored = page.locator(f"#todo-{middle.pk}")
         expect(restored).to_be_in_viewport()
         expect(restored.get_by_text("Steps: 0 of 1 done")).to_be_visible()
-        expect(page.get_by_role("button", name="Undo", exact=True)).to_have_count(0)
+        expect(
+            page.get_by_role("button", name="Undo delete: Call the bank")
+        ).to_have_count(0)
