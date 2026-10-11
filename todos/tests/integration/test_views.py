@@ -455,6 +455,16 @@ class DeleteTests(LoggedInTestCase):
         self.client.post(reverse("todo_delete", args=[todo.pk]))
         self.assertEqual(Todo.objects.count(), 0)
 
+    def test_delete_ignores_done(self):
+        # The row's Delete shares its form with Done/Undo, so it also sends done.
+        for value in ["0", "1"]:
+            with self.subTest(done=value):
+                todo = Todo.objects.create(title="Call home", todo_list=self.todo_list)
+                self.client.post(
+                    reverse("todo_delete", args=[todo.pk]), {"done": value}
+                )
+                self.assertFalse(Todo.objects.filter(pk=todo.pk).exists())
+
     def test_get_does_not_delete(self):
         todo = Todo.objects.create(title="Call home", todo_list=self.todo_list)
         response = self.client.get(reverse("todo_delete", args=[todo.pk]))

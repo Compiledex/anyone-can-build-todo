@@ -6,7 +6,7 @@ to every row, raise ROW_BUDGET on purpose and say so in the pull request.
 """
 
 from accounts.tests.helpers import LoggedInTestCase
-from todos.models import Todo
+from todos.models import Subtask, Todo
 
 ROWS = 300
 
@@ -17,6 +17,12 @@ ROWS = 300
 MEASURED_BYTES_PER_ROW = 1429
 ROW_BUDGET = round(MEASURED_BYTES_PER_ROW * 1.05)
 
+# The same, for a to-do with one step (not done): 2,011 bytes per row, after the
+# step's Done/Undo and Delete share one form. Two forms again cost about 150 bytes
+# more per step (a second CSRF token), more than the 5 %.
+MEASURED_BYTES_PER_STEP_ROW = 2011
+STEP_ROW_BUDGET = round(MEASURED_BYTES_PER_STEP_ROW * 1.05)
+
 
 class ListPageSizeTests(LoggedInTestCase):
     def page_size(self):
@@ -24,11 +30,23 @@ class ListPageSizeTests(LoggedInTestCase):
         self.assertEqual(response.status_code, 200)
         return len(response.content)
 
-    def test_bytes_per_row_stay_light(self):
+    def bytes_per_row(self, with_step=False):
+        """(page with ROWS to-dos - page with none) / ROWS."""
         empty = self.page_size()
-        Todo.objects.bulk_create(
+        todos = Todo.objects.bulk_create(
             Todo(todo_list=self.todo_list, title=f"To-do {i:03d}", position=i)
             for i in range(ROWS)
         )
-        per_row = (self.page_size() - empty) / ROWS
-        self.assertLessEqual(per_row, ROW_BUDGET)
+        if with_step:
+            Subtask.objects.bulk_create(
+                Subtask(todo=todo, title=f"Step {i:03d}")
+                for i, todo in enumerate(todos)
+            )
+        return (self.page_size() - empty) / ROWS
+
+    def test_bytes_per_row_stay_light(self):
+        self.assertLessEqual(self.bytes_per_row(), ROW_BUDGET)
+
+    def test_bytes_per_row_with_a_step_stay_light(self):
+        per_row = self.bytes_per_row(with_step=True)
+        self.assertLessEqual(per_row, STEP_ROW_BUDGET)

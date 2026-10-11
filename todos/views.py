@@ -370,7 +370,10 @@ def todo_toggle(request, pk):
 
 @require_POST
 def todo_delete(request, pk):
-    """Delete at once, and keep a snapshot in the session for the Undo button."""
+    """Delete at once, and keep a snapshot in the session for the Undo button.
+
+    Ignores `done` (the row form shares it with Done/Undo).
+    """
     # Read inside the transaction: a second Delete at the same time waits for
     # the first (IMMEDIATE), then gets 404 instead of a stale copy with no tags
     # and no steps, which would replace the good snapshot.
