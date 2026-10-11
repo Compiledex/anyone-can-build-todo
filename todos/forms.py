@@ -144,7 +144,6 @@ class ShareForm(NoColon, forms.Form):
         widget=forms.TextInput(
             attrs={
                 "aria-label": "Username to share with",
-                "placeholder": "Username",
                 "autocomplete": "off",
             }
         ),

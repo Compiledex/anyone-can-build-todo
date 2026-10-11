@@ -97,3 +97,10 @@ class ListPageLabelTests(LoggedInTestCase):
         self.assertLess(
             add_form.index('name="title"'), add_form.index('id="id_title_error"')
         )
+
+    def test_share_field_has_a_label_not_a_placeholder(self):
+        # The visible "Username" label says what to type; a placeholder with the
+        # same word would only repeat it, and it disappears while typing.
+        response = self.client.get(self.url)
+        self.assertContains(response, 'name="username"')
+        self.assertNotContains(response, 'placeholder="Username"')
