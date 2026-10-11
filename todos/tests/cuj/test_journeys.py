@@ -661,6 +661,9 @@ class ReorderJourneyTests(BrowserTestCase):
         # request is already recorded.
         expect(page.locator("li.dragging")).to_have_count(0)
         self.assertEqual(page.evaluate("window.__fetchCalls"), [])
+        # The recorder works: a fetch the test makes itself is recorded.
+        page.evaluate("fetch('/')")
+        self.assertEqual(page.evaluate("window.__fetchCalls"), ["/"])
 
 
 def overlaps(a, b):

@@ -176,9 +176,9 @@ numbers grow with the app):
 
 ```
 Test layers
-  CUJ          24 passed
-  Integration  406 passed
-  Unit         107 passed
+  CUJ          28 passed
+  Integration  483 passed
+  Unit         123 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
@@ -338,7 +338,7 @@ runs the same checks and the tests on every push.
 |---|---|
 | `config/` | The settings for the whole project, the main addresses, and the test runner |
 | `accounts/` | Sign up, log in and log out, with Django's own accounts |
-| `todos/` | The to-do app itself: |
+| `todos/` | The to-do app itself |
 | `todos/models.py` | The tables in the database: lists, to-dos, tags and steps |
 | `todos/views.py` | What happens when each address is visited |
 | `todos/queries.py` | The search, the filter and the order of a list page |

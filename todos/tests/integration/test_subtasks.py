@@ -275,6 +275,13 @@ class SubtaskTests(LoggedInTestCase):
     def list_page(self, query=None):
         return self.client.get(reverse("list_detail", args=[self.todo_list.pk]), query)
 
+    def test_step_input_keeps_its_browser_checks(self):
+        page = self.list_page().content.decode()
+        start = page.index('<input name="title" aria-label="New step for Move house"')
+        tag = page[start : page.index(">", start)].split()
+        self.assertIn('maxlength="200"', tag)
+        self.assertIn("required", tag)
+
     def test_list_shows_step_count(self):
         for i in range(5):
             self.make_step(f"Step {i}", done=i < 2)

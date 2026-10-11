@@ -188,7 +188,7 @@ earlier plan added one). It only fixes the order of to-dos made in the same micr
 
 - Nothing changes in who may see or change what. The tests in `test_access.py` and every
   `assertOtherUserGets404` move unchanged.
-- `signup` gets stricter (only `GET` and `POST`).
+- `signup` gets stricter (only `GET`, `HEAD` and `POST`).
 - The hidden inputs still come from `cleaned_data` (only valid values), as today.
 - `order_by` is not touched (the `Meta.ordering` change is a fixed list in the model).
 
@@ -226,7 +226,7 @@ split from the real file (class names may have grown).
 | `todos/templates/todos/todo_list.html`, `_todo_item.html` | `maxlength` from the context; hidden inputs in a loop. |
 | `todos/static/todos/app.css` | Decision 4. |
 | `accounts/forms.py` | `NoColon`. |
-| `accounts/views.py` | `@require_http_methods(["GET", "POST"])` on `signup`. |
+| `accounts/views.py` | `@require_http_methods(["GET", "HEAD", "POST"])` on `signup`. |
 | `todos/models.py`, `todos/migrations/00NN_todo_ordering_tiebreak.py` | Decision 6. |
 | `todos/templates/todos/site_base.html` | The comment. |
 | `README.md`, `AGENTS.md` | Decision 7; the test file rows; `todos/tests/helpers.py` and `accounts/tests/helpers.py` rows list the new helpers; `models.py` row (`Meta.ordering`). |
@@ -259,7 +259,7 @@ Each step is its own commit, and `make check` passes after each one.
 |---|---|---|
 | Integration, `test_reorder.py` `test_move_up_on_first_changes_nothing` | "Move up" on the first row: redirect to `?sort=manual#todo-<pk>`, positions and shown order unchanged. | `todo_move` wrapping around (moving the first row to the end) or crashing at index `-1`. |
 | Integration, `accounts/tests/integration/test_accounts.py` `test_signup_methods` | `PUT` and `DELETE` to `/accounts/signup/` give 405; `GET` and `HEAD` give 200. | No method rule on `signup`, or a rule that drops `HEAD`. |
-| Integration, `todos/tests/integration/test_views.py` `ListTests.test_todos_with_the_same_time_come_back_by_pk` | Three to-dos in one list, then one `update(created_at=<one fixed time>)` on all of them: `[t.pk for t in the_list.todos.all()]` equals the sorted pks. | Removing `"pk"` from `Todo.Meta.ordering` (then SQLite may return equal times in any order). |
+| Integration, `todos/tests/integration/test_views.py` `ListTests.test_todos_with_the_same_time_come_back_by_pk` | Three to-dos in one list, then one `update(created_at=<one fixed time>)` on all of them: `[t.pk for t in the_list.todos.all()]` equals the sorted pks, and the SQL of `the_list.todos.all()` ends with `"todos_todo"."id" ASC` (SQLite often returns rowid order anyway, which would hide a missing `pk`). | Removing `"pk"` from `Todo.Meta.ordering`. |
 | CUJ, `test_escape_cancels_a_drag` (changed) | No reorder `fetch` after Escape, checked after `dragend`, with no timed wait. | `reorder.js` sending on a cancelled drag. |
 
 Everything else is a move or a rewrite of how a test is written; what each test checks does not
@@ -356,5 +356,17 @@ What differs from the plan above:
   Before the fix: `PUT` and `DELETE` gave `200 != 405`.
 - Migration `0018_todo_ordering_tiebreak` (depends on `0017_todo_reminded_on`; one
   `AlterModelOptions`).
+- After review (PASS WITH FIXES), more checks, each shown failing with its break first:
+  `SubtaskTests.test_step_input_keeps_its_browser_checks` (the "New step" input has
+  `maxlength="200"` and `required`; fails with `step_max_length` left out of the context, or
+  set to 199); the ordering test also checks the SQL ends with `"todos_todo"."id" ASC` (fails
+  with `ordering = ["created_at"]`, where the pk list alone passed); the CUJ test checks that
+  its fetch recorder records a `fetch('/')` (fails when the init script records nothing);
+  `count_queries` raises when `func()` made no queries, and the new
+  `todos/tests/integration/test_test_helpers.py` (2 tests) checks it counts 1 and 2 queries
+  (fails when it does not call `func`, or returns a constant; the per-test count comparisons
+  alone did not catch a constant); `SortTests.test_search_form_has_no_hidden_sort_for_the_default`
+  (fails when the search form always sends `sort`). Final counts: CUJ 28, Integration 483,
+  Unit 123 (634).
 - Running `ruff format` on the whole repo also rewrites code blocks in some `docs/plans/*.md`
   files; those changes were not kept. The commit hook only formats Python files.

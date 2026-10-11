@@ -54,6 +54,10 @@ class ListTests(LoggedInTestCase):
         # a fixed order (the admin and the_list.todos.all() use it).
         todos = [add_todo(self.todo_list, title) for title in ["C", "B", "A"]]
         self.todo_list.todos.update(created_at=timezone.now())
+        # SQLite often gives rowid order anyway, so check the SQL asks for it.
+        self.assertTrue(
+            str(self.todo_list.todos.all().query).endswith('"todos_todo"."id" ASC')
+        )
         self.assertEqual(
             [todo.pk for todo in self.todo_list.todos.all()],
             sorted(todo.pk for todo in todos),

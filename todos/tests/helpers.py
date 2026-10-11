@@ -29,9 +29,15 @@ def messages_of(response):
 
 
 def count_queries(func):
-    """Runs func() and returns how many database queries it made."""
+    """Runs func() and returns how many database queries it made.
+
+    Fails when there are none: then func() did not load the page, and two
+    counts of 0 would prove nothing.
+    """
     with CaptureQueriesContext(connection) as queries:
         func()
+    if not queries:
+        raise AssertionError("func() made no database queries.")
     return len(queries)
 
 

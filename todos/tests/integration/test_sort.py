@@ -136,6 +136,15 @@ class SortTests(LoggedInTestCase):
             '<input type="hidden" name="sort" value="title">', search_form
         )
 
+    def test_search_form_has_no_hidden_sort_for_the_default(self):
+        for query in ["", "?sort=created", "?sort=bogus"]:
+            with self.subTest(query=query):
+                html = self.client.get(f"{self.url}{query}").content.decode()
+                search_form = html[html.index('<form class="search"') :]
+                search_form = search_form[: search_form.index("</form>")]
+                self.assertIn('<input type="search" name="q"', search_form)
+                self.assertNotIn('name="sort"', search_form)
+
     def test_other_users_list_with_sort_is_404(self):
         self.add("Buy milk")
         self.assertOtherUserGets404(f"{self.url}?sort=due", method="get")
