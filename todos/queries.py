@@ -43,6 +43,8 @@ class CaseFold(Func):
 def search(todos, q):
     """The to-dos whose title, notes or a tag name contain `q`.
 
+    For tags, a leading "#" in `q` is left out: "#work" finds the tag "work".
+
     It ignores case for every letter (also æ, ø, å): both the column and `q`
     are case folded the same way. `Contains` escapes `%` and `_`, so they are
     normal letters here.
@@ -50,16 +52,21 @@ def search(todos, q):
     if not q:
         return todos
     folded = casefold(q)
-    # A sub-query, not a join: a to-do with two matching tags is shown once.
-    # It starts from `todos` too, so it never reads other people's rows.
-    with_matching_tag = todos.filter(Contains(CaseFold("tags__name"), folded)).values(
-        "pk"
+    matches = Q(Contains(CaseFold("title"), folded)) | Q(
+        Contains(CaseFold("description"), folded)
     )
-    return todos.filter(
-        Q(Contains(CaseFold("title"), folded))
-        | Q(Contains(CaseFold("description"), folded))
-        | Q(pk__in=with_matching_tag)
-    )
+    # The page shows a tag as "#work", but it is stored as "work" (parse_tags),
+    # so the tag part leaves out a leading "#". Titles and notes still get the
+    # whole text, so "#work" finds "Fix #work bug".
+    tag_text = folded.lstrip("#").strip()
+    if tag_text:  # An empty Contains would match every tag.
+        # A sub-query, not a join: a to-do with two matching tags is shown once.
+        # It starts from `todos` too, so it never reads other people's rows.
+        with_matching_tag = todos.filter(
+            Contains(CaseFold("tags__name"), tag_text)
+        ).values("pk")
+        matches |= Q(pk__in=with_matching_tag)
+    return todos.filter(matches)
 
 
 def filter_by_status(todos, status):
