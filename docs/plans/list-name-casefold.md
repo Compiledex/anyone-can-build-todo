@@ -1,6 +1,6 @@
 # Plan: list names are unique ignoring case for every letter, also æ, ø and å
 
-Status: approved by the person (2026-10-11, plan card answered), not started
+Status: **done** (2026-10-11)
 
 Builds on: **lists** (`TodoList`, `TodoListForm`, new list and rename), **accounts** (sign-up
 makes "Inbox"), **sharing** (lists shared with you), **nordic-letters** (`casefold()` in
@@ -298,3 +298,17 @@ WITH CHANGES. What changed:
 - Migration `0021`: a new name is checked against all of the owner's keys from the start plus
   every key given out so far; trailing spaces are removed after a cut. The optional second NFC
   after casefold was not taken, so the migration and `save()` always make the same key.
+
+## How it was built (2026-10-11)
+
+- Built on `main` (`80f1fa5`), before A merged, so the three migrations are
+  `0019_todolist_name_key`, `0020_fill_list_name_key` and `0021_list_name_key_unique` on the
+  branch. The merge queue renumbers them to `0020`-`0022` after A's `0019` (only the names, the
+  `dependencies` and the names in `FillListNameKeyMigrationTests` change; the data migration's
+  header names its partners without numbers).
+- One extra test: `NewListTests.test_save_with_update_fields_name_sets_the_key`, for the
+  `update_fields` rule in `save()`.
+- `test_long_duplicate_name_is_cut` uses "Æ"/"æ" names, not "A"/"a": the old A-to-Z rule, still
+  on the table at the field migration, refuses "AAA..." next to "aaa...".
+- The migration's printed lines are checked in `test_duplicates_are_renamed`; the tests catch
+  them, so a test run prints nothing.
