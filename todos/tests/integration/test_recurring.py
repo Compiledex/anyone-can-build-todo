@@ -643,6 +643,22 @@ class RecurringTests(LoggedInTestCase):
         self.assertFalse(Todo.objects.filter(pk=copy.pk).exists())
         self.assertEqual(messages_of(response), [self.removed_message()])
 
+    def test_undo_removes_a_copy_saved_with_windows_line_breaks(self):
+        # Made directly, so the notes keep "\r\n"; the copy has them too. The
+        # browser sends "\r\n" back, and NoteField saves "\n": not a change.
+        self.weekly.description = "a\r\nb"
+        self.weekly.save()
+        self.toggle(self.weekly, True)
+        copy = self.copies_of(self.weekly).get()
+        self.assertEqual(copy.description, "a\r\nb")
+        response = self.edit(copy)
+        self.assertRedirects(response, self.todo_list.get_absolute_url())
+        copy.refresh_from_db()
+        self.assertEqual(copy.description, "a\nb")
+        response = self.toggle(self.weekly, False)
+        self.assertFalse(Todo.objects.filter(pk=copy.pk).exists())
+        self.assertEqual(messages_of(response), [self.removed_message()])
+
     def test_undo_with_done_step_and_edit_says_the_step_message(self):
         self.add_two_steps()
         self.toggle(self.weekly, True)
@@ -703,6 +719,7 @@ class RecurringTests(LoggedInTestCase):
         self.assertEqual(
             messages_of(response), ["Made the next copy, due 22 Oct 2026."]
         )
+        self.assertEqual(len(copy.copy_fingerprint), 64)
         self.assertFalse(copy.changed_since_copy())
 
     def test_edit_turn_on_repeat_on_open_todo_makes_no_copy(self):
@@ -723,7 +740,7 @@ class RecurringTests(LoggedInTestCase):
         self.assertFalse(self.copies_of(todo).exists())
         self.assertEqual(messages_of(response), [])
 
-    def test_edit_rereads_the_todo_inside_the_transaction(self):
+    def test_edit_uses_the_current_done_state(self):
         todo = self.done_once(done=False)
         page = self.client.get(reverse("todo_edit", args=[todo.pk]))
         self.assertEqual(page.status_code, 200)
