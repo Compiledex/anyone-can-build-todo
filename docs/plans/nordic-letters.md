@@ -1,6 +1,6 @@
 # Plan: æ, ø and å sort and search correctly
 
-Status: **approved** (2026-10-11, by the orchestrator for the person), not started.
+Status: **done** (2026-10-11).
 
 Builds on: **search** (#12, `search()` in `todos/queries.py`), **sort** (`SORT_OPTIONS["title"]`),
 **tags** (`todos/tags.py`, tag names are stored in lower case), and the **test pyramid**

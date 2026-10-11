@@ -64,9 +64,9 @@ A member finds the list under **Shared with me**, and can leave it at any time.
   <img src="todos/static/todos/landing/find-light.webp" width="720" alt="A list showing only the to-dos that are not done, sorted by due date, with the overdue one first.">
 </picture>
 
-- **Search** the titles, notes and tags of a list.
+- **Search** the titles, notes and tags of a list (upper and lower case do not matter, also for æ, ø and å).
 - **Filter**: show All, Not done or Done.
-- **Sort by** date added, due date, priority, title, or your own order.
+- **Sort by** date added, due date, priority, title (a to z, then æ, ø, å), or your own order.
 
 ### Put them in your own order
 
@@ -308,6 +308,7 @@ runs the same checks and the tests on every push.
 | `todos/urls.py` | The addresses of the list and to-do pages |
 | `todos/forms.py` | The forms that check a to-do (with its tags), a step's title, a list's name, the username to share a list with, and the search text |
 | `todos/queries.py` | Picks the to-dos a list page shows and their order, from the address: the search (in the title, the notes and the tags), the filter (All, Not done, Done), and the sort (Created, Due date, Priority, Title, or Manual, the order chosen by drag and drop); it also says when drag and the Move buttons may be shown (only in the Manual order, with no search and no filter) |
+| `todos/sqlite_functions.py` | Teaches the database the Norwegian alphabet (a to z, then æ, ø, å) for sorting, and upper and lower case of every letter for search |
 | `todos/ordering.py` | Reads and saves the manual order of a list (drag and drop and the Move buttons) |
 | `todos/reminders.py` | Finds your to-dos due today and shows them in one Mac notification |
 | `todos/management/commands/send_reminders.py` | The command `send_reminders --user <username>`, which launchd runs every morning |
