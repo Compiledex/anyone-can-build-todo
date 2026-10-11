@@ -92,30 +92,43 @@ Reasons:
 - `unicodedata.normalize("NFC", text).casefold()`.
 - **NFC first.** On a Mac, "å" can arrive as two characters: "a" and a small ring (this is called
   NFD). NFC joins them into one "å". Then a typed "å" and a pasted "å" are the same.
-- `None` gives `None`, because SQL can pass `NULL`. (Today no searched column can be `NULL`, but a
-  crash here would break the whole page.)
+- `None` gives `None`, because SQL passes `NULL`. This guard is **required**: the tag sub-query
+  (`CaseFold("tags__name")`) is a `LEFT OUTER JOIN`, so for a to-do without tags SQLite calls
+  `casefold(NULL)`. Without the guard every search on a list with an untagged to-do would crash.
 - **Only case, not accents.** "e" does not find "é". The person asked for case. Ignoring accents
   is a separate choice (see "Not part of this task").
 
 ### 3. `norwegian_key(text)`: the Norwegian alphabet
 
-The key is a list of pairs `(group, number)`, one or more per character of `casefold(text)`.
-Python compares lists pair by pair, and a shorter list that is the start of a longer one comes
-first ("al" before "ale").
+This is a **simple rule**, not a full dictionary standard (not CLDR Norwegian): a to z, then æ, ø,
+å; ä counts as æ, ö as ø, and other accented letters count as their base letter.
+
+The key is a tuple of pairs `(group, number)`. Python compares tuples pair by pair, and a shorter
+tuple that is the start of a longer one comes first ("al" before "ale"). It is built like this:
+
+1. `casefold(text)` (NFC, then case folding).
+2. For each character: if it is in the table below (`æ`, `ä`, `ø`, `ö`, `å`), use its pair.
+3. Otherwise split it with `unicodedata.normalize("NFKD", ch)` and **drop every combining mark**
+   (`unicodedata.combining`). A character that is only a combining mark (like the dot that
+   `"İ".casefold()` leaves after the `i`) gives **no** pair. Each base letter that is left is
+   looked up again: in the æ/ø/å table first (so `ǿ` gives the pair of `ø`), then a to z, then
+   the other groups.
+
+The function has `@functools.lru_cache(maxsize=4096)`: SQLite calls the collation for every
+comparison, and the same titles come back many times in one sort. That is why the key is a tuple
+(a cached value must not be changeable).
 
 | Character (after `casefold`) | Pair | So it sorts |
 |---|---|---|
 | `a` to `z` | `(1, 0)` to `(1, 25)` | in the normal order |
-| `æ`, and `ä` | `(1, 26)` | after z (`ä` is the Swedish and German way to write æ, and Norwegian dictionaries sort it as æ) |
-| `ø`, and `ö` | `(1, 27)` | after æ (the same reason) |
+| `æ`, and `ä` | `(1, 26)` | after z (`ä` is the Swedish and German letter for the sound of æ; this plan's simple rule treats it as æ) |
+| `ø`, and `ö` (also `ǿ`, through step 3) | `(1, 27)` | after æ (the same reason) |
 | `å` | `(1, 28)` | last |
 | another letter with an accent, like `é`, `ü`, `ñ` | its base letter, `e`, `u`, `n` | with its base letter |
 | another letter, like Greek or Cyrillic | `(2, its Unicode number)` | after å |
 | anything else: a space, a digit, a sign | `(0, its Unicode number)` | before a (as today: SQLite's order also puts spaces, digits and most signs before letters) |
 
-"Its base letter" means: `unicodedata.normalize("NFKD", ch)`, then drop the combining marks
-(`unicodedata.combining`). A character that becomes two letters, like `ß` (casefold gives `ss`)
-or `ﬁ`, gives two pairs.
+A character that becomes two letters, like `ß` (casefold gives `ss`) or `ﬁ`, gives two pairs.
 
 ### 4. `compare_norwegian(a, b)`: equal keys give 0
 
@@ -137,13 +150,18 @@ def ready(self):
     from .sqlite_functions import add_functions
 
     connection_created.connect(add_functions, dispatch_uid="todos_sqlite_functions")
-    # A connection opened before ready() (rare) gets them too.
+    # A connection opened before ready() (rare) gets them too. add_functions
+    # skips a wrapper that is set up but not open yet (connection is None).
     for connection in connections.all(initialized_only=True):
         add_functions(sender=connection.__class__, connection=connection)
 ```
 
-`add_functions` does nothing unless `connection.vendor == "sqlite"`. For SQLite it calls, on the
-real `sqlite3` connection (`connection.connection`):
+`add_functions` returns at once when `connection.vendor != "sqlite"` **or**
+`connection.connection is None`. The second check matters: `connections.all(initialized_only=True)`
+also gives wrappers that exist but have not opened the database yet, and for those
+`connection.connection` is `None`; without the check every `manage.py` command would crash in
+`ready()`. Such a wrapper gets the functions later, from the signal, when it really opens. For an
+open SQLite connection it calls, on the real `sqlite3` connection (`connection.connection`):
 
 - `create_collation(COLLATION, compare_norwegian)`
 - `create_function(CASEFOLD, 1, casefold, deterministic=True)` (deterministic means: the same
@@ -261,6 +279,8 @@ The app redesign (`feature/app-redesign`, paused) changes templates and CSS only
   there. It is a model option; changing it touches every place that shows tags.
 - Changing `parse_tags` from `.lower()` to `.casefold()`. `.lower()` is already right for æ, ø, å.
   (`ß` stays `ß` in a tag; the search still finds it, because both sides are case folded.)
+- **The admin's sort by title** (Django's admin at `/admin/`): it still uses SQLite's plain order.
+  Only the list page uses the collation.
 - Another database (PostgreSQL). `add_functions` does nothing there, and `Collate("title",
   "norwegian")` would then need a real collation. The person runs only SQLite.
 
@@ -275,27 +295,29 @@ The app redesign (`feature/app-redesign`, paused) changes templates and CSS only
 | `todos/tests/integration/test_sort.py` | Two new tests (see "Tests"). |
 | `todos/tests/integration/test_search.py` | Four new tests (see "Tests"). |
 | `todos/tests/integration/test_sqlite_functions.py` (new) | One test that a new connection has the function and the collation. |
-| `AGENTS.md` | `todos/queries.py` row: `title` is "Norwegian order: a to z, then æ, ø, å, ignoring case (the `norwegian` collation)"; `search` ignores case "for every letter, also æ, ø, å (`CaseFold` on both sides)"; remove both "(A-Z only on SQLite)" notes. New row `todos/sqlite_functions.py`: what the three functions do, that `TodosConfig.ready()` adds them to every SQLite connection with the `connection_created` signal, and "a query that uses `COLLATE \"norwegian\"` or `casefold()` fails on a connection that missed them, so never open a raw `sqlite3` connection for app queries". `todos/models.py` row: unchanged. |
+| `AGENTS.md` | `todos/queries.py` row: `title` is "Norwegian order: a to z, then æ, ø, å, ignoring case (the `norwegian` collation)"; `search` ignores case "for every letter, also æ, ø, å (`CaseFold` on both sides)"; remove both "(A-Z only on SQLite)" notes. New row `todos/sqlite_functions.py`: what the three functions do, that `TodosConfig.ready()` adds them to every SQLite connection with the `connection_created` signal, and "a query that uses `COLLATE \"norwegian\"` or `casefold()` fails on a connection that missed them, so never open a raw `sqlite3` connection for app queries". Also: "the `norwegian` collation is only for `ORDER BY`; never use it for `=`, `UNIQUE`, `DISTINCT` or `GROUP BY` (it says "Ål" equals "ål", and a database constraint built on a Python collation breaks when the function is missing)". `todos/models.py` row: unchanged. |
 | `README.md` | "Find a to-do, and sort them": "Search the titles, notes and tags of a list (upper and lower case do not matter, also for æ, ø and å)." and "Sort by date added, due date, priority, title (a to z, then æ, ø, å), or your own order." "How it is put together": add the `todos/sqlite_functions.py` row, and in the `todos/queries.py` row nothing else changes. |
 
 ## Steps
 
-1. **Tests first.** Write `todos/tests/unit/test_sqlite_functions.py`, the new tests in
+1. Before anything else, and again after step 3: `uv run python manage.py check` (it must say "no
+   issues"; this is how a crash in `ready()` shows up).
+2. **Tests first.** Write `todos/tests/unit/test_sqlite_functions.py`, the new tests in
    `test_sort.py` and `test_search.py`, and `todos/tests/integration/test_sqlite_functions.py`.
    Run `make unit` and `make integration`: the unit tests fail (no module yet), and the new sort
    and search tests fail with today's order and today's search. Show the person the failures.
-2. Write `todos/sqlite_functions.py`.
-3. Change `todos/apps.py`.
-4. Change `todos/queries.py`.
-5. `make test`: all pass, also the old ones (`test_sort_by_title_ignores_case`,
+3. Write `todos/sqlite_functions.py`.
+4. Change `todos/apps.py`, then run `uv run python manage.py check` again.
+5. Change `todos/queries.py`.
+6. `make test`: all pass, also the old ones (`test_sort_by_title_ignores_case`,
    `test_percent_sign_is_not_a_wildcard`, `test_search_query_count_does_not_grow_with_rows`,
    `test_todo_with_two_matching_tags_is_shown_once`). Also run `make test PARALLEL=2` once
    (`make test` uses one process by default), so the worker processes are covered: each worker
    must get the collation and the function from the signal.
-6. `uv run python manage.py makemigrations --check --dry-run`: "No changes detected". No manual
+7. `uv run python manage.py makemigrations --check --dry-run`: "No changes detected". No manual
    check in the browser: the tests use the real view, and `db.sqlite3` is never opened.
-7. Update `AGENTS.md` and `README.md`.
-8. `make check`, then commit. In the last commit, set the Status line of this plan to
+8. Update `AGENTS.md` and `README.md`.
+9. `make check`, then commit. In the last commit, set the Status line of this plan to
    `**done** (<date>)`.
 
 ## Tests
@@ -313,7 +335,9 @@ The app redesign (`feature/app-redesign`, paused) changes templates and CSS only
 | `test_case_does_not_change_the_key` | `norwegian_key("ÅL") == norwegian_key("ål")`, and `compare_norwegian("ÅL", "ål") == 0`. | A key that keeps case. |
 | `test_compare_answers_minus_one_zero_one` | `compare_norwegian("z", "æ") == -1`, `("å", "ø") == 1`, `("a", "a") == 0`, `("al", "ale") == -1`. | Returning a bool, or the wrong sign. |
 | `test_signs_and_digits_before_letters_other_letters_after` | `sorted(["b", "2", " x", "ж", "å"], key=norwegian_key)` is `[" x", "2", "b", "å", "ж"]`. | A key that crashes or mixes groups. |
-| `test_odd_text_does_not_crash` | `""`, `"🙂"`, `"\x00"`, `"ﬁ"`, 200 × `"Å"` give a key and a casefold without an error. | A Python error inside a SQLite function, which breaks the page. |
+| `test_odd_text_does_not_crash` | `""`, `"🙂"`, `"\x00"`, `"ﬁ"`, `"İstanbul"`, `"ǿ"`, 200 × `"Å"` give a key and a casefold without an error. | A Python error inside a SQLite function, which breaks the page. |
+| `test_combining_marks_are_dropped` | `norwegian_key("İstanbul") == norwegian_key("istanbul")` (the dot left by case folding gives no pair), and `norwegian_key("ǿ") == norwegian_key("ø")` (the base letter is looked up in the æ/ø/å table). | Keeping a lone combining mark as a `(0, ...)` pair, or looking up only `a` to `z` after NFKD (`ǿ` splits into `ø` plus an accent, and `ø` is not in a to z, so it would become `(2, ...)`, after å). |
+| `test_add_functions_skips_a_connection_that_is_not_open` | `add_functions(sender=None, connection=<a stub with vendor "sqlite" and connection None>)` raises nothing. | Leaving out the `connection is None` check (every `manage.py` command would crash in `ready()`). |
 | `test_add_functions_skips_other_databases` | `add_functions(sender=None, connection=<a stub with vendor "postgresql">)` does nothing (the stub's `connection` attribute is never touched). | Calling `create_collation` on a database that has no such method. |
 
 ### Integration: `todos/tests/integration/test_sort.py` (`LoggedInTestCase`)
@@ -337,7 +361,7 @@ pass.
 | `test_search_ignores_case_of_nordic_letters_in_title` | "Ærend på posten" and "Kjøp melk"; `?q=ærend` shows only "Ærend på posten", and `?q=ÆREND` does too. | Today's `icontains` (SQLite `LIKE` ignores case for A to Z only). |
 | `test_search_ignores_case_of_nordic_letters_in_notes` | Notes "Kjøp ØL og brus" on "Fest", and "Vask bilen" with no notes; `?q=øl` shows only "Fest". | Folding only the title. |
 | `test_search_ignores_case_of_nordic_letters_in_tags` | "Handle" with the tag `åker` (typed "Åker", stored `åker`), and "Ring" with the tag `jobb`; `?q=ÅKER` shows only "Handle". | Folding only the column, not the typed text (the tag is already lower case). |
-| `test_nordic_search_keeps_other_users_out` | alice has "Ærend i byen" with the tag `ærend`; bob's list has "Ærend for bob". bob searches **his** list for `ÆREND`: he sees only `["Ærend for bob"]` (the "does happen" case), and not alice's to-do. Same shape as `test_other_users_todos_never_match`. | A tag sub-query that starts from `Todo.objects` instead of `todos` (alice's to-do would then match through her tag). |
+| `test_nordic_search_keeps_other_users_out` | alice has "Ærend i byen" with the tag `ærend`; bob's list has "Ærend for bob". bob searches **his** list for `ærend` (lower case, so today's `LIKE` does not find his "Ærend" and the test fails today): he sees only `["Ærend for bob"]` (the "does happen" case), and not alice's to-do. Same shape as `test_other_users_todos_never_match`. | A tag sub-query that starts from `Todo.objects` instead of `todos` (alice's to-do would then match through her tag). |
 
 `test_search_query_count_does_not_grow_with_rows`, `test_todo_with_two_matching_tags_is_shown_once`
 and `test_percent_sign_is_not_a_wildcard` stay and must still pass.
@@ -362,6 +386,11 @@ integration tests already check that through the real view.
   (`created_at`, then `pk`), as today.
 - **Search ignores case for every letter, but not accents.**
 - **Both are registered for every connection with `connection_created` in `TodosConfig.ready()`.**
+- **Keep the simple rule** (a to z, æ, ø, å; ä as æ, ö as ø, other accents as their base letter),
+  not a full CLDR Norwegian collation. It is never called "dictionary order".
+- **Keep the loop over open connections in `ready()`**, with the `connection is None` guard in
+  `add_functions` (the plan review's first option).
+- **`lru_cache` on `norwegian_key`**: yes, it is cheap.
 
 ## Left for the person
 
@@ -395,3 +424,22 @@ code on `main` (`2dc6747`):
 - Checked: `parse_tags` uses `.lower()`, which is right for æ, ø, å, so stored tags need no change.
 - Found, and left out on purpose: list-name uniqueness and tag display order have the same A to Z
   limit (see "Not part of this task" and "Left for the person").
+
+The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
+
+- **Blocker fixed:** the loop over open connections in `ready()` would have crashed every
+  `manage.py` command, because a wrapper that is set up but not open has `connection.connection`
+  set to `None`. `add_functions` now returns early in that case. New unit test
+  `test_add_functions_skips_a_connection_that_is_not_open`, and a new first step:
+  `uv run python manage.py check` before the tests and after changing `apps.py`.
+- `test_nordic_search_keeps_other_users_out` passed on today's code with `ÆREND` (the stored tag
+  matched nothing either way). bob now searches `ærend`, which fails today.
+- The sentence about `NULL` was wrong: the tag sub-query is a `LEFT OUTER JOIN`, so SQLite calls
+  `casefold(NULL)` for every to-do without tags. The `None` guard is required, and the plan says so.
+- `norwegian_key` drops combining marks after case folding (a lone mark gives no pair) and looks
+  each base letter up in the æ/ø/å table too. New unit test `test_combining_marks_are_dropped`
+  (`İstanbul`, `ǿ`), and both words added to the odd-text test.
+- The rule is no longer called "dictionary order": it is the simple rule a to z, æ, ø, å.
+- `AGENTS.md`: the `norwegian` collation is only for `ORDER BY`, never for `=`, `UNIQUE`,
+  `DISTINCT` or `GROUP BY`. The admin's title sort is under "Not part of this task".
+  `norwegian_key` gets `functools.lru_cache` (so it returns a tuple).

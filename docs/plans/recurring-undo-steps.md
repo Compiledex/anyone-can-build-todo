@@ -50,7 +50,7 @@ Undo on a repeating to-do now looks at its next copy like this (the first rule t
 | none | nothing more | none (as today) |
 | done | keeps it | none (as today, `test_undo_keeps_copy_that_is_done`) |
 | in another list | keeps it | none (as today, `test_undo_keeps_copy_in_another_list`) |
-| not done, same list, **at least one step done** | **keeps it (new)** | `The next copy, due 18 Oct 2026, was kept, because some of its steps are done.` |
+| not done, same list, **at least one step done** | **keeps it (new)** | `The next copy, due 18 Oct 2026, was kept, because a step in it is already done.` |
 | not done, same list, no step done (or no steps) | deletes it and its steps | `The next copy, due 18 Oct 2026, was removed.` (as today) |
 
 Reasons:
@@ -79,7 +79,7 @@ if copy and not copy.done and copy.todo_list_id == todo.todo_list_id:
     if copy.subtasks.filter(done=True).exists():
         messages.info(
             request,
-            f"The next copy, due {due}, was kept, because some of its steps are done.",
+            f"The next copy, due {due}, was kept, because a step in it is already done.",
         )
     else:
         copy.delete()  # Its steps go with it (on_delete=CASCADE).
@@ -140,7 +140,7 @@ first, then this one** (or either; a conflict, if any, is only in `AGENTS.md`).
 |---|---|
 | `todos/views.py` | `todo_toggle`: the new "keep the copy when a step is done" branch and message (decision 2); the docstring. |
 | `todos/tests/integration/test_views.py` | Three new tests in `RecurringTests` (see "Tests"). |
-| `todos/tests/integration/test_sharing.py` | One new test in `MemberCanTests` (see "Tests"); add `Subtask` to the `from todos.models import ...` line. |
+| `todos/tests/integration/test_sharing.py` | One new test in `MemberCanTests` (see "Tests"); add `Subtask` to the `from todos.models import ...` line and `dateformat` to `from django.utils import timezone`. |
 | `AGENTS.md` | `todos/views.py` row, the toggle sentence: "Undo deletes the copy (and its steps) if it is not done, still in the same list, and none of its steps is done, with a message; if a step is done, it keeps the copy and says so." Also the intro paragraph: "and "Undo" removes that copy again" gets "(unless a step of the copy is already done)". |
 | `README.md` | Nothing: it does not describe what Undo does to a copy. |
 
@@ -172,8 +172,8 @@ alice's "Groceries". A step is marked done the way a person does it: `POST` to
 | Test | What it checks | The break that makes it fail |
 |---|---|---|
 | `test_undo_removes_copy_and_its_steps` | `self.weekly` gets two steps ("Fill the can", "Check the soil"). Done: the copy has two steps, none done. Undo: the copy is gone, `Subtask.objects.filter(todo_id=copy_pk)` is empty, `self.weekly` still has its two steps, and the message is "...was removed." | A keep rule that also keeps a copy whose steps are all not done (for example `copy.subtasks.exists()` instead of `filter(done=True).exists()`). |
-| `test_undo_keeps_copy_with_a_done_step` | Two steps; Done; mark the copy's first step done with `subtask_toggle`; Undo. `self.weekly` is not done; the copy still exists, with both steps, the first still done; the only message is `The next copy, due <date>, was kept, because some of its steps are done.` (date as in `test_undo_removes_copy_that_is_not_done`). | Today's code (the copy and the done step are deleted), or keeping the copy without a message. |
-| `test_done_after_kept_copy_makes_no_second_copy` | The same start as the test above, then Done again on `self.weekly`: `copies_of(self.weekly).count()` is 1, and `Todo.objects.count()` is 2. | A change that makes a new copy whenever Undo did not delete one (a duplicate). |
+| `test_undo_keeps_copy_with_a_done_step` | Two steps; Done; mark the copy's first step done with `subtask_toggle`; Undo. `self.weekly` is not done; the copy still exists, with both steps, the first still done; the only message is `The next copy, due <date>, was kept, because a step in it is already done.` (date as in `test_undo_removes_copy_that_is_not_done`). | Today's code (the copy and the done step are deleted), or keeping the copy without a message. |
+| `test_done_after_kept_copy_makes_no_second_copy` | The same start as the test above; save `copy_pk = copy.pk` before Undo. Then Done again on `self.weekly`: `copies_of(self.weekly)` holds exactly one to-do, its `pk` is `copy_pk` (the kept copy, not a new one), and that copy's first step is still done. | Today's code (Undo deletes the copy, then Done makes a new copy with a new `pk` and no done step), or a change that makes a new copy whenever Undo did not delete one. |
 
 The old `test_undo_removes_copy_that_is_not_done` (no steps: removed, with the message) stays and
 must still pass; it is the "something does happen" case for a copy with no steps.
@@ -182,7 +182,7 @@ must still pass; it is the "something does happen" case for a copy with no steps
 
 | Test | What it checks | The break that makes it fail |
 |---|---|---|
-| `test_member_undo_keeps_copy_with_a_done_step` | `make_weekly_milk()`, add one step to milk; bob marks milk done (a copy is made); bob marks the copy's step done; bob clicks Undo on milk: it redirects to the list, milk is not done, the copy and its done step still exist, and there is one message. | The rule only applying to the owner, or a member's Undo deleting the copy. |
+| `test_member_undo_keeps_copy_with_a_done_step` | `make_weekly_milk()`, add one step to milk; bob marks milk done (a copy is made); bob marks the copy's step done; bob clicks Undo on milk: it redirects to the list, milk is not done, the copy and its done step still exist, and the messages are exactly `["The next copy, due <date>, was kept, because a step in it is already done."]` (the date is the copy's `due_date` with `dateformat.format(..., "j M Y")`; add `dateformat` to the `django.utils` import). | The rule only applying to the owner, a member's Undo deleting the copy, or a different message. |
 
 The stranger case needs no new test: `test_stranger_cannot_undo_and_remove_copy` already checks
 that a stranger gets 404 and the copy stays, and the view still finds the to-do with
@@ -193,9 +193,11 @@ page only shows one more message).
 
 - **Keep the copy when any of its steps is done.** Do not check for edits to the title, notes,
   priority or tags (that needs a new field or a guess).
-- **Say so in a message**: `The next copy, due <date>, was kept, because some of its steps are
+- **Say so in a message**: `The next copy, due <date>, was kept, because a step in it is already
   done.`
 - **The rule stays in `todo_toggle`**, not in a new model method.
+- **The message wording** (chosen after the plan review): `The next copy, due <date>, was kept,
+  because a step in it is already done.`
 
 ## Left for the person
 
@@ -225,3 +227,12 @@ code on `main` (`2dc6747`):
   fail on today's code, because today the copy is deleted.
 - Checked: Done after a kept copy cannot make a duplicate (`make_next_copy` returns `None` when
   a copy exists), and a test now covers it.
+
+The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
+
+- `test_done_after_kept_copy_makes_no_second_copy` passed on today's code (Undo deleted the copy,
+  Done made a new one, and the count was still 1). It now saves the copy's `pk` before Undo and
+  checks that the only copy afterwards is that same row, with its first step still done.
+- The member test checks the exact text of the kept message, not only that there is one message.
+- The message wording is now "...was kept, because a step in it is already done." (the
+  orchestrator's choice).
