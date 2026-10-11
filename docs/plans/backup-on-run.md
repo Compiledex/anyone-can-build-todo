@@ -1,6 +1,6 @@
 # Plan: `make run` makes a daily backup first
 
-Status: approved by the person (2026-10-11), not started
+Status: approved by the person (2026-10-11, plan card answered), not started
 
 Builds on: **local-safety** (`todos/backup.py`, `backup_database`, `copy_sqlite`, the `backup_db`
 command, `make backup`, `make reset`, `/backups/` in `.gitignore`, `MakeResetTests` with a fake

@@ -1,6 +1,6 @@
 # Plan: cleanups: the "/" view is `home`, lighter list HTML, a shorter AGENTS.md
 
-Status: approved by the person (2026-10-11), not started
+Status: approved by the person (2026-10-11, plan card answered), not started
 
 Builds on: everything on `main` after **A** (recurring-copy-rules), **B** (delete-undo), **C**
 (list-name-casefold) and **D** (backup-on-run) have merged. This plan starts from that `main`, not

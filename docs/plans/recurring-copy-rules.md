@@ -1,6 +1,6 @@
 # Plan: Undo keeps a changed copy, and Repeat on a done to-do makes the copy at once
 
-Status: approved by the person (2026-10-11), not started
+Status: approved by the person (2026-10-11, plan card answered), not started
 
 Builds on: **recurring** (`make_next_copy`, `get_next_copy`, `repeated_from`), **recurring-undo-steps**
 (Undo keeps the next copy when a step in it is done), **safe-toggles** (Done and Undo say which

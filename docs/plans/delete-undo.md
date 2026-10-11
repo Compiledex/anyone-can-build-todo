@@ -1,6 +1,6 @@
 # Plan: Undo a deleted to-do
 
-Status: approved by the person (2026-10-11), not started
+Status: approved by the person (2026-10-11, plan card answered), not started
 
 Builds on: **edit-todo**, **subtasks**, **tags**, **recurring** (`repeated_from`, `next_copy`),
 **drag-and-drop** (`position`), **sharing** (members may delete), **safe-toggles** (Delete goes
@@ -341,6 +341,7 @@ Wave: A, B, C and D are built at the same time; **merge order A → B (this) →
   and a clear message says so.
 - Messages must not show titles unsafely. It works with safe-toggles' anchors (back to the
   restored row).
+- Answered on 2026-10-11: two deletes close together: only the message whose id matches the snapshot gets an Undo button; an id taken by another to-do: "Could not undo." and the other to-do is not touched.
 
 ## Open choices
 

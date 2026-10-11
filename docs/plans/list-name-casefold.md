@@ -1,6 +1,6 @@
 # Plan: list names are unique ignoring case for every letter, also æ, ø and å
 
-Status: approved by the person (2026-10-11), not started
+Status: approved by the person (2026-10-11, plan card answered), not started
 
 Builds on: **lists** (`TodoList`, `TodoListForm`, new list and rename), **accounts** (sign-up
 makes "Inbox"), **sharing** (lists shared with you), **nordic-letters** (`casefold()` in
@@ -255,6 +255,7 @@ Wave: A, B, C and D are built at the same time; **merge order A → B → C (thi
 - Existing duplicates are handled in the data migration (the person has one list, "Inbox"; the
   rule is still written).
 - Names of lists shared **with** you do not count.
+- Answered on 2026-10-11: a duplicate name typed in the admin keeps today's friendly error (no 500).
 
 ## Open choices
 
