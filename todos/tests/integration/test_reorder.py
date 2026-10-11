@@ -135,6 +135,17 @@ class ReorderTests(LoggedInTestCase):
         self.assertEqual(self.positions(), before)
         self.assertEqual(self.shown(), ["First", "Second", "Third"])
 
+    def test_move_up_on_first_changes_nothing(self):
+        before = self.positions()
+        response = self.move(self.first, "up")
+        self.assertRedirects(
+            response,
+            f"{self.manual_url}#todo-{self.first.pk}",
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(self.positions(), before)
+        self.assertEqual(self.shown(), ["First", "Second", "Third"])
+
     def test_move_with_bad_direction_is_400(self):
         before = self.positions()
         response = self.move(self.second, "sideways")

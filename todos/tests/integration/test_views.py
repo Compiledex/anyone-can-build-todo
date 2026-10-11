@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from accounts.tests.helpers import LoggedInTestCase
 from todos.models import Todo, TodoList
+from todos.tests.helpers import add_todo
 
 # What an overdue row shows next to its date.
 OVERDUE_LABEL = '<span class="overdue-label">Overdue</span>'
@@ -47,6 +48,16 @@ class ListTests(LoggedInTestCase):
         Todo.objects.filter(pk=older.pk).update(created_at=now - timedelta(days=1))
         response = self.list_page()
         self.assertEqual(list(response.context["todos"]), [older, newer])
+
+    def test_todos_with_the_same_time_come_back_by_pk(self):
+        # Meta.ordering ends with pk, so to-dos made at the same moment keep
+        # a fixed order (the admin and the_list.todos.all() use it).
+        todos = [add_todo(self.todo_list, title) for title in ["C", "B", "A"]]
+        self.todo_list.todos.update(created_at=timezone.now())
+        self.assertEqual(
+            [todo.pk for todo in self.todo_list.todos.all()],
+            sorted(todo.pk for todo in todos),
+        )
 
     def test_add_input_keeps_its_browser_checks(self):
         response = self.list_page()
