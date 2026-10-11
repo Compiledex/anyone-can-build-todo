@@ -5,7 +5,8 @@ db.sqlite3
 staticfiles/
 .DS_Store
 .env
-# Worktrees: each branch gets its own folder here (`make worktree BRANCH=name`).
-.claude/worktrees/
+# Local files for Claude Code: worktrees (`make worktree BRANCH=name` puts each branch in
+# .claude/worktrees/) and this computer's own settings, like launch.json.
+.claude/
 # Copies of the test database that parallel test runs make.
 default_*.sqlite3
