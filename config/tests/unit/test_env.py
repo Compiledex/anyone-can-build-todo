@@ -37,14 +37,20 @@ class ReadDebugTests(SimpleTestCase):
                     read_debug({"DJANGO_DEBUG": value})
 
     def test_debug_message_has_no_part_of_the_value(self):
-        value = secrets.token_urlsafe(50)
+        # A fixed key-like value, so the test can never fail by chance.
+        value = "q7Zx" + "Kw9vLm3RtY8pNb2HjC5sFd6GaE4uXo1VnB0iTe7MzQ" + "Ws9R"
         with self.assertRaises(ImproperlyConfigured) as caught:
             read_debug({"DJANGO_DEBUG": value})
         message = str(caught.exception)
         for start in range(len(value) - 3):
             piece = value[start : start + 4]
             self.assertNotIn(piece, message)
-        self.assertIn(f"({len(value)} characters)", message)
+        self.assertIn(f"(length {len(value)})", message)
+
+    def test_debug_message_length_of_one_character(self):
+        with self.assertRaises(ImproperlyConfigured) as caught:
+            read_debug({"DJANGO_DEBUG": "0"})
+        self.assertIn("(length 1)", str(caught.exception))
 
 
 class ReadSecretKeyTests(SimpleTestCase):

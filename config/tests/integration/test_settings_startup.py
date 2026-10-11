@@ -38,6 +38,26 @@ class SettingsStartupTests(SimpleTestCase):
         self.assertNotEqual(result.returncode, 0, output_of(result))
         self.assertIn("DJANGO_SECRET_KEY is not set", result.stderr, output_of(result))
 
+    def test_debug_unknown_value_stops(self):
+        result = run_manage("check", DJANGO_DEBUG="0")
+        self.assertNotEqual(result.returncode, 0, output_of(result))
+        self.assertIn(
+            "DJANGO_DEBUG must be True or False", result.stderr, output_of(result)
+        )
+
+    def test_debug_true_lower_case_without_key_starts(self):
+        result = run_manage("check", DJANGO_DEBUG="true")
+        self.assertEqual(result.returncode, 0, output_of(result))
+
+    def test_debug_off_with_weak_key_stops(self):
+        result = run_manage(
+            "check",
+            DJANGO_DEBUG="False",
+            DJANGO_SECRET_KEY="django-insecure-only-for-your-laptop",
+        )
+        self.assertNotEqual(result.returncode, 0, output_of(result))
+        self.assertIn("DJANGO_SECRET_KEY is too weak", result.stderr, output_of(result))
+
     def test_debug_off_with_strong_key_passes_deploy_check(self):
         result = run_manage(
             "check",

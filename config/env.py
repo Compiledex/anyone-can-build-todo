@@ -36,7 +36,7 @@ def read_debug(env):
         return False
     raise ImproperlyConfigured(
         "DJANGO_DEBUG must be True or False. "
-        f"It is set to something else ({len(value)} characters)."
+        f"It is set to something else (length {len(value)})."
     )
 
 

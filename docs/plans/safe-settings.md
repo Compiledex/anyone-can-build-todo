@@ -1,6 +1,6 @@
 # Plan: the app refuses to start with unsafe production settings
 
-Status: **done** (2026-10-11). Approved 2026-10-11. Built as planned; `config/env.py` also has a small helper `is_strong(key)` for the three limits.
+Status: **done** (2026-10-11). Approved 2026-10-11. Built as planned; `config/env.py` also has a small helper `is_strong(key)` for the three limits. After code review: three more integration tests (`DJANGO_DEBUG=0` stops, `true` with no key starts, a weak key stops) and the `DJANGO_DEBUG` message says "(length N)".
 
 Builds on: **foundation** and **accounts** (the settings in `config/settings.py` that read
 `DJANGO_SECRET_KEY`, `DJANGO_DEBUG` and `DJANGO_ALLOWED_HOSTS` from environment variables), and the
@@ -96,7 +96,7 @@ settings) and `ALLOWED_HOSTS` do not change.
 | not set | `True` (the laptop, as today) |
 | `True`, `true`, `TRUE` | `True` |
 | `False`, `false`, `FALSE` | `False` |
-| anything else: `""`, `0`, `1`, `no`, `Flase`, ... | `ImproperlyConfigured`: `DJANGO_DEBUG must be True or False. It is set to something else (N characters).` |
+| anything else: `""`, `0`, `1`, `no`, `Flase`, ... | `ImproperlyConfigured`: `DJANGO_DEBUG must be True or False. It is set to something else (length N).` |
 
 For both words, spaces and line breaks at the ends are removed first (`.strip()`), then upper and
 lower case are treated the same (`.casefold()`). So ` False` and `false` followed by a line break
@@ -266,7 +266,7 @@ Each test passes a plain dict as `env`.
 | `test_debug_true_any_case` | `True`, `true`, `TRUE`, ` true ` give `True`. | Comparing with `== "True"` only. |
 | `test_debug_false_any_case` | `False`, `false`, `FALSE`, ` False`, `"false\n"` give `False`. | Comparing without `.strip()` or `.casefold()`. |
 | `test_debug_unknown_value_stops` | `""`, `0`, `1`, `yes`, `no`, `Flase` each raise `ImproperlyConfigured` (subtests), and the message says `True or False`. | Treating an unknown value as off (today's behavior) or as on. |
-| `test_debug_message_has_no_part_of_the_value` | A key-like value (`secrets.token_urlsafe(50)`) gives a message that contains no 4-character piece of the value, but does contain its length. | Printing the value, or its first characters. |
+| `test_debug_message_has_no_part_of_the_value` | A fixed key-like value of 50 characters gives a message that contains no 4-character piece of the value, but does contain its length. | Printing the value, or its first characters. |
 | `test_debug_on_uses_laptop_key` | `read_secret_key({}, debug=True)` is `LAPTOP_SECRET_KEY`. | Requiring a key on the laptop (breaks `make run`, CI). |
 | `test_debug_on_uses_given_key` | With debug on and a key set, that key is used, even a short one. | Ignoring the variable. |
 | `test_debug_off_missing_key_stops` | With debug off, no key and an empty key both raise, and the message names `DJANGO_SECRET_KEY` and the `secrets.token_urlsafe(50)` command. | Falling back to the laptop key (today's bug). |
