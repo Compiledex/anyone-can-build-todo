@@ -140,10 +140,38 @@ class MemberCanTests(SharingTestCase):
         self.assertTrue(self.groceries.todos.filter(title="Eggs").exists())
 
     def test_member_can_toggle(self):
-        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        response = self.client.post(
+            self.url("todo_toggle", self.milk.pk), {"done": "1"}
+        )
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.milk.refresh_from_db()
         self.assertTrue(self.milk.done)
+
+    def test_two_members_click_done_once_each(self):
+        self.make_weekly_milk()
+        alice = self.client_for(self.alice)
+        alice.post(self.url("todo_toggle", self.milk.pk), {"done": "1"})
+        # bob's page is from before alice's click: it still shows Done.
+        self.client.post(self.url("todo_toggle", self.milk.pk), {"done": "1"})
+        self.milk.refresh_from_db()
+        self.assertTrue(self.milk.done)
+        self.assertEqual(Todo.objects.filter(repeated_from=self.milk).count(), 1)
+
+    def test_stale_undo_does_not_undo_new_work(self):
+        self.make_weekly_milk()
+        alice = self.client_for(self.alice)
+        alice.post(self.url("todo_toggle", self.milk.pk), {"done": "1"})
+        alice.post(self.url("todo_toggle", self.milk.pk), {"done": "0"})
+        count = Todo.objects.count()
+        # bob's tab is from when milk was done: it shows Undo.
+        response = self.client.post(
+            self.url("todo_toggle", self.milk.pk), {"done": "0"}
+        )
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        self.assertEqual(self.messages_of(response), [])
+        self.milk.refresh_from_db()
+        self.assertFalse(self.milk.done)
+        self.assertEqual(Todo.objects.count(), count)
 
     def test_member_can_edit(self):
         url = self.url("todo_edit", self.milk.pk)
@@ -254,7 +282,9 @@ class MemberCanTests(SharingTestCase):
 
     def test_member_done_makes_copy_in_shared_list(self):
         self.make_weekly_milk()
-        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        response = self.client.post(
+            self.url("todo_toggle", self.milk.pk), {"done": "1"}
+        )
         self.assertRedirects(response, self.groceries.get_absolute_url())
         copy = Todo.objects.get(repeated_from=self.milk)
         self.assertEqual(copy.todo_list, self.groceries)
@@ -262,8 +292,10 @@ class MemberCanTests(SharingTestCase):
 
     def test_member_undo_removes_copy(self):
         self.make_weekly_milk()
-        self.client.post(self.url("todo_toggle", self.milk.pk))
-        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.client.post(self.url("todo_toggle", self.milk.pk), {"done": "1"})
+        response = self.client.post(
+            self.url("todo_toggle", self.milk.pk), {"done": "0"}
+        )
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.assertEqual(list(self.groceries.todos.all()), [self.milk])
         self.assertEqual(len(self.messages_of(response)), 1)
@@ -271,11 +303,13 @@ class MemberCanTests(SharingTestCase):
     def test_member_undo_keeps_copy_with_a_done_step(self):
         self.make_weekly_milk()
         Subtask.objects.create(todo=self.milk, title="Check the date")
-        self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.client.post(self.url("todo_toggle", self.milk.pk), {"done": "1"})
         copy = Todo.objects.get(repeated_from=self.milk)
         step = copy.subtasks.get()
-        self.client.post(self.url("subtask_toggle", step.pk))
-        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.client.post(self.url("subtask_toggle", step.pk), {"done": "1"})
+        response = self.client.post(
+            self.url("todo_toggle", self.milk.pk), {"done": "0"}
+        )
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.milk.refresh_from_db()
         self.assertFalse(self.milk.done)
@@ -293,9 +327,11 @@ class MemberCanTests(SharingTestCase):
 
     def test_former_member_undo_does_not_touch_list(self):
         self.make_weekly_milk()
-        self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.client.post(self.url("todo_toggle", self.milk.pk), {"done": "1"})
         self.groceries.members.remove(self.bob)
-        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        response = self.client.post(
+            self.url("todo_toggle", self.milk.pk), {"done": "0"}
+        )
         self.assertEqual(response.status_code, 404)
         self.milk.refresh_from_db()
         self.assertTrue(self.milk.done)
@@ -398,7 +434,9 @@ class StrangerTests(SharingTestCase):
         self.assertEqual(list(self.groceries.todos.all()), [self.milk])
 
     def test_stranger_cannot_toggle(self):
-        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        response = self.client.post(
+            self.url("todo_toggle", self.milk.pk), {"done": "1"}
+        )
         self.assertEqual(response.status_code, 404)
         self.assertStillMilk()
 
@@ -451,7 +489,9 @@ class StrangerTests(SharingTestCase):
         self.milk.repeat = Todo.Repeat.WEEKLY
         self.milk.due_date = timezone.localdate() + timedelta(days=30)
         self.milk.save()
-        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        response = self.client.post(
+            self.url("todo_toggle", self.milk.pk), {"done": "1"}
+        )
         self.assertEqual(response.status_code, 404)
         self.assertStillMilk()
         self.assertEqual(list(self.groceries.todos.all()), [self.milk])
@@ -460,8 +500,12 @@ class StrangerTests(SharingTestCase):
         self.milk.repeat = Todo.Repeat.WEEKLY
         self.milk.due_date = timezone.localdate() + timedelta(days=30)
         self.milk.save()
-        self.client_for(self.alice).post(self.url("todo_toggle", self.milk.pk))
-        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.client_for(self.alice).post(
+            self.url("todo_toggle", self.milk.pk), {"done": "1"}
+        )
+        response = self.client.post(
+            self.url("todo_toggle", self.milk.pk), {"done": "0"}
+        )
         self.assertEqual(response.status_code, 404)
         self.milk.refresh_from_db()
         self.assertTrue(self.milk.done)
@@ -584,7 +628,7 @@ class LeaveRemoveTests(SharingTestCase):
         bob = self.client_for(self.bob)
         bob.post(self.url("list_leave", self.groceries.pk))
         self.assertEqual(bob.get(self.groceries.get_absolute_url()).status_code, 404)
-        response = bob.post(self.url("todo_toggle", self.milk.pk))
+        response = bob.post(self.url("todo_toggle", self.milk.pk), {"done": "1"})
         self.assertEqual(response.status_code, 404)
         self.assertStillMilk()
         response = bob.post(self.url("list_leave", self.groceries.pk))

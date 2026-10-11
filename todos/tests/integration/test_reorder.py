@@ -64,7 +64,7 @@ class ReorderTests(LoggedInTestCase):
             "Water plants", repeat="daily", due_date=timezone.localdate()
         )
         self.reorder(repeating, self.first, self.second, self.third)
-        self.client.post(reverse("todo_toggle", args=[repeating.pk]))
+        self.client.post(reverse("todo_toggle", args=[repeating.pk]), {"done": "1"})
         self.assertEqual(
             self.shown(), ["Water plants", "First", "Second", "Third", "Water plants"]
         )

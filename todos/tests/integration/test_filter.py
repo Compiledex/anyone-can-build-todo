@@ -133,20 +133,25 @@ class RedirectBackTests(LoggedInTestCase):
         self.url = self.todo_list.get_absolute_url()
         self.todo = Todo.objects.create(todo_list=self.todo_list, title="Buy milk")
 
-    def toggle(self, data=None, client=None, **extra):
+    def toggle(self, done, data=None, client=None, **extra):
         url = reverse("todo_toggle", args=[self.todo.pk])
-        return (client or self.client).post(url, data or {}, **extra)
+        data = {**(data or {}), "done": "1" if done else "0"}
+        return (client or self.client).post(url, data, **extra)
 
     def test_row_forms_carry_current_address(self):
         response = self.client.get(f"{self.url}?q=milk&status=open")
-        hidden = f'<input type="hidden" name="next" value="{self.url}?q=milk&amp;status=open">'
+        # The only row, with a filter: Done and Delete both go to the list (#todos).
+        hidden = (
+            f'<input type="hidden" name="next" '
+            f'value="{self.url}?q=milk&amp;status=open#todos">'
+        )
         self.assertContains(response, hidden, count=2, html=True)  # Done, Delete.
         # The & is escaped in the HTML.
         self.assertNotContains(response, f'value="{self.url}?q=milk&status')
 
     def test_toggle_returns_to_filtered_view(self):
         next_url = f"{self.url}?status=open"
-        response = self.toggle({"next": next_url})
+        response = self.toggle(True, {"next": next_url})
         self.assertRedirects(response, next_url, fetch_redirect_response=False)
         self.todo.refresh_from_db()
         self.assertTrue(self.todo.done)
@@ -162,11 +167,11 @@ class RedirectBackTests(LoggedInTestCase):
     def test_toggle_keeps_open_steps(self):
         # A row on a page with ?open= (after a step action) keeps it too.
         next_url = f"{self.url}?status=open&open={self.todo.pk}"
-        response = self.toggle({"next": next_url})
+        response = self.toggle(True, {"next": next_url})
         self.assertRedirects(response, next_url, fetch_redirect_response=False)
 
     def test_toggle_without_next_goes_to_list(self):
-        response = self.toggle()
+        response = self.toggle(True)
         self.assertRedirects(response, self.url, fetch_redirect_response=False)
 
     def test_unsafe_next_is_ignored(self):
@@ -181,13 +186,15 @@ class RedirectBackTests(LoggedInTestCase):
             "",
         ]:
             with self.subTest(next=value):
-                response = self.toggle({"next": value}, secure=True)
+                response = self.toggle(True, {"next": value}, secure=True)
                 self.assertEqual(response.status_code, 302)
                 self.assertEqual(response["Location"], self.url)
 
     def test_absolute_next_to_own_site_is_ignored(self):
         # Not secure, so require_https does not refuse it: the "/" rule does.
-        response = self.toggle({"next": f"http://testserver{self.url}?status=open"})
+        response = self.toggle(
+            True, {"next": f"http://testserver{self.url}?status=open"}
+        )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(response["Location"], self.url)
 
@@ -199,7 +206,7 @@ class RedirectBackTests(LoggedInTestCase):
 
     def test_next_does_not_skip_owner_check(self):
         bob = self.client_for(self.other_user)
-        response = self.toggle({"next": f"{self.url}?status=open"}, client=bob)
+        response = self.toggle(True, {"next": f"{self.url}?status=open"}, client=bob)
         self.assertEqual(response.status_code, 404)
         self.todo.refresh_from_db()
         self.assertFalse(self.todo.done)
@@ -219,5 +226,10 @@ class RedirectBackTests(LoggedInTestCase):
         self.assertContains(
             response, f'<a href="{self.url}?status=done">Done</a>', html=True
         )
-        hidden = f'<input type="hidden" name="next" value="{self.url}">'
-        self.assertContains(response, hidden, count=2, html=True)
+        # No filter: Done keeps its row; Delete goes to the list (the only row).
+        done_next = (
+            f'<input type="hidden" name="next" value="{self.url}#todo-{self.todo.pk}">'
+        )
+        delete_next = f'<input type="hidden" name="next" value="{self.url}#todos">'
+        self.assertContains(response, done_next, count=1, html=True)
+        self.assertContains(response, delete_next, count=1, html=True)

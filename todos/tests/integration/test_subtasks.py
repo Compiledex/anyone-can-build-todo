@@ -9,6 +9,8 @@ does not exist also gives 404, so an "other user gets 404" test would pass
 before any code exists.
 """
 
+import re
+
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
@@ -82,13 +84,62 @@ class SubtaskTests(LoggedInTestCase):
     def test_toggle_step_and_back(self):
         step = self.make_step()
         url = reverse("subtask_toggle", args=[step.pk])
-        response = self.client.post(url)
+        response = self.client.post(url, {"done": "1"})
         self.assertRedirects(response, self.back_url(), fetch_redirect_response=False)
         step.refresh_from_db()
         self.assertTrue(step.done)
-        self.client.post(url)
+        self.client.post(url, {"done": "0"})
         step.refresh_from_db()
         self.assertFalse(step.done)
+
+    def test_step_done_twice_stays_done(self):
+        step = self.make_step()
+        url = reverse("subtask_toggle", args=[step.pk])
+        self.client.post(url, {"done": "1"})
+        self.client.post(url, {"done": "1"})
+        step.refresh_from_db()
+        self.assertTrue(step.done)
+
+    def test_step_done_and_undo_still_work(self):
+        step = self.make_step()
+        url = reverse("subtask_toggle", args=[step.pk])
+        self.client.post(url, {"done": "1"})
+        step.refresh_from_db()
+        self.assertTrue(step.done)
+        self.client.post(url, {"done": "0"})
+        step.refresh_from_db()
+        self.assertFalse(step.done)
+
+    def test_step_bad_done_value_is_400(self):
+        step = self.make_step()
+        url = reverse("subtask_toggle", args=[step.pk])
+        for data in [{}, {"done": "yes"}]:
+            with self.subTest(data=data):
+                response = self.client.post(url, data)
+                self.assertEqual(response.status_code, 400)
+                step.refresh_from_db()
+                self.assertFalse(step.done)
+        # 404 before 400: a stranger learns nothing.
+        self.assertOtherUserGets404(url, data={"done": "yes"})
+        step.refresh_from_db()
+        self.assertFalse(step.done)
+
+    def test_step_form_sends_the_state_it_wants(self):
+        open_step = self.make_step("Pack books")
+        done_step = self.make_step("Book a van", done=True)
+        response = self.client.get(
+            reverse("list_detail", args=[self.todo_list.pk]), {"open": self.todo.pk}
+        )
+        page = response.content.decode()
+        for step, value in [(open_step, "1"), (done_step, "0")]:
+            with self.subTest(step=step.title):
+                action = reverse("subtask_toggle", args=[step.pk])
+                form = re.search(
+                    rf'<form method="post" action="{action}">.*?</form>', page, re.S
+                ).group(0)
+                self.assertInHTML(
+                    f'<input type="hidden" name="done" value="{value}">', form
+                )
 
     def test_delete_step(self):
         step = self.make_step()
@@ -158,7 +209,7 @@ class SubtaskTests(LoggedInTestCase):
         step = Subtask.objects.get(todo=self.todo)
         self.assertEqual(step.title, "Book a van")
 
-        client.post(reverse("subtask_toggle", args=[step.pk]))
+        client.post(reverse("subtask_toggle", args=[step.pk]), {"done": "1"})
         step.refresh_from_db()
         self.assertTrue(step.done)
 
@@ -187,7 +238,7 @@ class SubtaskTests(LoggedInTestCase):
     def test_all_steps_done_does_not_finish_todo(self):
         for title in ["Pack books", "Book a van"]:
             step = self.make_step(title)
-            self.client.post(reverse("subtask_toggle", args=[step.pk]))
+            self.client.post(reverse("subtask_toggle", args=[step.pk]), {"done": "1"})
         self.assertEqual(self.todo.subtasks.filter(done=True).count(), 2)
         self.todo.refresh_from_db()
         self.assertFalse(self.todo.done)
@@ -195,7 +246,7 @@ class SubtaskTests(LoggedInTestCase):
     def test_finishing_todo_does_not_change_steps(self):
         self.make_step("Pack books", done=True)
         self.make_step("Book a van", done=False)
-        self.client.post(reverse("todo_toggle", args=[self.todo.pk]))
+        self.client.post(reverse("todo_toggle", args=[self.todo.pk]), {"done": "1"})
         self.todo.refresh_from_db()
         self.assertTrue(self.todo.done)
         self.assertEqual(

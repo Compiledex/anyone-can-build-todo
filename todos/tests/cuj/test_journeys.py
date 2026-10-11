@@ -91,6 +91,29 @@ class PlanAndFinishTests(BrowserTestCase):
         expect(call).to_have_count(0)
 
 
+class KeepThePlaceTests(BrowserTestCase):
+    def test_done_keeps_the_place(self):
+        """On a long list, Done and Delete open the page at the same place."""
+        user = make_user_with_inbox()
+        the_list = user.todo_lists.get()
+        todos = [the_list.todos.create(title=f"Task {n}") for n in range(1, 41)]
+        phone = self.browser.new_context(viewport={"width": 390, "height": 844})
+        self.addCleanup(phone.close)
+        self.log_in_as(user, phone)
+        page = phone.new_page()
+        page.goto(f"{self.live_server_url}{the_list.get_absolute_url()}")
+
+        row_30 = page.locator(f"#todo-{todos[29].pk}")
+        row_30.get_by_role("button", name="Done", exact=True).click()
+        expect(row_30).to_have_class(DONE)
+        expect(row_30).to_be_in_viewport()
+        expect(page.get_by_label("New to-do")).not_to_be_focused()
+
+        row_30.get_by_role("button", name="Delete", exact=True).click()
+        expect(row_30).to_have_count(0)
+        expect(page.locator(f"#todo-{todos[30].pk}")).to_be_in_viewport()
+
+
 class SeparateListsTests(BrowserTestCase):
     def test_separate_lists(self):
         page = self.page

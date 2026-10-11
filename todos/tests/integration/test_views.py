@@ -1,3 +1,5 @@
+import html
+import re
 from datetime import UTC, date, datetime, timedelta
 from html.parser import HTMLParser
 from unittest import mock
@@ -16,6 +18,19 @@ from todos.models import Subtask, Tag, Todo, TodoList
 
 # What an overdue row shows next to its date.
 OVERDUE_LABEL = '<span class="overdue-label">Overdue</span>'
+
+
+def hidden_next(response, action):
+    """The hidden `next` of the form that posts to `action`, as the browser reads it."""
+    pattern = re.compile(
+        rf'<form method="post" action="{re.escape(action)}">.*?'
+        r'name="next" value="([^"]*)"',
+        re.S,
+    )
+    match = pattern.search(response.content.decode())
+    if match is None:
+        raise AssertionError(f"No form with a hidden next posts to {action}")
+    return html.unescape(match.group(1))
 
 
 class ListTests(LoggedInTestCase):
@@ -258,10 +273,10 @@ class AddTests(LoggedInTestCase):
 class ToggleTests(LoggedInTestCase):
     def test_toggle_marks_done_and_back(self):
         todo = Todo.objects.create(title="Read chapter 3", todo_list=self.todo_list)
-        self.client.post(reverse("todo_toggle", args=[todo.pk]))
+        self.client.post(reverse("todo_toggle", args=[todo.pk]), {"done": "1"})
         todo.refresh_from_db()
         self.assertTrue(todo.done)
-        self.client.post(reverse("todo_toggle", args=[todo.pk]))
+        self.client.post(reverse("todo_toggle", args=[todo.pk]), {"done": "0"})
         todo.refresh_from_db()
         self.assertFalse(todo.done)
 
@@ -275,12 +290,119 @@ class ToggleTests(LoggedInTestCase):
     def test_toggle_returns_to_its_list(self):
         work = TodoList.objects.create(owner=self.user, name="Work")
         todo = Todo.objects.create(title="Send report", todo_list=work)
-        response = self.client.post(reverse("todo_toggle", args=[todo.pk]))
+        response = self.client.post(
+            reverse("todo_toggle", args=[todo.pk]), {"done": "1"}
+        )
         self.assertRedirects(response, work.get_absolute_url())
 
     def test_toggle_unknown_todo_is_404(self):
         response = self.client.post(reverse("todo_toggle", args=[999]))
         self.assertEqual(response.status_code, 404)
+
+    def toggle(self, todo, done, client=None):
+        return (client or self.client).post(
+            reverse("todo_toggle", args=[todo.pk]), {"done": "1" if done else "0"}
+        )
+
+    def make_three(self):
+        return [
+            Todo.objects.create(title=title, todo_list=self.todo_list)
+            for title in ["First", "Second", "Third"]
+        ]
+
+    def test_done_twice_stays_done(self):
+        todo = Todo.objects.create(title="Read chapter 3", todo_list=self.todo_list)
+        self.toggle(todo, True)
+        self.toggle(todo, True)
+        todo.refresh_from_db()
+        self.assertTrue(todo.done)
+
+    def test_undo_twice_stays_not_done(self):
+        todo = Todo.objects.create(
+            title="Read chapter 3", todo_list=self.todo_list, done=True
+        )
+        self.toggle(todo, False)
+        self.toggle(todo, False)
+        todo.refresh_from_db()
+        self.assertFalse(todo.done)
+
+    def test_done_and_undo_still_work(self):
+        todo = Todo.objects.create(title="Read chapter 3", todo_list=self.todo_list)
+        self.toggle(todo, True)
+        todo.refresh_from_db()
+        self.assertTrue(todo.done)
+        self.toggle(todo, False)
+        todo.refresh_from_db()
+        self.assertFalse(todo.done)
+
+    def test_bad_done_value_is_400(self):
+        todo = Todo.objects.create(title="Read chapter 3", todo_list=self.todo_list)
+        url = reverse("todo_toggle", args=[todo.pk])
+        for data in [{}, {"done": ""}, {"done": "yes"}, {"done": "2"}]:
+            with self.subTest(data=data):
+                response = self.client.post(url, data)
+                self.assertEqual(response.status_code, 400)
+                todo.refresh_from_db()
+                self.assertFalse(todo.done)
+
+    def test_bad_done_value_from_stranger_is_404(self):
+        todo = Todo.objects.create(title="Read chapter 3", todo_list=self.todo_list)
+        self.assertOtherUserGets404(
+            reverse("todo_toggle", args=[todo.pk]), data={"done": "x"}
+        )
+        todo.refresh_from_db()
+        self.assertFalse(todo.done)
+
+    def test_page_sends_the_state_it_wants(self):
+        open_todo = Todo.objects.create(title="Open", todo_list=self.todo_list)
+        done_todo = Todo.objects.create(
+            title="Finished", todo_list=self.todo_list, done=True
+        )
+        response = self.client.get(self.todo_list.get_absolute_url())
+        page = response.content.decode()
+        for todo, value in [(open_todo, "1"), (done_todo, "0")]:
+            with self.subTest(todo=todo.title):
+                action = reverse("todo_toggle", args=[todo.pk])
+                form = re.search(
+                    rf'<form method="post" action="{action}">.*?</form>', page, re.S
+                ).group(0)
+                self.assertInHTML(
+                    f'<input type="hidden" name="done" value="{value}">', form
+                )
+
+    def test_done_goes_back_to_its_row(self):
+        first, second, _ = self.make_three()
+        url = self.todo_list.get_absolute_url()
+        response = self.client.get(url)
+        next_url = hidden_next(response, reverse("todo_toggle", args=[second.pk]))
+        self.assertEqual(next_url, f"{url}#todo-{second.pk}")
+        response = self.client.post(
+            reverse("todo_toggle", args=[second.pk]), {"done": "1", "next": next_url}
+        )
+        self.assertRedirects(response, next_url, fetch_redirect_response=False)
+
+    def test_done_in_not_done_filter_goes_to_the_next_row(self):
+        _, second, third = self.make_three()
+        url = self.todo_list.get_absolute_url()
+        action = reverse("todo_toggle", args=[second.pk])
+        response = self.client.get(f"{url}?status=open")
+        self.assertTrue(hidden_next(response, action).endswith(f"#todo-{third.pk}"))
+        # A bad status shows every row, so it is no filter: the row stays.
+        response = self.client.get(f"{url}?status=bogus")
+        self.assertTrue(hidden_next(response, action).endswith(f"#todo-{second.pk}"))
+
+    def test_next_with_a_fragment_keeps_the_same_site_rule(self):
+        todo = Todo.objects.create(title="Read chapter 3", todo_list=self.todo_list)
+        url = self.todo_list.get_absolute_url()
+        action = reverse("todo_toggle", args=[todo.pk])
+        for value in ["//evil.example/#todo-1", "/\\evil.example#todo-1", "#todo-1"]:
+            with self.subTest(next=value):
+                response = self.client.post(action, {"done": "1", "next": value})
+                self.assertEqual(response.status_code, 302)
+                self.assertEqual(response["Location"], url)
+        good = f"{url}?q=a#todo-{todo.pk}"
+        response = self.client.post(action, {"done": "1", "next": good})
+        self.assertRedirects(response, good, fetch_redirect_response=False)
 
 
 class DeleteTests(LoggedInTestCase):
@@ -304,6 +426,24 @@ class DeleteTests(LoggedInTestCase):
     def test_delete_unknown_todo_is_404(self):
         response = self.client.post(reverse("todo_delete", args=[999]))
         self.assertEqual(response.status_code, 404)
+
+    def test_delete_goes_to_the_next_row(self):
+        first, second, third = [
+            Todo.objects.create(title=title, todo_list=self.todo_list)
+            for title in ["First", "Second", "Third"]
+        ]
+        url = self.todo_list.get_absolute_url()
+
+        def delete(todo):
+            action = reverse("todo_delete", args=[todo.pk])
+            next_url = hidden_next(self.client.get(url), action)
+            response = self.client.post(action, {"next": next_url})
+            self.assertRedirects(response, next_url, fetch_redirect_response=False)
+            return next_url
+
+        self.assertEqual(delete(first), f"{url}#todo-{second.pk}")
+        self.assertEqual(delete(third), f"{url}#todo-{second.pk}")
+        self.assertEqual(delete(second), f"{url}#todos")
 
 
 def open_view_names(patterns):
@@ -919,8 +1059,10 @@ class RecurringTests(LoggedInTestCase):
             due_date=self.due,
         )
 
-    def toggle(self, todo, client=None):
-        return (client or self.client).post(reverse("todo_toggle", args=[todo.pk]))
+    def toggle(self, todo, done, client=None):
+        return (client or self.client).post(
+            reverse("todo_toggle", args=[todo.pk]), {"done": "1" if done else "0"}
+        )
 
     def copies_of(self, todo):
         return Todo.objects.filter(repeated_from=todo)
@@ -1013,7 +1155,7 @@ class RecurringTests(LoggedInTestCase):
         self.assertIsNone(self.weekly.due_date)
 
     def test_done_makes_a_copy_with_next_date(self):
-        response = self.toggle(self.weekly)
+        response = self.toggle(self.weekly, True)
         self.assertRedirects(response, self.todo_list.get_absolute_url())
         self.weekly.refresh_from_db()
         self.assertTrue(self.weekly.done)
@@ -1027,7 +1169,7 @@ class RecurringTests(LoggedInTestCase):
         self.weekly.priority = Todo.Priority.HIGH
         self.weekly.save()
         self.weekly.set_tags(["home", "plants"])
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         copy = self.copies_of(self.weekly).get()
         self.assertEqual(copy.title, "Water the plants")
         self.assertEqual(copy.description, "The ones by the window.")
@@ -1049,7 +1191,7 @@ class RecurringTests(LoggedInTestCase):
         )
         moment = datetime(2026, 10, 9, 16, 0, tzinfo=UTC)
         with mock.patch("django.utils.timezone.now", return_value=moment):
-            self.toggle(todo)
+            self.toggle(todo, True)
         self.assertEqual(self.copies_of(todo).get().due_date, date(2026, 10, 11))
 
     def test_copy_stays_in_the_same_list_of_several(self):
@@ -1058,13 +1200,13 @@ class RecurringTests(LoggedInTestCase):
         todo = Todo.objects.create(
             title="Stand-up", todo_list=middle, repeat="daily", due_date=self.due
         )
-        self.toggle(todo)
+        self.toggle(todo, True)
         self.assertEqual(self.copies_of(todo).get().todo_list, middle)
 
     def test_copy_has_the_steps_not_done(self):
         for title, done in [("Pack", True), ("Load", False), ("Drive", True)]:
             Subtask.objects.create(todo=self.weekly, title=title, done=done)
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         copy = self.copies_of(self.weekly).get()
         self.assertEqual(
             [(step.title, step.done) for step in copy.subtasks.all()],
@@ -1085,7 +1227,7 @@ class RecurringTests(LoggedInTestCase):
                 )
             return len(queries)
 
-        self.toggle(self.weekly)  # The original and its copy.
+        self.toggle(self.weekly, True)  # The original and its copy.
         before = count_queries()
         for n in range(3):
             todo = Todo.objects.create(
@@ -1094,13 +1236,13 @@ class RecurringTests(LoggedInTestCase):
                 repeat="daily",
                 due_date=self.due,
             )
-            self.toggle(todo)
+            self.toggle(todo, True)
         self.assertEqual(count_queries(), before)
 
     def test_copy_stays_in_owners_list_when_member_clicks_done(self):
         carol = make_user("carol")
         self.todo_list.members.add(carol)
-        response = self.toggle(self.weekly, client=self.client_for(carol))
+        response = self.toggle(self.weekly, True, client=self.client_for(carol))
         self.assertRedirects(response, self.todo_list.get_absolute_url())
         copy = self.copies_of(self.weekly).get()
         self.assertEqual(copy.todo_list, self.todo_list)
@@ -1110,7 +1252,7 @@ class RecurringTests(LoggedInTestCase):
         todo = Todo.objects.create(
             title="Once", todo_list=self.todo_list, due_date=self.due
         )
-        self.toggle(todo)
+        self.toggle(todo, True)
         self.assertEqual(Todo.objects.filter(title="Once").count(), 1)
 
     def test_done_without_due_date_makes_no_copy(self):
@@ -1118,7 +1260,7 @@ class RecurringTests(LoggedInTestCase):
         todo = Todo.objects.create(
             title="Broken", todo_list=self.todo_list, repeat="daily"
         )
-        response = self.toggle(todo)
+        response = self.toggle(todo, True)
         self.assertRedirects(response, self.todo_list.get_absolute_url())
         todo.refresh_from_db()
         self.assertTrue(todo.done)
@@ -1131,13 +1273,13 @@ class RecurringTests(LoggedInTestCase):
             repeat="daily",
             due_date=date(9999, 12, 31),
         )
-        response = self.toggle(todo)
+        response = self.toggle(todo, True)
         self.assertRedirects(response, self.todo_list.get_absolute_url())
         self.assertEqual(Todo.objects.filter(title="The end").count(), 1)
 
     def test_undo_removes_copy_that_is_not_done(self):
-        self.toggle(self.weekly)
-        response = self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
+        response = self.toggle(self.weekly, False)
         self.assertEqual(Todo.objects.filter(title="Water the plants").count(), 1)
         self.weekly.refresh_from_db()
         self.assertFalse(self.weekly.done)
@@ -1150,37 +1292,37 @@ class RecurringTests(LoggedInTestCase):
         )
 
     def test_done_undo_done_makes_one_new_copy(self):
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         self.assertEqual(Todo.objects.count(), 2)
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, False)
         self.assertEqual(Todo.objects.count(), 1)
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         self.assertEqual(Todo.objects.count(), 2)
         self.assertEqual(self.copies_of(self.weekly).count(), 1)
 
     def test_undo_keeps_copy_that_is_done(self):
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         copy = self.copies_of(self.weekly).get()
-        self.toggle(copy)  # The copy is done, and makes its own copy.
+        self.toggle(copy, True)  # The copy is done, and makes its own copy.
         count = Todo.objects.count()
-        response = self.toggle(self.weekly)  # Undo on the original.
+        response = self.toggle(self.weekly, False)  # Undo on the original.
         self.assertEqual(self.messages_of(response), [])
         copy.refresh_from_db()
         self.assertTrue(copy.done)
         self.weekly.refresh_from_db()
         self.assertFalse(self.weekly.done)
         self.assertEqual(Todo.objects.count(), count)
-        self.toggle(self.weekly)  # Done again: no second copy.
+        self.toggle(self.weekly, True)  # Done again: no second copy.
         self.assertEqual(Todo.objects.count(), count)
         self.assertEqual(self.copies_of(self.weekly).count(), 1)
 
     def test_undo_keeps_copy_in_another_list(self):
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         copy = self.copies_of(self.weekly).get()
         work = TodoList.objects.create(owner=self.user, name="Work")
         copy.todo_list = work
         copy.save()
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, False)
         copy.refresh_from_db()
         self.assertEqual(copy.todo_list, work)
 
@@ -1197,12 +1339,12 @@ class RecurringTests(LoggedInTestCase):
 
     def test_undo_removes_copy_and_its_steps(self):
         self.add_two_steps()
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         copy = self.copies_of(self.weekly).get()
         self.assertEqual(copy.subtasks.count(), 2)
         self.assertFalse(copy.subtasks.filter(done=True).exists())
         copy_pk = copy.pk
-        response = self.toggle(self.weekly)  # Undo
+        response = self.toggle(self.weekly, False)  # Undo
         self.assertFalse(Todo.objects.filter(pk=copy_pk).exists())
         self.assertFalse(Subtask.objects.filter(todo_id=copy_pk).exists())
         self.assertEqual(self.weekly.subtasks.count(), 2)
@@ -1216,11 +1358,11 @@ class RecurringTests(LoggedInTestCase):
 
     def test_undo_keeps_copy_with_a_done_step(self):
         self.add_two_steps()
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         copy = self.copies_of(self.weekly).get()
         first = copy.subtasks.get(title="Fill the can")
-        self.client.post(reverse("subtask_toggle", args=[first.pk]))
-        response = self.toggle(self.weekly)  # Undo
+        self.client.post(reverse("subtask_toggle", args=[first.pk]), {"done": "1"})
+        response = self.toggle(self.weekly, False)  # Undo
         self.weekly.refresh_from_db()
         self.assertFalse(self.weekly.done)
         self.assertTrue(Todo.objects.filter(pk=copy.pk).exists())
@@ -1231,41 +1373,77 @@ class RecurringTests(LoggedInTestCase):
 
     def test_done_after_kept_copy_makes_no_second_copy(self):
         self.add_two_steps()
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         copy = self.copies_of(self.weekly).get()
         copy_pk = copy.pk
         first = copy.subtasks.get(title="Fill the can")
-        self.client.post(reverse("subtask_toggle", args=[first.pk]))
-        self.toggle(self.weekly)  # Undo: the copy is kept.
-        self.toggle(self.weekly)  # Done again.
+        self.client.post(reverse("subtask_toggle", args=[first.pk]), {"done": "1"})
+        self.toggle(self.weekly, False)  # Undo: the copy is kept.
+        self.toggle(self.weekly, True)  # Done again.
         copies = list(self.copies_of(self.weekly))
         self.assertEqual([c.pk for c in copies], [copy_pk])
         first.refresh_from_db()
         self.assertTrue(first.done)
 
     def test_deleted_copy_is_made_again(self):
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         copy = self.copies_of(self.weekly).get()
         self.client.post(reverse("todo_delete", args=[copy.pk]))
         self.assertFalse(self.copies_of(self.weekly).exists())
-        self.toggle(self.weekly)  # Undo
-        self.toggle(self.weekly)  # Done
+        self.toggle(self.weekly, False)  # Undo
+        self.toggle(self.weekly, True)  # Done
         self.assertEqual(self.copies_of(self.weekly).count(), 1)
 
     def test_deleting_original_keeps_copy(self):
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         copy = self.copies_of(self.weekly).get()
         self.client.post(reverse("todo_delete", args=[self.weekly.pk]))
         copy.refresh_from_db()
         self.assertIsNone(copy.repeated_from)
 
     def test_clearing_completed_keeps_copy(self):
-        self.toggle(self.weekly)
+        self.toggle(self.weekly, True)
         copy = self.copies_of(self.weekly).get()
         self.client.post(reverse("list_clear_completed", args=[self.todo_list.pk]))
         self.assertFalse(Todo.objects.filter(pk=self.weekly.pk).exists())
         copy.refresh_from_db()
         self.assertIsNone(copy.repeated_from)
+
+    def test_double_done_keeps_one_copy(self):
+        self.toggle(self.weekly, True)
+        self.toggle(self.weekly, True)
+        self.weekly.refresh_from_db()
+        self.assertTrue(self.weekly.done)
+        self.assertEqual(self.copies_of(self.weekly).count(), 1)
+
+    def test_double_undo_removes_the_copy_once(self):
+        self.toggle(self.weekly, True)
+        first = self.toggle(self.weekly, False)
+        # The browser follows the redirect: the list page shows the message.
+        self.client.get(self.todo_list.get_absolute_url())
+        second = self.toggle(self.weekly, False)
+        self.weekly.refresh_from_db()
+        self.assertFalse(self.weekly.done)
+        self.assertFalse(self.copies_of(self.weekly).exists())
+        self.assertEqual(Todo.objects.count(), 1)
+        removed = [m for m in self.messages_of(first) if m.endswith("was removed.")]
+        self.assertEqual(len(removed), 1)
+        self.assertEqual(self.messages_of(second), [])
+
+    def test_undo_of_an_open_todo_keeps_a_kept_copy(self):
+        self.add_two_steps()
+        self.toggle(self.weekly, True)
+        copy = self.copies_of(self.weekly).get()
+        first = copy.subtasks.get(title="Fill the can")
+        self.client.post(reverse("subtask_toggle", args=[first.pk]), {"done": "1"})
+        response = self.toggle(self.weekly, False)  # Undo: the copy is kept.
+        self.assertEqual(self.messages_of(response), [self.kept_message()])
+        self.client.get(self.todo_list.get_absolute_url())  # Shows the message.
+        response = self.toggle(self.weekly, False)  # Undo again: nothing happens.
+        self.assertEqual(self.messages_of(response), [])
+        self.assertTrue(Todo.objects.filter(pk=copy.pk).exists())
+        first.refresh_from_db()
+        self.assertTrue(first.done)
 
     def test_other_user_cannot_toggle_repeating_todo(self):
         self.assertOtherUserGets404(reverse("todo_toggle", args=[self.weekly.pk]))
