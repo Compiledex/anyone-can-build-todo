@@ -253,7 +253,8 @@ def todo_add(request, pk):
 @require_POST
 def todo_toggle(request, pk):
     """Done or Undo. Done on a repeating to-do makes its next copy; Undo removes
-    that copy again, unless it is already done or in another list."""
+    that copy again, unless it is already done, in another list, or has a done
+    step."""
     # Read the to-do inside the transaction, so a second click at the same time
     # waits and then sees the new value (see transaction_mode in settings.py).
     with transaction.atomic():
@@ -265,12 +266,17 @@ def todo_toggle(request, pk):
         else:
             copy = todo.get_next_copy()
             if copy and not copy.done and copy.todo_list_id == todo.todo_list_id:
-                copy.delete()
-                messages.info(
-                    request,
-                    f"The next copy, due {format_date(copy.due_date, 'j M Y')}, "
-                    "was removed.",
-                )
+                due = format_date(copy.due_date, "j M Y")
+                if copy.subtasks.filter(done=True).exists():
+                    # A done step is work: never delete it on one click.
+                    messages.info(
+                        request,
+                        f"The next copy, due {due}, was kept, "
+                        "because a step in it is already done.",
+                    )
+                else:
+                    copy.delete()  # Its steps go with it (on_delete=CASCADE).
+                    messages.info(request, f"The next copy, due {due}, was removed.")
     return redirect_back(request, todo.todo_list.get_absolute_url())
 
 

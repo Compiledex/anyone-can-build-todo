@@ -1123,6 +1123,65 @@ class RecurringTests(LoggedInTestCase):
         copy.refresh_from_db()
         self.assertEqual(copy.todo_list, work)
 
+    def add_two_steps(self):
+        Subtask.objects.create(todo=self.weekly, title="Fill the can")
+        Subtask.objects.create(todo=self.weekly, title="Check the soil")
+
+    def kept_message(self):
+        next_due = self.due + timedelta(days=7)
+        return (
+            f"The next copy, due {dateformat.format(next_due, 'j M Y')}, was kept, "
+            "because a step in it is already done."
+        )
+
+    def test_undo_removes_copy_and_its_steps(self):
+        self.add_two_steps()
+        self.toggle(self.weekly)
+        copy = self.copies_of(self.weekly).get()
+        self.assertEqual(copy.subtasks.count(), 2)
+        self.assertFalse(copy.subtasks.filter(done=True).exists())
+        copy_pk = copy.pk
+        response = self.toggle(self.weekly)  # Undo
+        self.assertFalse(Todo.objects.filter(pk=copy_pk).exists())
+        self.assertFalse(Subtask.objects.filter(todo_id=copy_pk).exists())
+        self.assertEqual(self.weekly.subtasks.count(), 2)
+        next_due = self.due + timedelta(days=7)
+        self.assertEqual(
+            self.messages_of(response),
+            [
+                f"The next copy, due {dateformat.format(next_due, 'j M Y')}, was removed."
+            ],
+        )
+
+    def test_undo_keeps_copy_with_a_done_step(self):
+        self.add_two_steps()
+        self.toggle(self.weekly)
+        copy = self.copies_of(self.weekly).get()
+        first = copy.subtasks.get(title="Fill the can")
+        self.client.post(reverse("subtask_toggle", args=[first.pk]))
+        response = self.toggle(self.weekly)  # Undo
+        self.weekly.refresh_from_db()
+        self.assertFalse(self.weekly.done)
+        self.assertTrue(Todo.objects.filter(pk=copy.pk).exists())
+        self.assertEqual(copy.subtasks.count(), 2)
+        first.refresh_from_db()
+        self.assertTrue(first.done)
+        self.assertEqual(self.messages_of(response), [self.kept_message()])
+
+    def test_done_after_kept_copy_makes_no_second_copy(self):
+        self.add_two_steps()
+        self.toggle(self.weekly)
+        copy = self.copies_of(self.weekly).get()
+        copy_pk = copy.pk
+        first = copy.subtasks.get(title="Fill the can")
+        self.client.post(reverse("subtask_toggle", args=[first.pk]))
+        self.toggle(self.weekly)  # Undo: the copy is kept.
+        self.toggle(self.weekly)  # Done again.
+        copies = list(self.copies_of(self.weekly))
+        self.assertEqual([c.pk for c in copies], [copy_pk])
+        first.refresh_from_db()
+        self.assertTrue(first.done)
+
     def test_deleted_copy_is_made_again(self):
         self.toggle(self.weekly)
         copy = self.copies_of(self.weekly).get()
