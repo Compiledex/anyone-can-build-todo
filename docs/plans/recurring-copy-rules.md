@@ -1,6 +1,6 @@
 # Plan: Undo keeps a changed copy, and Repeat on a done to-do makes the copy at once
 
-Status: approved by the person (2026-10-11, plan card answered), not started
+Status: **done** (2026-10-11)
 
 Builds on: **recurring** (`make_next_copy`, `get_next_copy`, `repeated_from`), **recurring-undo-steps**
 (Undo keeps the next copy when a step in it is done), **safe-toggles** (Done and Undo say which
@@ -351,3 +351,11 @@ WITH CHANGES. What changed:
 - `todo_edit` reads the to-do again with `get_visible_todo` inside `transaction.atomic()`, and
   checks `done` and `repeat` on that fresh row; a test covers a to-do marked done after the edit
   page was opened.
+
+## Built (2026-10-11)
+
+As planned. Small differences: the CUJ test is in its own class `KeepAChangedCopyTests`;
+`make_next_copy` loads the tags and the step titles once and uses them for the fingerprint, the
+tags and the steps; the tests reach `COPIED_FIELDS` and `fingerprint` through the module
+(`todo_models.COPIED_FIELDS`), so a missing name fails only those tests. No data migration
+(open choice 1, a), the message "Made the next copy, due ..." (open choice 3).
