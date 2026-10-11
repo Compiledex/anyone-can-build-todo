@@ -43,22 +43,20 @@
       </form>
     {% endif %}{% endif %}
     <a class="button button-quiet button-compact" href="{% url 'todo_edit' todo.pk %}" aria-label="Edit {{ todo.title }}">Edit</a>
-    <form method="post" action="{% url 'todo_toggle' todo.pk %}">
+    {# One form, two buttons: each button names its own view (formaction) and its own #}
+    {# next (name and value), so one CSRF token is enough. No action on the form. #}
+    <form method="post">
       {% csrf_token %}
-      {# The state the button asks for, so a second click or an old tab changes nothing. #}
+      {# The state Done/Undo asks for, so a second click or an old tab changes nothing. #}
+      {# Delete ignores it. #}
       <input type="hidden" name="done" value="{% if todo.done %}0{% else %}1{% endif %}">
       {# Back to this same address (search, filter), at this row; with a filter the row #}
       {# leaves the page, so at the next row. Only database numbers after the #. #}
-      <input type="hidden" name="next" value="{{ back_url }}#{% if status %}{{ todo.anchor_after_removal }}{% else %}todo-{{ todo.pk }}{% endif %}">
       {# "Done: <title>": the visible word first, so voice control still works. #}
-      <button class="button button-secondary button-compact" type="submit" aria-label="{% if todo.done %}Undo{% else %}Done{% endif %}: {{ todo.title }}">{% if todo.done %}Undo{% else %}Done{% endif %}</button>
-    </form>
-    <form method="post" action="{% url 'todo_delete' todo.pk %}">
-      {% csrf_token %}
-      {# The row is gone after this: open the page at the next row. #}
-      <input type="hidden" name="next" value="{{ back_url }}#{{ todo.anchor_after_removal }}">
+      <button class="button button-secondary button-compact" type="submit" formaction="{% url 'todo_toggle' todo.pk %}" name="next" value="{{ back_url }}#{% if status %}{{ todo.anchor_after_removal }}{% else %}todo-{{ todo.pk }}{% endif %}" aria-label="{% if todo.done %}Undo{% else %}Done{% endif %}: {{ todo.title }}">{% if todo.done %}Undo{% else %}Done{% endif %}</button>
+      {# The row is gone after Delete: open the page at the next row. #}
       {# Quiet gray; red on hover and on keyboard focus. #}
-      <button class="button button-quiet button-compact delete" type="submit" aria-label="Delete: {{ todo.title }}">Delete</button>
+      <button class="button button-quiet button-compact delete" type="submit" formaction="{% url 'todo_delete' todo.pk %}" name="next" value="{{ back_url }}#{{ todo.anchor_after_removal }}" aria-label="Delete: {{ todo.title }}">Delete</button>
     </form>
   </div>
   {# The steps of one to-do, inside its <li>. Opens and closes with no JavaScript. #}
@@ -72,18 +70,12 @@
         {% for step in todo.subtasks.all %}
           <li class="step{% if step.done %} done{% endif %}">
             <span class="step-title">{{ step.title }}</span>
-            <form method="post" action="{% url 'subtask_toggle' step.pk %}">
+            {# One form for Done/Undo and Delete, as in the row: each button has a formaction. #}
+            <form method="post">
               {% csrf_token %}
               <input type="hidden" name="done" value="{% if step.done %}0{% else %}1{% endif %}">
-              {% if step.done %}
-                <button class="button button-quiet button-compact" type="submit" aria-label="Undo: {{ step.title }}">Undo</button>
-              {% else %}
-                <button class="button button-quiet button-compact" type="submit" aria-label="Done: {{ step.title }}">Done</button>
-              {% endif %}
-            </form>
-            <form method="post" action="{% url 'subtask_delete' step.pk %}">
-              {% csrf_token %}
-              <button class="button button-quiet button-compact delete" type="submit" aria-label="Delete step: {{ step.title }}">Delete</button>
+              <button class="button button-quiet button-compact" type="submit" formaction="{% url 'subtask_toggle' step.pk %}" aria-label="{% if step.done %}Undo{% else %}Done{% endif %}: {{ step.title }}">{% if step.done %}Undo{% else %}Done{% endif %}</button>
+              <button class="button button-quiet button-compact delete" type="submit" formaction="{% url 'subtask_delete' step.pk %}" aria-label="Delete step: {{ step.title }}">Delete</button>
             </form>
           </li>
         {% endfor %}

@@ -745,6 +745,12 @@ ul.steps li {
   font-size: 0.9375rem;
 }
 
+/* A step's Done/Undo and Delete share one form; it makes no box of its own, so
+   the two buttons are flex items with the same gap as the title. */
+ul.steps li form {
+  display: contents;
+}
+
 ul.steps .step-title {
   flex: 1;
   min-width: 0;

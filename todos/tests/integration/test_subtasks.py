@@ -9,8 +9,6 @@ does not exist also gives 404, so an "other user gets 404" test would pass
 before any code exists.
 """
 
-import re
-
 from django.db import connection
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
@@ -18,7 +16,7 @@ from django.urls import reverse
 
 from accounts.tests.helpers import LoggedInTestCase, make_user
 from todos.models import Subtask, Todo
-from todos.tests.helpers import count_queries
+from todos.tests.helpers import button_form, count_queries
 
 OPEN_DETAILS = '<details class="steps" open>'
 ERROR = "A step needs a title of 1 to 200 characters."
@@ -144,16 +142,11 @@ class SubtaskTests(LoggedInTestCase):
         response = self.client.get(
             reverse("list_detail", args=[self.todo_list.pk]), {"open": self.todo.pk}
         )
-        page = response.content.decode()
         for step, value in [(open_step, "1"), (done_step, "0")]:
             with self.subTest(step=step.title):
                 action = reverse("subtask_toggle", args=[step.pk])
-                form = re.search(
-                    rf'<form method="post" action="{action}">.*?</form>', page, re.S
-                ).group(0)
-                self.assertInHTML(
-                    f'<input type="hidden" name="done" value="{value}">', form
-                )
+                _, hidden = button_form(response, action)
+                self.assertEqual(hidden["done"], value)
 
     def test_delete_step(self):
         step = self.make_step()

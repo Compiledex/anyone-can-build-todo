@@ -3,7 +3,6 @@
 Edit, priority, tags, repeating to-dos and access rules have their own files.
 """
 
-import html
 import re
 from datetime import date, timedelta
 
@@ -12,23 +11,18 @@ from django.utils import timezone
 
 from accounts.tests.helpers import LoggedInTestCase
 from todos.models import Todo, TodoList
-from todos.tests.helpers import add_todo
+from todos.tests.helpers import add_todo, button_form
 
 # What an overdue row shows next to its date.
 OVERDUE_LABEL = '<span class="overdue-label">Overdue</span>'
 
 
-def hidden_next(response, action):
-    """The hidden `next` of the form that posts to `action`, as the browser reads it."""
-    pattern = re.compile(
-        rf'<form method="post" action="{re.escape(action)}">.*?'
-        r'name="next" value="([^"]*)"',
-        re.S,
-    )
-    match = pattern.search(response.content.decode())
-    if match is None:
-        raise AssertionError(f"No form with a hidden next posts to {action}")
-    return html.unescape(match.group(1))
+def button_next(response, action):
+    """The `next` the button that posts to `action` sends, as the browser reads it."""
+    button, _ = button_form(response, action)
+    if button.get("name") != "next":
+        raise AssertionError(f"The button that posts to {action} sends no next")
+    return button["value"]
 
 
 class ListTests(LoggedInTestCase):
@@ -414,22 +408,17 @@ class ToggleTests(LoggedInTestCase):
             title="Finished", todo_list=self.todo_list, done=True
         )
         response = self.client.get(self.todo_list.get_absolute_url())
-        page = response.content.decode()
         for todo, value in [(open_todo, "1"), (done_todo, "0")]:
             with self.subTest(todo=todo.title):
                 action = reverse("todo_toggle", args=[todo.pk])
-                form = re.search(
-                    rf'<form method="post" action="{action}">.*?</form>', page, re.S
-                ).group(0)
-                self.assertInHTML(
-                    f'<input type="hidden" name="done" value="{value}">', form
-                )
+                _, hidden = button_form(response, action)
+                self.assertEqual(hidden["done"], value)
 
     def test_done_goes_back_to_its_row(self):
         first, second, _ = self.make_three()
         url = self.todo_list.get_absolute_url()
         response = self.client.get(url)
-        next_url = hidden_next(response, reverse("todo_toggle", args=[second.pk]))
+        next_url = button_next(response, reverse("todo_toggle", args=[second.pk]))
         self.assertEqual(next_url, f"{url}#todo-{second.pk}")
         response = self.client.post(
             reverse("todo_toggle", args=[second.pk]), {"done": "1", "next": next_url}
@@ -441,10 +430,10 @@ class ToggleTests(LoggedInTestCase):
         url = self.todo_list.get_absolute_url()
         action = reverse("todo_toggle", args=[second.pk])
         response = self.client.get(f"{url}?status=open")
-        self.assertTrue(hidden_next(response, action).endswith(f"#todo-{third.pk}"))
+        self.assertTrue(button_next(response, action).endswith(f"#todo-{third.pk}"))
         # A bad status shows every row, so it is no filter: the row stays.
         response = self.client.get(f"{url}?status=bogus")
-        self.assertTrue(hidden_next(response, action).endswith(f"#todo-{second.pk}"))
+        self.assertTrue(button_next(response, action).endswith(f"#todo-{second.pk}"))
 
     def test_next_with_a_fragment_keeps_the_same_site_rule(self):
         todo = Todo.objects.create(title="Read chapter 3", todo_list=self.todo_list)
@@ -491,7 +480,7 @@ class DeleteTests(LoggedInTestCase):
 
         def delete(todo):
             action = reverse("todo_delete", args=[todo.pk])
-            next_url = hidden_next(self.client.get(url), action)
+            next_url = button_next(self.client.get(url), action)
             response = self.client.post(action, {"next": next_url})
             self.assertRedirects(response, next_url, fetch_redirect_response=False)
             return next_url

@@ -10,6 +10,7 @@ from django.contrib.messages import get_messages
 from django.db import connection
 from django.test.utils import CaptureQueriesContext
 
+from accounts.tests.helpers import parse_page
 from todos.models import Todo
 
 
@@ -26,6 +27,28 @@ def shown_titles(response):
 def messages_of(response):
     """The texts of the messages this response added."""
     return [str(m) for m in get_messages(response.wsgi_request)]
+
+
+def button_form(response, formaction):
+    """The button that posts to `formaction`, and the hidden fields of its form.
+
+    A row's Done/Undo and Delete share one form; each button names its own view
+    (`formaction`) and its own `next` (the button's `name` and `value`). Returns
+    (the button's attributes, {name: value} of the form's hidden inputs). Values
+    are read as the browser reads them (`&amp;` is `&`).
+    """
+    hidden = {}
+    found = []
+    for tag, attrs in parse_page(response).elements:
+        if tag == "form":
+            hidden = {}
+        elif tag == "input" and attrs.get("type") == "hidden":
+            hidden[attrs["name"]] = attrs.get("value")
+        elif tag == "button" and attrs.get("formaction") == formaction:
+            found.append((attrs, dict(hidden)))
+    if len(found) != 1:
+        raise AssertionError(f"{len(found)} buttons post to {formaction}, not 1")
+    return found[0]
 
 
 def count_queries(func):
