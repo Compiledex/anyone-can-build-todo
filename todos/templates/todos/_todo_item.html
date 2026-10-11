@@ -1,3 +1,6 @@
+{# spaceless: no whitespace between tags, so a long list sends much less HTML. #}
+{# Safe: tags side by side are always in a flex or grid box with gap, never a space. #}
+{% spaceless %}
 {% with overdue=todo.is_overdue %}
 <li id="todo-{{ todo.pk }}" class="{% if todo.done %}done{% elif overdue %}overdue{% endif %}"{% if can_reorder %} data-id="{{ todo.pk }}"{% endif %}>
   {# Only the handle is draggable, so the text and the "add step" box still work. #}
@@ -101,3 +104,4 @@
   {% endwith %}
 </li>
 {% endwith %}
+{% endspaceless %}
