@@ -5,8 +5,6 @@ Here: the pages use the same frame and CSS as the landing page, every input has
 a label, and the help and error texts are linked to their input.
 """
 
-from html.parser import HTMLParser
-
 from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.messages.storage.cookie import CookieStorage
@@ -16,79 +14,16 @@ from django.templatetags.static import static
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
-from accounts.tests.helpers import TEST_PASSWORD, LoggedInTestCase, make_user
+from accounts.tests.helpers import (
+    TEST_PASSWORD,
+    LoggedInTestCase,
+    make_user,
+    parse_page,
+)
 
 LOGIN_URL = "/accounts/login/"
 SIGNUP_URL = "/accounts/signup/"
 SITE_FRAME = "todos/site_base.html"
-
-
-class PageParts(HTMLParser):
-    """Collects the tags of a page in order, with their attributes and text."""
-
-    def __init__(self):
-        super().__init__()
-        self.elements = []  # (tag, attributes), in the order of the page
-        self.links = []  # (href, text)
-        self.buttons = []  # the text of each <button>
-        self.text_by_id = {}  # the text inside each element that has an id
-        self._open = []  # (tag, id, text parts) of the elements still open
-        self._href = None
-        self._link_text = []
-        self._button_text = None
-
-    def handle_starttag(self, tag, attrs):
-        attrs = dict(attrs)
-        self.elements.append((tag, attrs))
-        if tag == "a":
-            self._href = attrs.get("href")
-            self._link_text = []
-        if tag == "button":
-            self._button_text = []
-        if tag not in ("input", "img", "source", "link", "meta", "br"):
-            self._open.append((tag, attrs.get("id"), []))
-
-    def handle_data(self, data):
-        if self._href is not None:
-            self._link_text.append(data)
-        if self._button_text is not None:
-            self._button_text.append(data)
-        for _tag, _id, parts in self._open:
-            parts.append(data)
-
-    def handle_endtag(self, tag):
-        if tag == "a" and self._href is not None:
-            self.links.append((self._href, " ".join("".join(self._link_text).split())))
-            self._href = None
-        if tag == "button" and self._button_text is not None:
-            self.buttons.append(" ".join("".join(self._button_text).split()))
-            self._button_text = None
-        for index in range(len(self._open) - 1, -1, -1):
-            if self._open[index][0] == tag:
-                _tag, element_id, parts = self._open.pop(index)
-                if element_id:
-                    self.text_by_id[element_id] = " ".join("".join(parts).split())
-                break
-
-    def all(self, tag, **attrs):
-        return [
-            a
-            for t, a in self.elements
-            if t == tag and all(a.get(k) == v for k, v in attrs.items())
-        ]
-
-    def position(self, tag, **attrs):
-        """The place of the first matching element in the page, for 'above' and 'below'."""
-        for index, (t, a) in enumerate(self.elements):
-            if t == tag and all(a.get(k) == v for k, v in attrs.items()):
-                return index
-        raise AssertionError(f"No <{tag}> with {attrs}")
-
-
-def parts_of(response):
-    parser = PageParts()
-    parser.feed(response.content.decode())
-    return parser
 
 
 def visible_inputs(parts):
@@ -103,7 +38,8 @@ class SharedFrameTests(TestCase):
                 self.assertTemplateUsed(response, SITE_FRAME)
                 self.assertTemplateNotUsed(response, "base.html")
                 stylesheets = [
-                    a["href"] for a in parts_of(response).all("link", rel="stylesheet")
+                    a["href"]
+                    for a in parse_page(response).all("link", rel="stylesheet")
                 ]
                 # The tokens, then the shared CSS, then the page's own CSS.
                 self.assertEqual(
@@ -115,7 +51,7 @@ class SharedFrameTests(TestCase):
     def test_every_stylesheet_is_a_static_file_and_nothing_comes_from_other_sites(self):
         for url in [LOGIN_URL, SIGNUP_URL]:
             with self.subTest(url=url):
-                parts = parts_of(self.client.get(url))
+                parts = parse_page(self.client.get(url))
                 self.assertEqual(parts.all("script"), [])
                 for attrs in parts.all("link", rel="stylesheet"):
                     path = attrs["href"].removeprefix(static(""))
@@ -150,7 +86,7 @@ class SharedFrameTests(TestCase):
         ]
         for url, other, other_url, this in cases:
             with self.subTest(url=url):
-                parts = parts_of(self.client.get(url))
+                parts = parse_page(self.client.get(url))
                 self.assertIn(("/", "To-do list"), parts.links)
                 self.assertEqual(
                     [href for href, text in parts.links if text == other], [other_url]
@@ -171,7 +107,7 @@ class SharedFrameTests(TestCase):
     def test_one_app_screenshot_with_a_dark_version(self):
         for url in [LOGIN_URL, SIGNUP_URL]:
             with self.subTest(url=url):
-                parts = parts_of(self.client.get(url))
+                parts = parse_page(self.client.get(url))
                 images = parts.all("img")
                 self.assertEqual(len(images), 1)
                 image = images[0]
@@ -208,7 +144,7 @@ class FormFieldTests(TestCase):
     def test_every_input_has_a_label(self):
         for url in [LOGIN_URL, SIGNUP_URL]:
             with self.subTest(url=url):
-                parts = parts_of(self.client.get(url))
+                parts = parse_page(self.client.get(url))
                 inputs = visible_inputs(parts)
                 self.assertTrue(inputs)
                 label_for = {a.get("for") for a in parts.all("label")}
@@ -236,7 +172,7 @@ class FormFieldTests(TestCase):
         ]
         for url, fields in cases:
             with self.subTest(url=url):
-                inputs = visible_inputs(parts_of(self.client.get(url)))
+                inputs = visible_inputs(parse_page(self.client.get(url)))
                 self.assertEqual(
                     [(a["name"], a.get("autocomplete")) for a in inputs], fields
                 )
@@ -247,14 +183,14 @@ class FormFieldTests(TestCase):
             (SIGNUP_URL, reverse("signup")),
         ]:
             with self.subTest(url=url):
-                forms = parts_of(self.client.get(url)).all("form")
+                forms = parse_page(self.client.get(url)).all("form")
                 self.assertEqual(
                     [(f.get("method"), f.get("action")) for f in forms],
                     [("post", action)],
                 )
 
     def test_signup_help_text_is_shown_and_linked_to_its_input(self):
-        parts = parts_of(self.client.get(SIGNUP_URL))
+        parts = parse_page(self.client.get(SIGNUP_URL))
         for name in ["username", "password1", "password2"]:
             with self.subTest(name=name):
                 (attrs,) = parts.all("input", name=name)
@@ -278,7 +214,7 @@ class FormFieldTests(TestCase):
         self.assertNotContains(response, bad_password)
         self.assertEqual(response.status_code, 200)
         self.assertFalse(get_user_model().objects.filter(username="carol").exists())
-        parts = parts_of(response)
+        parts = parse_page(response)
         # Django puts the password rule errors on the confirmation field.
         (attrs,) = parts.all("input", name="password2")
         self.assertEqual(attrs.get("aria-invalid"), "true")
@@ -301,7 +237,7 @@ class FormFieldTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotIn("_auth_user_id", self.client.session)
         self.assertNotContains(response, "wrong-password-1")
-        parts = parts_of(response)
+        parts = parse_page(response)
         errors = parts.position("ul", **{"class": "errorlist nonfield"})
         self.assertLess(errors, parts.position("input", name="username"))
         self.assertContains(response, "Please enter a correct username and password.")
@@ -334,7 +270,7 @@ class MessagesTests(TestCase):
         self.client.cookies.update(response.cookies)
 
         response = self.client.get(LOGIN_URL)
-        parts = parts_of(response)
+        parts = parse_page(response)
         boxes = parts.all("div", **{"class": "container messages", "role": "status"})
         self.assertEqual(len(boxes), 1, "the message box is missing")
         self.assertContains(response, "Your session ended. Please log in again.")
@@ -360,7 +296,7 @@ class AppPagesTests(LoggedInTestCase):
         self.assertNotContains(response, "todos/site.css")
         # The app shares the tokens with the visitor pages, then has its own CSS.
         stylesheets = [
-            a["href"] for a in parts_of(response).all("link", rel="stylesheet")
+            a["href"] for a in parse_page(response).all("link", rel="stylesheet")
         ]
         self.assertEqual(
             stylesheets, [static("todos/tokens.css"), static("todos/app.css")]

@@ -14,7 +14,6 @@ Two rules, so that no test can pass while the feature is broken:
 import re
 from datetime import timedelta
 
-from django.contrib.messages import get_messages
 from django.test import Client, TestCase
 from django.urls import reverse
 from django.utils import dateformat, timezone
@@ -22,6 +21,7 @@ from django.utils.html import escape
 
 from accounts.tests.helpers import make_user
 from todos.models import Subtask, Tag, Todo, TodoList
+from todos.tests.helpers import messages_of
 
 # The two parts of the menu on the list page.
 MY_LISTS = re.compile(r'<p class="menu" id="my-lists">(.*?)</p>', re.S)
@@ -54,9 +54,6 @@ class SharingTestCase(TestCase):
 
     def url(self, name, *args):
         return reverse(name, args=args)
-
-    def messages_of(self, response):
-        return [str(m) for m in get_messages(response.wsgi_request)]
 
     def assertStillMilk(self):
         """ "Milk" exists, is not done, and has its old title."""
@@ -168,7 +165,7 @@ class MemberCanTests(SharingTestCase):
             self.url("todo_toggle", self.milk.pk), {"done": "0"}
         )
         self.assertRedirects(response, self.groceries.get_absolute_url())
-        self.assertEqual(self.messages_of(response), [])
+        self.assertEqual(messages_of(response), [])
         self.milk.refresh_from_db()
         self.assertFalse(self.milk.done)
         self.assertEqual(Todo.objects.count(), count)
@@ -245,7 +242,7 @@ class MemberCanTests(SharingTestCase):
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.assertFalse(Todo.objects.filter(pk__in=[eggs.pk, bread.pk]).exists())
         self.assertStillMilk()
-        self.assertIn("Deleted 2 completed to-dos.", self.messages_of(response))
+        self.assertIn("Deleted 2 completed to-dos.", messages_of(response))
 
     def test_member_sees_clear_button(self):
         Todo.objects.create(todo_list=self.groceries, title="Eggs", done=True)
@@ -298,7 +295,7 @@ class MemberCanTests(SharingTestCase):
         )
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.assertEqual(list(self.groceries.todos.all()), [self.milk])
-        self.assertEqual(len(self.messages_of(response)), 1)
+        self.assertEqual(len(messages_of(response)), 1)
 
     def test_member_undo_keeps_copy_with_a_done_step(self):
         self.make_weekly_milk()
@@ -318,7 +315,7 @@ class MemberCanTests(SharingTestCase):
         self.assertTrue(step.done)
         due = dateformat.format(copy.due_date, "j M Y")
         self.assertEqual(
-            self.messages_of(response),
+            messages_of(response),
             [
                 f"The next copy, due {due}, was kept, "
                 "because a step in it is already done."
@@ -573,13 +570,13 @@ class ShareTests(SharingTestCase):
         response = self.share("carol")
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.assertTrue(self.groceries.members.filter(pk=self.carol.pk).exists())
-        self.assertEqual(self.messages_of(response), ["Shared with carol."])
+        self.assertEqual(messages_of(response), ["Shared with carol."])
 
     def test_unknown_username_is_refused(self):
         response = self.share("nobody")
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.assertEqual(list(self.groceries.members.all()), [self.bob])
-        self.assertEqual(self.messages_of(response), ["No user with that username."])
+        self.assertEqual(messages_of(response), ["No user with that username."])
 
     def test_inactive_user_is_refused(self):
         dave = make_user("dave")
@@ -587,23 +584,23 @@ class ShareTests(SharingTestCase):
         dave.save()
         response = self.share("dave")
         self.assertEqual(list(self.groceries.members.all()), [self.bob])
-        self.assertEqual(self.messages_of(response), ["No user with that username."])
+        self.assertEqual(messages_of(response), ["No user with that username."])
 
     def test_cannot_share_with_yourself(self):
         response = self.share("alice")
         self.assertFalse(self.groceries.members.filter(pk=self.alice.pk).exists())
-        self.assertEqual(self.messages_of(response), ["You already own this list."])
+        self.assertEqual(messages_of(response), ["You already own this list."])
 
     def test_sharing_twice_adds_one_member(self):
         response = self.share("bob")
         self.assertEqual(self.groceries.members.count(), 1)
-        self.assertEqual(self.messages_of(response), ["bob is already a member."])
+        self.assertEqual(messages_of(response), ["bob is already a member."])
 
     def test_username_is_exact(self):
         self.groceries.members.remove(self.bob)
         response = self.share("BOB")
         self.assertEqual(self.groceries.members.count(), 0)
-        self.assertEqual(self.messages_of(response), ["No user with that username."])
+        self.assertEqual(messages_of(response), ["No user with that username."])
 
     def test_get_does_not_share(self):
         response = self.client.get(
@@ -670,7 +667,7 @@ class LeaveRemoveTests(SharingTestCase):
         )
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.assertFalse(self.groceries.members.filter(pk=self.bob.pk).exists())
-        self.assertEqual(self.messages_of(response), ["bob was removed."])
+        self.assertEqual(messages_of(response), ["bob was removed."])
         self.bob.refresh_from_db()
         self.assertTrue(TodoList.objects.filter(pk=self.bobs_list.pk).exists())
 

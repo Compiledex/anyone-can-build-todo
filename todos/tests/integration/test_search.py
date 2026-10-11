@@ -7,12 +7,10 @@ broken page cannot pass.
 
 from urllib.parse import quote
 
-from django.db import connection
-from django.test.utils import CaptureQueriesContext
-
 from accounts.tests.helpers import LoggedInTestCase
 from todos.models import Subtask, Todo, TodoList
 from todos.tags import parse_tags
+from todos.tests.helpers import add_todo, count_queries, shown_titles
 
 NO_MATCH = "No to-dos match"
 EMPTY_LIST = "Nothing to do yet"
@@ -21,23 +19,18 @@ SHOW_ALL = ">Show all</a>"
 
 class SearchTests(LoggedInTestCase):
     def add(self, title, todo_list=None, **fields):
-        return Todo.objects.create(
-            todo_list=todo_list or self.todo_list, title=title, **fields
-        )
+        return add_todo(todo_list or self.todo_list, title, **fields)
 
     def search(self, q, todo_list=None, client=None):
         the_list = todo_list or self.todo_list
         url = f"{the_list.get_absolute_url()}?q={quote(q)}"
         return (client or self.client).get(url)
 
-    def shown(self, response):
-        return [todo.title for todo in response.context["todos"]]
-
     def test_search_finds_word_in_title(self):
         self.add("Buy milk")
         self.add("Call home")
         response = self.search("milk")
-        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
         self.assertContains(response, "Buy milk")
         self.assertNotContains(response, "Call home")
 
@@ -45,33 +38,33 @@ class SearchTests(LoggedInTestCase):
         self.add("Buy milk")
         self.add("Call home")
         response = self.search("MILK")
-        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
 
     def test_search_finds_word_in_description(self):
         self.add("Shopping", description="Remember the milk")
         self.add("Call home")
         response = self.search("milk")
-        self.assertEqual(self.shown(response), ["Shopping"])
+        self.assertEqual(shown_titles(response), ["Shopping"])
 
     def test_search_finds_tag_name(self):
         todo = self.add("Buy bread")
         todo.set_tags(["shopping"])
         self.add("Call home")
         response = self.search("shop")
-        self.assertEqual(self.shown(response), ["Buy bread"])
+        self.assertEqual(shown_titles(response), ["Buy bread"])
 
     def test_todo_with_two_matching_tags_is_shown_once(self):
         todo = self.add("Buy bread")
         todo.set_tags(["shop", "shopping"])
         self.add("Call home")
         response = self.search("shop")
-        self.assertEqual(self.shown(response), ["Buy bread"])
+        self.assertEqual(shown_titles(response), ["Buy bread"])
 
     def test_empty_search_shows_whole_list(self):
         self.add("Buy milk")
         self.add("Call home")
         response = self.search("  ")
-        self.assertEqual(self.shown(response), ["Buy milk", "Call home"])
+        self.assertEqual(shown_titles(response), ["Buy milk", "Call home"])
         self.assertNotContains(response, SHOW_ALL)
         self.assertNotContains(response, NO_MATCH)
 
@@ -79,7 +72,7 @@ class SearchTests(LoggedInTestCase):
         self.add("Buy milk")
         self.add("Call home")
         response = self.search(" milk ")
-        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
 
         response = self.search(" xyz ")
         self.assertContains(response, f"{NO_MATCH} “xyz”.")
@@ -89,18 +82,18 @@ class SearchTests(LoggedInTestCase):
         self.add("50% off")
         self.add("Call home")
         response = self.search("%")
-        self.assertEqual(self.shown(response), ["50% off"])
+        self.assertEqual(shown_titles(response), ["50% off"])
 
         # `_` is a normal letter too, not "any one letter".
         self.add("a_b")
         self.add("axb")
         response = self.search("_")
-        self.assertEqual(self.shown(response), ["a_b"])
+        self.assertEqual(shown_titles(response), ["a_b"])
 
     def test_no_match_shows_message(self):
         self.add("Buy milk")
         response = self.search("xyz")
-        self.assertEqual(self.shown(response), [])
+        self.assertEqual(shown_titles(response), [])
         self.assertContains(response, f"{NO_MATCH} “xyz”.")
         self.assertContains(response, SHOW_ALL)
         self.assertNotContains(response, EMPTY_LIST)
@@ -120,7 +113,7 @@ class SearchTests(LoggedInTestCase):
         self.add("Buy milk")
         self.add("Call home", done=True)
         response = self.search("milk")
-        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
         self.assertContains(response, "Clear completed (1)")
 
     def test_search_box_keeps_typed_text(self):
@@ -147,7 +140,7 @@ class SearchTests(LoggedInTestCase):
         response = self.search("m" * 201)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "at most 200 characters")
-        self.assertEqual(self.shown(response), ["Buy milk", "Call home"])
+        self.assertEqual(shown_titles(response), ["Buy milk", "Call home"])
         self.assertNotContains(response, NO_MATCH)
 
         response = self.search("m" * 200)
@@ -160,7 +153,7 @@ class SearchTests(LoggedInTestCase):
         self.add("Buy milk", todo_list=work)
         self.add("Milk the cow")
         response = self.search("milk")
-        self.assertEqual(self.shown(response), ["Milk the cow"])
+        self.assertEqual(shown_titles(response), ["Milk the cow"])
         self.assertNotContains(response, "Buy milk")
 
     def test_other_users_todos_never_match(self):
@@ -169,7 +162,7 @@ class SearchTests(LoggedInTestCase):
         Todo.objects.create(todo_list=self.other_list, title="Milk shake")
         bob = self.client_for(self.other_user)
         response = self.search("milk", todo_list=self.other_list, client=bob)
-        self.assertEqual(self.shown(response), ["Milk shake"])
+        self.assertEqual(shown_titles(response), ["Milk shake"])
         self.assertNotContains(response, "Buy milk")
 
     def test_search_ignores_case_of_nordic_letters_in_title(self):
@@ -178,26 +171,26 @@ class SearchTests(LoggedInTestCase):
         for q in ["ærend", "ÆREND"]:
             with self.subTest(q=q):
                 response = self.search(q)
-                self.assertEqual(self.shown(response), ["Ærend på posten"])
+                self.assertEqual(shown_titles(response), ["Ærend på posten"])
 
     def test_search_ignores_case_of_nordic_letters_in_notes(self):
         self.add("Fest", description="Kjøp ØL og brus")
         self.add("Vask bilen")
         response = self.search("øl")
-        self.assertEqual(self.shown(response), ["Fest"])
+        self.assertEqual(shown_titles(response), ["Fest"])
 
     def test_search_ignores_case_of_nordic_letters_in_tags(self):
         self.add("Handle").set_tags(parse_tags("Åker"))  # Stored as "åker".
         self.add("Ring").set_tags(["jobb"])
         response = self.search("ÅKER")
-        self.assertEqual(self.shown(response), ["Handle"])
+        self.assertEqual(shown_titles(response), ["Handle"])
 
     def test_search_case_folds_the_stored_tag_name(self):
         # parse_tags keeps "ß" ("straße"); only folding the column finds "strasse".
         self.add("Flytt").set_tags(parse_tags("Straße"))
         self.add("Ring").set_tags(parse_tags("jobb"))
         response = self.search("STRASSE")
-        self.assertEqual(self.shown(response), ["Flytt"])
+        self.assertEqual(shown_titles(response), ["Flytt"])
 
     def test_nordic_search_keeps_other_users_out(self):
         theirs = self.add("Ærend i byen")  # alice's to-do, with a matching tag.
@@ -205,7 +198,7 @@ class SearchTests(LoggedInTestCase):
         Todo.objects.create(todo_list=self.other_list, title="Ærend for bob")
         bob = self.client_for(self.other_user)
         response = self.search("ærend", todo_list=self.other_list, client=bob)
-        self.assertEqual(self.shown(response), ["Ærend for bob"])
+        self.assertEqual(shown_titles(response), ["Ærend for bob"])
         self.assertNotContains(response, "Ærend i byen")
 
     def test_other_users_list_with_search_is_404(self):
@@ -221,10 +214,10 @@ class SearchTests(LoggedInTestCase):
         bob = self.client_for(self.other_user)
 
         response = self.search("milk", client=bob)
-        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
 
         response = self.search("dairy", client=bob)
-        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
 
     def test_search_keeps_steps_open(self):
         # ?open= (from a step action) and ?q= work together.
@@ -233,15 +226,13 @@ class SearchTests(LoggedInTestCase):
         self.add("Call home")
         url = f"{self.todo_list.get_absolute_url()}?q=milk&open={milk.pk}"
         response = self.client.get(url)
-        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
         self.assertContains(response, '<details class="steps" open>', count=1)
         self.assertContains(response, "Find a bag")
 
     def test_search_query_count_does_not_grow_with_rows(self):
-        def count_queries():
-            with CaptureQueriesContext(connection) as queries:
-                self.assertEqual(self.search("milk").status_code, 200)
-            return len(queries)
+        def load():
+            self.assertEqual(self.search("milk").status_code, 200)
 
         def add_match(n):
             todo = self.add(f"Milk {n}")
@@ -249,10 +240,10 @@ class SearchTests(LoggedInTestCase):
             Subtask.objects.create(todo=todo, title=f"Step {n}")
 
         add_match(0)
-        with_one = count_queries()
+        with_one = count_queries(load)
         for n in range(1, 5):
             add_match(n)
-        self.assertEqual(count_queries(), with_one)
+        self.assertEqual(count_queries(load), with_one)
 
     def test_hash_finds_the_tag(self):
         # The page shows the tag as "#work"; it is stored as "work".
@@ -261,13 +252,13 @@ class SearchTests(LoggedInTestCase):
         for q in ["#work", "#WORK", "# work", "##work"]:
             with self.subTest(q=q):
                 response = self.search(q)
-                self.assertEqual(self.shown(response), ["Write report"])
+                self.assertEqual(shown_titles(response), ["Write report"])
 
     def test_hash_still_searches_titles(self):
         self.add("Fix #work bug")
         self.add("Call home")
         response = self.search("#work")
-        self.assertEqual(self.shown(response), ["Fix #work bug"])
+        self.assertEqual(shown_titles(response), ["Fix #work bug"])
 
     def test_hash_alone_does_not_match_every_tag(self):
         self.add("Clean the kitchen").set_tags(["home"])
@@ -275,14 +266,14 @@ class SearchTests(LoggedInTestCase):
         for q in ["#", "# ", "###"]:
             with self.subTest(q=q):
                 response = self.search(q)
-                self.assertEqual(self.shown(response), [])
+                self.assertEqual(shown_titles(response), [])
                 self.assertContains(response, NO_MATCH)
 
     def test_hash_search_shows_a_todo_once(self):
         self.add("Write report").set_tags(["work", "workshop"])
         self.add("Call home")
         response = self.search("#work")
-        self.assertEqual(self.shown(response), ["Write report"])
+        self.assertEqual(shown_titles(response), ["Write report"])
 
     def test_hash_search_stays_in_the_list(self):
         self.add("Write report").set_tags(["work"])
@@ -290,6 +281,6 @@ class SearchTests(LoggedInTestCase):
             ["work"]
         )
         response = self.search("#work")
-        self.assertEqual(self.shown(response), ["Write report"])
+        self.assertEqual(shown_titles(response), ["Write report"])
         self.assertNotContains(response, "Bob&#x27;s report")
         self.assertNotContains(response, "Bob's report")

@@ -13,6 +13,7 @@ from django.utils import timezone
 
 from accounts.tests.helpers import LoggedInTestCase, make_user
 from todos.models import Todo
+from todos.tests.helpers import add_todo, shown_titles
 
 
 class ReorderTests(LoggedInTestCase):
@@ -25,13 +26,10 @@ class ReorderTests(LoggedInTestCase):
         self.manual_url = f"{self.todo_list.get_absolute_url()}?sort=manual"
 
     def add(self, title, todo_list=None, **fields):
-        return Todo.objects.create(
-            todo_list=todo_list or self.todo_list, title=title, **fields
-        )
+        return add_todo(todo_list or self.todo_list, title, **fields)
 
     def shown(self, client=None):
-        response = (client or self.client).get(self.manual_url)
-        return [todo.title for todo in response.context["todos"]]
+        return shown_titles((client or self.client).get(self.manual_url))
 
     def reorder(self, *todos, client=None):
         return (client or self.client).post(

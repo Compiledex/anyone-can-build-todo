@@ -6,6 +6,34 @@ file as tests. Other test files import from it.
 
 from unittest.mock import patch
 
+from django.contrib.messages import get_messages
+from django.db import connection
+from django.test.utils import CaptureQueriesContext
+
+from todos.models import Todo
+
+
+def add_todo(todo_list, title, **fields):
+    """A new to-do in this list."""
+    return Todo.objects.create(todo_list=todo_list, title=title, **fields)
+
+
+def shown_titles(response):
+    """The titles of the to-dos the list page shows, in their order."""
+    return [todo.title for todo in response.context["todos"]]
+
+
+def messages_of(response):
+    """The texts of the messages this response added."""
+    return [str(m) for m in get_messages(response.wsgi_request)]
+
+
+def count_queries(func):
+    """Runs func() and returns how many database queries it made."""
+    with CaptureQueriesContext(connection) as queries:
+        func()
+    return len(queries)
+
 
 class FakeOsascriptMixin:
     """Replaces subprocess.run in todos/reminders.py with a fake, for every test.

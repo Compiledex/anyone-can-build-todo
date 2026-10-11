@@ -18,6 +18,7 @@ from django.urls import reverse
 
 from accounts.tests.helpers import LoggedInTestCase, make_user
 from todos.models import Subtask, Todo
+from todos.tests.helpers import count_queries
 
 OPEN_DETAILS = '<details class="steps" open>'
 ERROR = "A step needs a title of 1 to 200 characters."
@@ -285,20 +286,18 @@ class SubtaskTests(LoggedInTestCase):
         self.assertNotContains(response, "0 of 0")
 
     def test_list_has_fixed_number_of_queries(self):
-        def count_queries():
-            with CaptureQueriesContext(connection) as queries:
-                self.assertEqual(self.list_page().status_code, 200)
-            return len(queries)
+        def load():
+            self.assertEqual(self.list_page().status_code, 200)
 
         for i in range(3):
             self.make_step(f"Step {i}")
-        one_todo = count_queries()
+        one_todo = count_queries(load)
 
         for n in range(4):
             todo = Todo.objects.create(title=f"Todo {n}", todo_list=self.todo_list)
             for i in range(3):
                 self.make_step(f"Step {i}", todo=todo)
-        self.assertEqual(count_queries(), one_todo)
+        self.assertEqual(count_queries(load), one_todo)
 
     def test_after_action_details_is_open(self):
         second = Todo.objects.create(title="Pay rent", todo_list=self.todo_list)

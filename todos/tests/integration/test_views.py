@@ -5,16 +5,15 @@ from html.parser import HTMLParser
 from unittest import mock
 
 from django.contrib.auth import get_user_model
-from django.contrib.messages import get_messages
-from django.db import IntegrityError, connection
+from django.db import IntegrityError
 from django.test import Client, TestCase
-from django.test.utils import CaptureQueriesContext
 from django.urls import URLResolver, get_resolver, reverse
 from django.utils import dateformat, timezone
 
 from accounts.tests.helpers import LoggedInTestCase, make_user
 from todos.forms import TodoForm
 from todos.models import Subtask, Tag, Todo, TodoList
+from todos.tests.helpers import count_queries, messages_of, shown_titles
 
 # What an overdue row shows next to its date.
 OVERDUE_LABEL = '<span class="overdue-label">Overdue</span>'
@@ -563,8 +562,7 @@ class OnlyMyDataTests(LoggedInTestCase):
     def test_list_shows_only_my_todos(self):
         self.make_two_todos()
         response = self.client.get(self.todo_list.get_absolute_url())
-        titles = [todo.title for todo in response.context["todos"]]
-        self.assertEqual(titles, ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
         self.assertContains(response, "Buy milk")
         self.assertNotContains(response, "Call home")
 
@@ -574,8 +572,7 @@ class OnlyMyDataTests(LoggedInTestCase):
             reverse("todo_add", args=[self.todo_list.pk]), {"title": ""}
         )
         self.assertEqual(response.status_code, 200)
-        titles = [todo.title for todo in response.context["todos"]]
-        self.assertEqual(titles, ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
         self.assertContains(response, "Buy milk")
         self.assertNotContains(response, "Call home")
 
@@ -1025,17 +1022,15 @@ class TagTests(LoggedInTestCase):
         self.assertLess(page.index("#home"), page.index("#work"))
 
     def test_list_query_count_does_not_grow_with_tags(self):
-        def count_queries():
-            with CaptureQueriesContext(connection) as queries:
-                self.assertEqual(self.list_page().status_code, 200)
-            return len(queries)
+        def load():
+            self.assertEqual(self.list_page().status_code, 200)
 
         self.edit(self.todo, "work, home")
-        with_one = count_queries()
+        with_one = count_queries(load)
         for n in range(4):
             todo = Todo.objects.create(title=f"Todo {n}", todo_list=self.todo_list)
             self.edit(todo, f"work, tag{n}")
-        self.assertEqual(count_queries(), with_one)
+        self.assertEqual(count_queries(load), with_one)
 
     def test_same_name_for_two_users_is_two_tags(self):
         self.edit(self.todo, "work")
@@ -1145,9 +1140,6 @@ class RecurringTests(LoggedInTestCase):
 
     def copies_of(self, todo):
         return Todo.objects.filter(repeated_from=todo)
-
-    def messages_of(self, response):
-        return [str(m) for m in get_messages(response.wsgi_request)]
 
     def test_add_a_repeating_todo(self):
         response = self.client.post(
@@ -1298,16 +1290,13 @@ class RecurringTests(LoggedInTestCase):
         )
 
     def test_list_query_count_does_not_grow_with_repeating_todos(self):
-        def count_queries():
-            with CaptureQueriesContext(connection) as queries:
-                self.assertEqual(
-                    self.client.get(self.todo_list.get_absolute_url()).status_code,
-                    200,
-                )
-            return len(queries)
+        def load():
+            self.assertEqual(
+                self.client.get(self.todo_list.get_absolute_url()).status_code, 200
+            )
 
         self.toggle(self.weekly, True)  # The original and its copy.
-        before = count_queries()
+        before = count_queries(load)
         for n in range(3):
             todo = Todo.objects.create(
                 title=f"Todo {n}",
@@ -1316,7 +1305,7 @@ class RecurringTests(LoggedInTestCase):
                 due_date=self.due,
             )
             self.toggle(todo, True)
-        self.assertEqual(count_queries(), before)
+        self.assertEqual(count_queries(load), before)
 
     def test_copy_stays_in_owners_list_when_member_clicks_done(self):
         carol = make_user("carol")
@@ -1364,7 +1353,7 @@ class RecurringTests(LoggedInTestCase):
         self.assertFalse(self.weekly.done)
         next_due = self.due + timedelta(days=7)
         self.assertEqual(
-            self.messages_of(response),
+            messages_of(response),
             [
                 f"The next copy, due {dateformat.format(next_due, 'j M Y')}, was removed."
             ],
@@ -1385,7 +1374,7 @@ class RecurringTests(LoggedInTestCase):
         self.toggle(copy, True)  # The copy is done, and makes its own copy.
         count = Todo.objects.count()
         response = self.toggle(self.weekly, False)  # Undo on the original.
-        self.assertEqual(self.messages_of(response), [])
+        self.assertEqual(messages_of(response), [])
         copy.refresh_from_db()
         self.assertTrue(copy.done)
         self.weekly.refresh_from_db()
@@ -1429,7 +1418,7 @@ class RecurringTests(LoggedInTestCase):
         self.assertEqual(self.weekly.subtasks.count(), 2)
         next_due = self.due + timedelta(days=7)
         self.assertEqual(
-            self.messages_of(response),
+            messages_of(response),
             [
                 f"The next copy, due {dateformat.format(next_due, 'j M Y')}, was removed."
             ],
@@ -1448,7 +1437,7 @@ class RecurringTests(LoggedInTestCase):
         self.assertEqual(copy.subtasks.count(), 2)
         first.refresh_from_db()
         self.assertTrue(first.done)
-        self.assertEqual(self.messages_of(response), [self.kept_message()])
+        self.assertEqual(messages_of(response), [self.kept_message()])
 
     def test_done_after_kept_copy_makes_no_second_copy(self):
         self.add_two_steps()
@@ -1511,9 +1500,9 @@ class RecurringTests(LoggedInTestCase):
         self.assertFalse(self.weekly.done)
         self.assertFalse(self.copies_of(self.weekly).exists())
         self.assertEqual(Todo.objects.count(), 1)
-        removed = [m for m in self.messages_of(first) if m.endswith("was removed.")]
+        removed = [m for m in messages_of(first) if m.endswith("was removed.")]
         self.assertEqual(len(removed), 1)
-        self.assertEqual(self.messages_of(second), [])
+        self.assertEqual(messages_of(second), [])
 
     def test_undo_of_an_open_todo_keeps_a_kept_copy(self):
         self.add_two_steps()
@@ -1522,10 +1511,10 @@ class RecurringTests(LoggedInTestCase):
         first = copy.subtasks.get(title="Fill the can")
         self.client.post(reverse("subtask_toggle", args=[first.pk]), {"done": "1"})
         response = self.toggle(self.weekly, False)  # Undo: the copy is kept.
-        self.assertEqual(self.messages_of(response), [self.kept_message()])
+        self.assertEqual(messages_of(response), [self.kept_message()])
         self.client.get(self.todo_list.get_absolute_url())  # Shows the message.
         response = self.toggle(self.weekly, False)  # Undo again: nothing happens.
-        self.assertEqual(self.messages_of(response), [])
+        self.assertEqual(messages_of(response), [])
         self.assertTrue(Todo.objects.filter(pk=copy.pk).exists())
         first.refresh_from_db()
         self.assertTrue(first.done)
