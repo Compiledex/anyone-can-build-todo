@@ -199,6 +199,12 @@ It saves a copy in the folder `backups/`, with the date and time in the name, fo
 `backups/db-20261011-081500.sqlite3`. It is safe while the server runs: it uses SQLite's own copy,
 not a plain file copy. Without `make`: `uv run python manage.py backup_db`.
 
+**`make run` also makes a copy, once a day.** Before it starts the server, `make run` saves a
+*daily copy*, for example `backups/db-20261011-081500-daily.sqlite3`, at most one a day. It keeps the
+newest 14 daily copies and deletes older **daily** copies. It never deletes the copies from
+`make backup` or `make reset`, or any other file. If the copy does not work (for example the disk is
+full), it prints a warning, and the app starts anyway; run `make backup` to try again.
+
 **`make reset` asks first.** It deletes `db.sqlite3` and starts again with an empty database. So it
 first asks you to type `yes` (anything else stops, and nothing is deleted), then it makes a copy in
 `backups/`, and only then deletes the database.
@@ -218,7 +224,8 @@ first asks you to type `yes` (anything else stops, and nothing is deleted), then
 
 **Good to know.**
 
-- `backups/` is not in git, and the copies stay until you delete them by hand.
+- `backups/` is not in git. The copies from `make backup` and `make reset` stay until you delete them
+  by hand; of the daily copies from `make run`, only the newest 14 stay.
 - A copy holds all your data, also the accounts (with their password hashes). Do not share it.
 - A copy on the same Mac does not help if the Mac breaks. Copy the `backups/` folder to an
   external disk or a cloud folder now and then: that is what really keeps your data safe.
