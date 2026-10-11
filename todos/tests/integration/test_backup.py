@@ -6,19 +6,21 @@ person's db.sqlite3 or writes to the real backups/ folder.
 """
 
 import io
+import os
 import shutil
 import sqlite3
+import stat
 import subprocess
 import tempfile
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest import mock
 
 from django.conf import settings
-from django.core.management import call_command
+from django.core.management import CommandError, call_command
 from django.test import SimpleTestCase
 
-from todos.backup import backup_database
+from todos.backup import backup_database, copy_sqlite
 
 NOW = datetime(2026, 10, 11, 8, 15, 0)
 NAME = "db-20261011-081500.sqlite3"
@@ -86,6 +88,45 @@ class BackupTests(SimpleTestCase):
             backup_database(self.source, self.folder, NOW)
         self.assertEqual(self.files_in_folder(), [])
 
+    def test_copy_opens_the_source_read_only(self):
+        # Read-write would make an empty database file at the missing path.
+        missing = self.tmp / "missing.sqlite3"
+        with self.assertRaises(sqlite3.OperationalError):
+            copy_sqlite(missing, self.tmp / "out")
+        self.assertFalse(missing.exists())
+
+    def test_source_in_a_folder_with_special_letters(self):
+        # "#" and "?" end the path in a URI unless it is quoted.
+        folder = self.tmp / "a #?b æ"
+        folder.mkdir()
+        source = folder / "db.sqlite3"
+        shutil.copy(self.source, source)
+        target = backup_database(source, self.folder, NOW)
+        self.assertEqual(self.rows(target), ("ok", ["Milk", "Bread"]))
+
+    def test_copy_goes_to_a_temporary_name_first(self):
+        self.folder.mkdir()
+        targets = []
+
+        def half_copy(source, target):
+            targets.append(Path(target))
+            Path(target).write_bytes(b"half a database")
+            raise sqlite3.OperationalError("disk full")
+
+        with (
+            mock.patch("todos.backup.copy_sqlite", side_effect=half_copy),
+            self.assertRaises(sqlite3.OperationalError),
+        ):
+            backup_database(self.source, self.folder, NOW)
+        self.assertEqual(len(targets), 1)
+        self.assertTrue(targets[0].name.endswith(".tmp"))
+        self.assertNotEqual(targets[0].name, NAME)
+        self.assertEqual(self.files_in_folder(), [])
+
+    def test_backup_only_the_owner_can_read(self):
+        target = backup_database(self.source, self.folder, NOW)
+        self.assertEqual(stat.S_IMODE(target.stat().st_mode), 0o600)
+
     def test_source_is_not_changed(self):
         before = self.source.read_bytes()
         backup_database(self.source, self.folder, NOW)
@@ -110,8 +151,131 @@ class BackupTests(SimpleTestCase):
         self.assertIn("No database yet", out.getvalue())
         self.assertEqual(len(self.files_in_folder()), 1)
 
+    def test_command_names_the_copy_with_the_local_time(self):
+        # 23:15 UTC is 08:15 the next day in Tokyo (settings.TIME_ZONE).
+        local = datetime(2026, 10, 10, 23, 15, 0, tzinfo=UTC)
+        with mock.patch(
+            "todos.management.commands.backup_db.timezone.now", return_value=local
+        ):
+            call_command(
+                "backup_db",
+                source=str(self.source),
+                folder=str(self.folder),
+                stdout=io.StringIO(),
+            )
+            self.assertEqual(self.files_in_folder(), [NAME])
+            with self.assertRaisesMessage(CommandError, "already exists"):
+                call_command(
+                    "backup_db",
+                    source=str(self.source),
+                    folder=str(self.folder),
+                    stdout=io.StringIO(),
+                )
+        self.assertEqual(self.files_in_folder(), [NAME])
+
+
+# A stand-in for `uv`: it writes its arguments to $UV_LOG, and for backup_db
+# also whether db.sqlite3 is still there. FAKE_BACKUP_EXIT=1 makes the copy fail.
+FAKE_UV = """#!/bin/sh
+echo "$*" >> "$UV_LOG"
+case "$*" in
+  *backup_db*)
+    if [ -f db.sqlite3 ]; then echo "db still there" >> "$UV_LOG"; fi
+    exit "${FAKE_BACKUP_EXIT:-0}";;
+esac
+exit 0
+"""
+
 
 class MakeResetTests(SimpleTestCase):
+    """`make reset` for real, in a temporary folder, with a fake `uv`.
+
+    Only a copy of the Makefile and a dummy db.sqlite3 are in the folder, and
+    the fake `uv` runs nothing, so the person's database is never near it.
+    """
+
+    def setUp(self):
+        self.make = shutil.which("make")
+        if self.make is None:
+            self.skipTest("make is not installed")
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp)
+        shutil.copy(Path(settings.BASE_DIR) / "Makefile", self.tmp / "Makefile")
+        self.db = self.tmp / "db.sqlite3"
+        self.db.write_bytes(b"the person's data")
+        bin_dir = self.tmp / "bin"
+        bin_dir.mkdir()
+        uv = bin_dir / "uv"
+        uv.write_text(FAKE_UV)
+        uv.chmod(0o755)
+        self.log = self.tmp / "uv.log"
+        self.env = {
+            key: value
+            for key, value in os.environ.items()
+            if key not in ("MAKEFLAGS", "MFLAGS", "MAKELEVEL")
+        }
+        self.env["PATH"] = f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"
+        self.env["UV_LOG"] = str(self.log)
+
+    def reset(self, answer, *args, backup_fails=False):
+        env = dict(self.env)
+        if backup_fails:
+            env["FAKE_BACKUP_EXIT"] = "1"
+        return subprocess.run(
+            [self.make, "reset", *args],
+            cwd=self.tmp,
+            env=env,
+            input=answer,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+
+    def logged(self):
+        return self.log.read_text().splitlines() if self.log.exists() else []
+
+    def test_anything_but_yes_deletes_nothing(self):
+        for answer in ["", "\n", "no\n", "y\n", "YES\n"]:
+            with self.subTest(answer=answer):
+                result = self.reset(answer)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("Nothing was deleted.", result.stdout)
+                self.assertEqual(self.db.read_bytes(), b"the person's data")
+                self.assertEqual(self.logged(), [])
+
+    def test_yes_copies_then_deletes(self):
+        for args, answer in [((), "yes\n"), (("CONFIRM=yes",), "")]:
+            with self.subTest(args=args):
+                self.db.write_bytes(b"the person's data")
+                self.log.unlink(missing_ok=True)
+                result = self.reset(answer, *args)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(
+                    self.logged(),
+                    [
+                        "run python manage.py backup_db",
+                        "db still there",
+                        "run python manage.py migrate",
+                    ],
+                )
+                self.assertFalse(self.db.exists())
+
+    def test_failed_copy_deletes_nothing(self):
+        for args, answer in [((), "yes\n"), (("CONFIRM=yes",), "")]:
+            with self.subTest(args=args):
+                result = self.reset(answer, *args, backup_fails=True)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(self.db.read_bytes(), b"the person's data")
+                self.assertNotIn("run python manage.py migrate", self.logged())
+
+    def test_no_database_only_migrates(self):
+        self.db.unlink()
+        result = self.reset("")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.logged(), ["run python manage.py migrate"])
+
+
+class MakeResetRecipeTests(SimpleTestCase):
     def test_make_reset_copies_before_deleting(self):
         make = shutil.which("make")
         if make is None:

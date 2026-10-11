@@ -7,9 +7,19 @@ Built as planned, with these small differences: the SQLite copy step is its own 
 URI is quoted, so a `?` or `#` in the folder name cannot break it. The `#` search tests also check
 `# work` and `###`. The repeat-error tests share one helper, `assertErrorOnDueDate`. Manual check
 (step 3): `make backup` was run in the worktree only (no database: "No database yet"; then a copy
-that passes `PRAGMA integrity_check`); `make reset` was **not** run at all, only read with
-`make -n reset`, on the orchestrator's instruction; the test `test_make_reset_copies_before_deleting`
-pins its order.
+that passes `PRAGMA integrity_check`). The implementer did not run `make reset`; the reviewer ran
+the real `make reset` flows in a scratch worktree on 2026-10-11 (no, empty, `y` and no terminal:
+nothing deleted; `yes`: copy, delete, migrate; `CONFIRM=yes`: still copies; a failed copy: not
+deleted), which covers step 3.
+
+Added after the code review (2026-10-11): `MakeResetTests` runs the real `make reset` in a
+temporary folder with a copy of the `Makefile`, a dummy `db.sqlite3` and a fake `uv` that only logs
+(answers "", Enter, `no`, `y`, `YES`, `yes`, `CONFIRM=yes`, a failing copy, no database); the old
+`make -n` check is kept as `MakeResetRecipeTests`. More backup tests: the read-only open, a folder
+named `a #?b æ`, the copy goes to a `.tmp` name first, the command's name uses the local time and
+turns a second copy in the same second into "already exists". The backup is `fsync`ed before the
+rename and is mode 600 (only the owner can read it). `##work` also finds the tag `work`. The
+README's warning in "Put it on the internet" now says to run `make backup`.
 
 Builds on: **foundation** (the `Makefile`, `make reset`), **tags** (`parse_tags`), **search**
 and **nordic-letters** (merged first: `search()` uses `casefold` and `Contains(CaseFold(...))`),

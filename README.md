@@ -391,7 +391,7 @@ runs the same checks and the tests on every push.
 >   the project folder; a setting to put it somewhere else is not built yet.
 > - Or use a hosted database such as PostgreSQL. That needs a small code change in
 >   `config/settings.py`, which is not built yet either.
-> - Either way, **make backups**: copy `db.sqlite3` somewhere safe regularly.
+> - Either way, **make backups**: run `make backup` regularly (see [Back up your data](#back-up-your-data)).
 >
 > On your own laptop this does not happen: `db.sqlite3` stays until you delete it.
 

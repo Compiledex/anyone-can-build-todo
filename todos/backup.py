@@ -34,7 +34,8 @@ def backup_database(source, folder, now):
 
     Uses SQLite's online backup, so the copy is whole even while the app runs.
     Returns the new file's path, or None when `source` does not exist.
-    Never overwrites a file, and never changes `source`.
+    Never overwrites a file, and never changes `source`. Only the owner can
+    read the copy (mode 600).
     """
     source = Path(source)
     if not source.is_file():
@@ -51,6 +52,12 @@ def backup_database(source, folder, now):
     try:
         temporary.unlink(missing_ok=True)
         copy_sqlite(source, temporary)
+        # Only the person can read the copy: it holds every account and to-do.
+        os.chmod(temporary, 0o600)
+        # On the disk before the rename, so a crash never leaves an empty
+        # file with the final name.
+        with open(temporary, "rb") as copy:
+            os.fsync(copy.fileno())
         # One step on the same disk: backups/ never holds a half-written file
         # with the final name.
         os.replace(temporary, target)

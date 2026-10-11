@@ -258,7 +258,7 @@ class SearchTests(LoggedInTestCase):
         # The page shows the tag as "#work"; it is stored as "work".
         self.add("Write report").set_tags(["work"])
         self.add("Call home")
-        for q in ["#work", "#WORK", "# work"]:
+        for q in ["#work", "#WORK", "# work", "##work"]:
             with self.subTest(q=q):
                 response = self.search(q)
                 self.assertEqual(self.shown(response), ["Write report"])
