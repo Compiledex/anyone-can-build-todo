@@ -4,7 +4,8 @@
   sign-up pages. It has the <head>, the header, the footer, and the CSS in
   todos/static/todos/tokens.css (the one place for colors, sizes and the font), then
   todos/static/todos/site.css (the header, footer, buttons and fields).
-  The logged-in app pages use base.html instead, which does not change.
+  The logged-in app pages use base.html instead (tokens.css, then app.css; never
+  site.css).
 
   Blocks: title, meta (more <meta> tags), page_css (the page's own CSS, after site.css),
   nav (the links on the right of the header), content (the <main>).

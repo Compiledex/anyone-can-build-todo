@@ -37,6 +37,9 @@ STEP_MAX_LENGTH = Subtask._meta.get_field("title").max_length
 # Only rename, delete, share and remove-member are for the owner alone. They use
 #   get_object_or_404(TodoList, pk=pk, owner=request.user)
 # so a member gets the same 404 as a stranger.
+# list_leave is for members alone: it uses
+#   get_object_or_404(TodoList, pk=pk, members=request.user)
+# so the owner and strangers get 404.
 
 
 def get_visible_todo(user, pk):

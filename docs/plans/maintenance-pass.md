@@ -1,6 +1,6 @@
 # Plan: a maintenance pass (tidy code and tests, no new behaviour)
 
-Status: **approved** (2026-10-11, by the orchestrator for the person), not started.
+Status: **done** (2026-10-11). Approved 2026-10-11 by the orchestrator for the person.
 
 Builds on: everything on `main`, plus the plans that merge before this one:
 **nordic-letters**, **recurring-undo-steps**, **safe-toggles**, **accessibility-pass** and
@@ -316,3 +316,45 @@ The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
   change keeps its own parser. `test_search.py` line ~141 keeps exactly 3 matches.
 - The CUJ fix is simpler: the existing wait for `li.dragging` count 0, then read
   `window.__fetchCalls`; no extra `dragend` listener.
+
+## Built (2026-10-11, on `main` `3dab572`)
+
+Test counts from `make test`. Before: CUJ 28, Integration 476, Unit 123 (627). After: CUJ 28,
+Integration 479, Unit 123 (630): the same tests plus the three new integration tests
+(`test_move_up_on_first_changes_nothing`, `test_signup_methods`,
+`test_todos_with_the_same_time_come_back_by_pk`). Tests per class in `test_views.py` before the
+split, after safe-toggles, accessibility-pass and local-safety: List 15, Add 15, Toggle 13,
+Delete 5, LoginRequired 4, OnlyMyData 7, Admin 1, Edit 25, Priority 10, Tag 14, Recurring 34
+(143). Every class has the same count after the move.
+
+What differs from the plan above:
+
+- `test_views.py` had a fourth parser, `TagsByName` (inputs by name, `<ul>` text by id), used
+  only by `RecurringTests.assertErrorOnDueDate`. It moved with `RecurringTests` to
+  `test_recurring.py`, unchanged: it keeps the first input of each name, which the shared
+  `PageParts` does not do, so merging it would change what the test checks.
+- `hidden_next` and `OVERDUE_LABEL` stay in `test_views.py`: only its classes use them.
+- `count_queries(func)`: the old inner functions also checked that the page answered 200. That
+  check stays, in a small `load()` function each test passes to `count_queries`.
+  `test_subtasks.py` keeps one `CaptureQueriesContext`: it reads the SQL of the `UPDATE`, not a
+  count.
+- Files with no own defaults (`test_filter.py`, `test_search.py`, `test_sort.py`,
+  `test_access.py`) call `shown_titles` directly; `test_reorder.py` keeps its `shown(client)`
+  wrapper (manual order). `add` wrappers stay where a file has its own list or `due_date`.
+- `parse_page(response, parser_class=PageParts)`: the landing page passes `LandingParts`.
+- `test_migrations.py`'s docstring now says `FillPositionMigrationTests` does not migrate the
+  database.
+- `views.py` has a module constant `STEP_MAX_LENGTH` (from `Subtask`), used by `subtask_add`'s
+  message and the `step_max_length` context value.
+- The hidden-input loop kept every exact-HTML test passing, so it is in.
+- `test_escape_cancels_a_drag` was a false pass all along: the last row's drag handle was at
+  y=719 in the 720px-high window, so the mouse press was off the page and no drag started (no
+  `dragstart` at all). The test now scrolls the list into view first and checks that a row is
+  `dragging` before it presses Escape. Checked: with `reorder.js` changed to send on a cancelled
+  drag, the new test fails (`['/lists/1/reorder/'] != []`) and the old test passed.
+- `test_signup_methods` is in `SignupTests` in `accounts/tests/integration/test_accounts.py`.
+  Before the fix: `PUT` and `DELETE` gave `200 != 405`.
+- Migration `0018_todo_ordering_tiebreak` (depends on `0017_todo_reminded_on`; one
+  `AlterModelOptions`).
+- Running `ruff format` on the whole repo also rewrites code blocks in some `docs/plans/*.md`
+  files; those changes were not kept. The commit hook only formats Python files.

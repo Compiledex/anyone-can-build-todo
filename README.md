@@ -171,7 +171,8 @@ stop the server.
 uv run python manage.py test
 ```
 
-You should see `OK`, and then one line for each layer of tests:
+You should see `OK`, and then one line for each layer of tests, something like this (the
+numbers grow with the app):
 
 ```
 Test layers
@@ -333,48 +334,23 @@ runs the same checks and the tests on every push.
 
 ## How it is put together
 
-| File | What it does |
+| Folder or file | What it holds |
 |---|---|
-| `config/settings.py` | Settings for the whole project |
-| `config/env.py` | Reads `DJANGO_DEBUG` and `DJANGO_SECRET_KEY`, and stops the app when debug is off and the secret key is missing or weak |
-| `config/urls.py` | Sends each address to the right app |
+| `config/` | The settings for the whole project, the main addresses, and the test runner |
 | `accounts/` | Sign up, log in and log out, with Django's own accounts |
-| `accounts/templates/registration/` | The login and sign-up pages, in the same style as the landing page |
-| `accounts/static/accounts/auth.css` | Where the login and sign-up pages put the form and the picture |
-| `accounts/tests/helpers.py` | Helpers the tests share: test users, and a test that starts logged in |
-| `todos/models.py` | The `TodoList` and `Todo` tables in the database; each list has an owner and can be shared with members, each to-do is in a list and has an optional due date, the day it was last shown in a reminder, optional notes, a priority (Low, Medium or High), tags, a repeat rule (Never, Daily, Weekly or Monthly), and a place in the list's manual order; the `Tag` table holds each person's tags; the `Subtask` table holds the steps inside a to-do |
-| `todos/tags.py` | Cleans the tags a person types, like "work, #Home", and checks their limits |
-| `todos/recurrence.py` | Works out the next due date of a repeating to-do |
-| `todos/urls.py` | The addresses of the list and to-do pages |
-| `todos/forms.py` | The forms that check a to-do (with its tags), a step's title, a list's name, the username to share a list with, and the search text |
-| `todos/queries.py` | Picks the to-dos a list page shows and their order, from the address: the search (in the title, the notes and the tags), the filter (All, Not done, Done), and the sort (Created, Due date, Priority, Title, or Manual, the order chosen by drag and drop); it also says when drag and the Move buttons may be shown (only in the Manual order, with no search and no filter) |
-| `todos/sqlite_functions.py` | Teaches the database the Norwegian alphabet (a to z, then æ, ø, å) for sorting, and upper and lower case of every letter for search |
-| `todos/ordering.py` | Reads and saves the manual order of a list (drag and drop and the Move buttons) |
-| `todos/reminders.py` | Finds your to-dos due today and shows them in one Mac notification |
-| `todos/management/commands/send_reminders.py` | The command `send_reminders --user <username>`, which launchd runs every morning |
-| `deploy/macos/com.anyone-can-build-todo.reminders.plist` | The launchd template you fill in to run the reminders at 08:00 |
+| `todos/` | The to-do app itself: |
+| `todos/models.py` | The tables in the database: lists, to-dos, tags and steps |
 | `todos/views.py` | What happens when each address is visited |
-| `todos/templates/base.html` | The frame of the app pages: the header with who is logged in, and the messages |
-| `todos/static/todos/app.css` | The style of the app pages: buttons, fields, the list page and its rows |
-| `todos/templates/todos/todo_list.html` | The page you see: one list |
-| `todos/templates/todos/site_base.html` | The frame of the pages a visitor sees (landing, login, sign-up): the header and the footer |
-| `todos/static/todos/tokens.css` | The colors, sizes and font of every page (the visitor pages and the app), in light and dark: the one place to change them |
-| `todos/static/todos/site.css` | The shared style of those pages: header, footer, buttons, form fields |
-| `todos/templates/todos/_field.html` | One form field: label, input, error, help text |
-| `todos/templates/todos/landing.html` | The landing page: what a visitor who is not logged in sees at `/` |
-| `todos/static/todos/landing.css` | Where the landing page puts its sections |
-| `todos/static/todos/landing/` | The landing page's pictures: screenshots of the app, light and dark, with invented sample data. `make landing-shots` takes them again |
-| `scripts/landing_shots.py`, `scripts/landing_seed.py` | The tool behind `make landing-shots`: invented data in a scratch database, a server on a free port, the screenshots |
-| `todos/templates/todos/list_form.html` | The page to make or rename a list |
-| `todos/templates/todos/list_confirm_delete.html` | The page that asks before a list is deleted |
-| `todos/templates/todos/_todo_item.html` | One row of the list |
-| `todos/templates/todos/todo_edit.html` | The page to edit one to-do |
-| `todos/static/todos/reorder.js` | Drag and drop to reorder the to-dos, in plain JavaScript |
-| `todos/tests/` | The tests, one folder per layer; `helpers.py` has a fake `osascript`, so no test shows a real notification |
-| `config/test_runner.py` | Sorts the tests into layers and counts them |
-| `.github/workflows/check.yml` | The checks and tests GitHub runs on every push and pull request |
-| `AGENTS.md` | Instructions for the AI assistant (Codex reads it; `CLAUDE.md` points Claude to it) |
+| `todos/queries.py` | The search, the filter and the order of a list page |
+| `todos/forms.py` | The forms that check what a person types |
+| `todos/templates/` | The HTML of each page |
+| `todos/static/` | The CSS, the JavaScript and the landing page's pictures |
+| `todos/tests/` | The tests, one folder per layer (unit, integration, CUJ) |
+| `deploy/macos/` | The launchd template for the morning reminders on a Mac |
+| `scripts/` | The tool behind `make landing-shots` |
 | `docs/plans/` | The plan for each feature, written before the code; history, not a description of the code today |
+
+Each file's job is in `AGENTS.md`.
 
 ## Put it on the internet
 
