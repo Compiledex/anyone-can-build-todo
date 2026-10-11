@@ -66,7 +66,8 @@ class TodoList(models.Model):
     # casefold(name): the name in one case, for the unique rule ("Ærend" and
     # "ærend" get the same key). Set by save() and clean(), never by a form.
     # Up to 300: casefold can make a name longer ("ß" becomes "ss").
-    # Never change a name without save() (no QuerySet.update(name=...)).
+    # Never change a name without save() (no QuerySet.update(name=...), no
+    # bulk_create). A data migration that makes lists sets name_key itself.
     name_key = models.CharField(max_length=300, editable=False, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     # The people the owner shared this list with. The owner is never a member.
@@ -332,7 +333,8 @@ class Subtask(models.Model):
     """A small step inside a to-do, like "Pack books" in "Move house".
 
     It has no owner and no list: whoever may see or change its to-do may see or
-    change its steps. A step has no steps (one level only).
+    change its steps. A step has no steps (one level only). Marking all steps
+    done does not mark the to-do done, and the other way round.
     """
 
     todo = models.ForeignKey(Todo, on_delete=models.CASCADE, related_name="subtasks")

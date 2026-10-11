@@ -7,7 +7,7 @@ from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.templatetags.static import static
 from django.test import Client, TestCase
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 
 from accounts.tests.helpers import PageParts, make_user, parse_page
 from todos.models import Subtask, Todo, TodoList
@@ -208,6 +208,13 @@ class LandingPageTests(TestCase):
         response = self.client.get("/")
         self.assertContains(response, "Every list needs a login.")
         self.assertNotContains(response, "Every page needs a login.")
+
+    def test_old_name_is_gone(self):
+        # The `/` view is called "home". The old URL name "todo_list" has no
+        # alias, so a forgotten use fails loudly.
+        self.assertEqual(reverse("home"), "/")
+        with self.assertRaises(NoReverseMatch):
+            reverse("todo_list")
 
     def test_landing_is_get_or_head_only(self):
         self.assertEqual(self.client.head("/").status_code, 200)

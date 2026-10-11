@@ -19,7 +19,7 @@
   {% if user.is_authenticated %}
     <header class="site">
       <div class="container site-inner">
-        <a class="wordmark" href="{% url 'todo_list' %}">To-do list</a>
+        <a class="wordmark" href="{% url 'home' %}">To-do list</a>
         <div class="user">
           <span class="who">Logged in as {{ user.username }}</span>
           <form method="post" action="{% url 'logout' %}">
@@ -43,6 +43,7 @@
               <form class="undo" method="post" action="{% url 'todo_undo_delete' undo_delete_id %}">
                 {% csrf_token %}
                 <input type="hidden" name="next" value="{{ request.get_full_path }}#todo-{{ undo_delete_id }}">
+                {# "Undo delete: <title>", so it is not confused with a row's "Undo: <title>". #}
                 <button class="button button-secondary button-compact" type="submit" aria-label="Undo delete: {{ undo_delete_title }}">Undo</button>
               </form>
             {% endif %}

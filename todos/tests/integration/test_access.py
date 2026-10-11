@@ -62,10 +62,10 @@ class LoginRequiredTests(TestCase):
 
     def test_only_landing_login_and_signup_are_open(self):
         # A new page that needs no login must be added here on purpose.
-        # "todo_list" is `/`: the landing page for a visitor (no user data).
+        # "home" is `/`: the landing page for a visitor (no user data).
         self.assertEqual(
             open_view_names(get_resolver().url_patterns),
-            {"login", "logout", "signup", "todo_list"},
+            {"login", "logout", "signup", "home"},
         )
 
     def test_admin_is_not_open(self):

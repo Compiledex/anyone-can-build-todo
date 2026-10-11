@@ -8,9 +8,17 @@ The shown to-dos are checked with response.context["todos"], because the word
 
 from django.urls import reverse
 
-from accounts.tests.helpers import LoggedInTestCase
+from accounts.tests.helpers import LoggedInTestCase, parse_page
 from todos.models import Todo
 from todos.tests.helpers import add_todo, shown_titles
+
+
+def row_nexts(response):
+    """The `next` of every button that sends one (a row's Done/Undo and Delete), in order."""
+    return [
+        button["value"] for button in parse_page(response).all("button", name="next")
+    ]
+
 
 NO_MATCH = "No to-dos match"
 EMPTY_LIST = "Nothing to do yet"
@@ -139,11 +147,9 @@ class RedirectBackTests(LoggedInTestCase):
     def test_row_forms_carry_current_address(self):
         response = self.client.get(f"{self.url}?q=milk&status=open")
         # The only row, with a filter: Done and Delete both go to the list (#todos).
-        hidden = (
-            f'<input type="hidden" name="next" '
-            f'value="{self.url}?q=milk&amp;status=open#todos">'
-        )
-        self.assertContains(response, hidden, count=2, html=True)  # Done, Delete.
+        self.assertEqual(
+            row_nexts(response), [f"{self.url}?q=milk&status=open#todos"] * 2
+        )  # Done, Delete.
         # The & is escaped in the HTML.
         self.assertNotContains(response, f'value="{self.url}?q=milk&status')
 
@@ -225,9 +231,7 @@ class RedirectBackTests(LoggedInTestCase):
             response, f'<a href="{self.url}?status=done">Done</a>', html=True
         )
         # No filter: Done keeps its row; Delete goes to the list (the only row).
-        done_next = (
-            f'<input type="hidden" name="next" value="{self.url}#todo-{self.todo.pk}">'
+        self.assertEqual(
+            row_nexts(response),
+            [f"{self.url}#todo-{self.todo.pk}", f"{self.url}#todos"],  # Done, Delete.
         )
-        delete_next = f'<input type="hidden" name="next" value="{self.url}#todos">'
-        self.assertContains(response, done_next, count=1, html=True)
-        self.assertContains(response, delete_next, count=1, html=True)
