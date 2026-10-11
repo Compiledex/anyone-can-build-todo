@@ -1,6 +1,6 @@
 # Plan: a test pyramid for the to-do list
 
-Status: **done**. See "Result" at the end.
+Status: **done** (2026-10-09, PR #1). See "Result" at the end.
 
 ## Goal
 

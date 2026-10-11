@@ -1,6 +1,6 @@
 # Plan: share a list with other users
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-09, PR #11). The decisions are in "Decided by the person" at the end.
 
 Builds on: **#17 accounts** (log in, `LoginRequiredMiddleware`, "each user sees only their own
 data"), **#10 lists** (a `TodoList` model with an `owner`, and each `Todo` belongs to one list),

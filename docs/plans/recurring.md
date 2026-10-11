@@ -1,6 +1,6 @@
 # Plan: recurring to-dos
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-10, PR #20). The decisions are in "Decided by the person" at the end.
 
 Builds on: test pyramid and foundation (wave 0: `TodoForm`, `_todo_item.html`, `base.html`),
 17 accounts (wave 1), 10 lists, 4 edit, 6 due date (wave 2), 5 description, 9 priority, 11 tags,

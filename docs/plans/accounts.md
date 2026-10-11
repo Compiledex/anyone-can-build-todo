@@ -1,6 +1,6 @@
 # Plan: user accounts and login (#17)
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-09, PR #7). The decisions are in "Decided by the person" at the end.
 
 Builds on: wave 0 (the test pyramid, `TodoForm` in `todos/forms.py`, the partial
 `todos/templates/todos/_todo_item.html`, colors as CSS variables on `:root`, and the shared layout

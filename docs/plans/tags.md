@@ -1,6 +1,6 @@
 # Plan: tags on a to-do
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-09, PR #15). The decisions are in "Decided by the person" at the end.
 
 Builds on: **#17 accounts** (log in; each user sees only their own data), **#10 lists** (every
 to-do is in a `TodoList`, and **the owner of a to-do is `todo.todo_list.owner`**), **#4 edit** (the

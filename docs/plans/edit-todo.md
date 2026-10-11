@@ -1,6 +1,6 @@
 # Plan: edit a to-do
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-09, PR #9). The decisions are in "Decided by the person" at the end.
 
 Builds on: wave 0 (`TodoForm` in `todos/forms.py`, the row partial
 `todos/templates/todos/_todo_item.html`, CSS variables on `:root`, the shared

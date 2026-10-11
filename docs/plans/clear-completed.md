@@ -1,6 +1,6 @@
 # Plan: clear all completed to-dos with one click (#19)
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-09, PR #12). The decisions are in "Decided by the person" at the end.
 
 Builds on: wave 0 (`TodoForm`, `_todo_item.html`, CSS variables, the shared `base.html`), #17
 accounts, #10 lists (`docs/plans/lists.md`). It runs in the same wave as #18 sharing, #11 tags,
