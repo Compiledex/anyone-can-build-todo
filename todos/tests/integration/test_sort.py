@@ -61,6 +61,26 @@ class SortTests(LoggedInTestCase):
         response = self.client.get(f"{self.url}?sort=title")
         self.assertEqual(self.shown(response), ["apple", "Banana", "cherry"])
 
+    def test_sort_by_title_uses_norwegian_order(self):
+        for title in ["Ål", "Zebra", "øl", "Ærend", "apple", "Banana"]:
+            self.add(title)
+        response = self.client.get(f"{self.url}?sort=title")
+        self.assertEqual(
+            self.shown(response), ["apple", "Banana", "Zebra", "Ærend", "øl", "Ål"]
+        )
+
+    def test_sort_by_title_nordic_case_ties_keep_created_order(self):
+        lower = self.add("ål")
+        upper = self.add("Ål")
+        response = self.client.get(f"{self.url}?sort=title")
+        self.assertEqual(self.shown(response), ["ål", "Ål"])
+        # The one made second gets the older created_at, so it comes first.
+        Todo.objects.filter(pk=upper.pk).update(
+            created_at=lower.created_at - datetime.timedelta(hours=1)
+        )
+        response = self.client.get(f"{self.url}?sort=title")
+        self.assertEqual(self.shown(response), ["Ål", "ål"])
+
     def test_bad_sort_shows_default_order(self):
         self.add("Old")
         self.add("New")

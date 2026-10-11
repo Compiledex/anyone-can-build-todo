@@ -12,6 +12,7 @@ from django.test.utils import CaptureQueriesContext
 
 from accounts.tests.helpers import LoggedInTestCase
 from todos.models import Subtask, Todo, TodoList
+from todos.tags import parse_tags
 
 NO_MATCH = "No to-dos match"
 EMPTY_LIST = "Nothing to do yet"
@@ -170,6 +171,35 @@ class SearchTests(LoggedInTestCase):
         response = self.search("milk", todo_list=self.other_list, client=bob)
         self.assertEqual(self.shown(response), ["Milk shake"])
         self.assertNotContains(response, "Buy milk")
+
+    def test_search_ignores_case_of_nordic_letters_in_title(self):
+        self.add("Ærend på posten")
+        self.add("Kjøp melk")
+        for q in ["ærend", "ÆREND"]:
+            with self.subTest(q=q):
+                response = self.search(q)
+                self.assertEqual(self.shown(response), ["Ærend på posten"])
+
+    def test_search_ignores_case_of_nordic_letters_in_notes(self):
+        self.add("Fest", description="Kjøp ØL og brus")
+        self.add("Vask bilen")
+        response = self.search("øl")
+        self.assertEqual(self.shown(response), ["Fest"])
+
+    def test_search_ignores_case_of_nordic_letters_in_tags(self):
+        self.add("Handle").set_tags(parse_tags("Åker"))  # Stored as "åker".
+        self.add("Ring").set_tags(["jobb"])
+        response = self.search("ÅKER")
+        self.assertEqual(self.shown(response), ["Handle"])
+
+    def test_nordic_search_keeps_other_users_out(self):
+        theirs = self.add("Ærend i byen")  # alice's to-do, with a matching tag.
+        theirs.set_tags(["ærend"])
+        Todo.objects.create(todo_list=self.other_list, title="Ærend for bob")
+        bob = self.client_for(self.other_user)
+        response = self.search("ærend", todo_list=self.other_list, client=bob)
+        self.assertEqual(self.shown(response), ["Ærend for bob"])
+        self.assertNotContains(response, "Ærend i byen")
 
     def test_other_users_list_with_search_is_404(self):
         self.add("Buy milk")
