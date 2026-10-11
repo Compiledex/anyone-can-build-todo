@@ -1,5 +1,5 @@
 /* The design tokens: the ONE place that sets colors, sizes and the font for the pages
-   a visitor sees (landing, login, sign-up), and later for the app. Only `:root` blocks
+   a visitor sees (landing, login, sign-up) and for the app (base.html, app.css). Only `:root` blocks
    here, no other selectors. site.css and every page's own CSS only use these with var().
 
    The page follows the system's light or dark mode. One accent color (a calm blue), one
@@ -23,10 +23,21 @@
   --on-accent: #f6f7f9; /* text on --accent */
   --danger: #b42318; /* error text and the edge of a field with an error */
 
+  /* Added for the app */
+  --danger-hover: #912018; /* a danger button on hover */
+  --on-danger: #f6f7f9; /* text on --danger */
+  --danger-bg: #fbeceb; /* an error message; a quiet Delete on hover and focus */
+  --priority-high: #8a4b00; /* the High priority label; not red, so not "overdue" */
+  --tag-text: #1f4f8f; /* tag text, on --band */
+  --drag-bg: #e6edf6; /* the to-do row being dragged */
+
   /* Sizes */
-  --radius: 8px; /* everything that is rounded */
+  --radius: 8px; /* everything you click or type into, and boxes */
+  --radius-label: 4px; /* small labels under 24px tall: priority, tag, filter link */
   --control-height: 48px; /* buttons and fields */
-  --control-height-small: 40px; /* small buttons, like in the header */
+  --control-height-small: 40px; /* small buttons, like in the header; the app's fields */
+  --control-height-compact: 32px; /* the app's row, step and header buttons */
+  --control-height-touch: 44px; /* the same buttons, under a finger */
   --space-1: 0.25rem;
   --space-2: 0.5rem;
   --space-3: 0.75rem;
@@ -38,6 +49,9 @@
 
   /* Font: the system's own sans-serif, nothing to download. */
   --font: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+
+  /* Motion: every transition, short and calm. */
+  --ease: 150ms ease-out;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -53,5 +67,11 @@
     --accent-hover: #b0cbf2;
     --on-accent: #0e1013;
     --danger: #ff8f85;
+    --danger-hover: #ffb0a8;
+    --on-danger: #0e1013;
+    --danger-bg: #2a1716;
+    --priority-high: #f0b46a;
+    --tag-text: #b0cbf2;
+    --drag-bg: #172231;
   }
 }

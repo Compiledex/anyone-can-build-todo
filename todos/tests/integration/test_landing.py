@@ -5,6 +5,7 @@ A logged-in person still goes straight to a list (see HomeTests in test_lists.py
 
 from html.parser import HTMLParser
 
+from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.templatetags.static import static
 from django.test import Client, TestCase
@@ -12,6 +13,7 @@ from django.urls import reverse
 
 from accounts.tests.helpers import make_user
 from todos.models import Subtask, Todo, TodoList
+from todos.tests.helpers import webp_size
 
 LANDING_TEMPLATE = "todos/landing.html"
 
@@ -42,6 +44,7 @@ class PageParts(HTMLParser):
         self.tags = set()
         self.loaded = []  # every address the browser would load
         self.pictures = []  # each <picture>: {"sources": [attrs], "img": attrs}
+        self.sized = []  # (address, width, height) of each <img> and <source> file
         self._picture = None
         self._href = None
         self._text = []
@@ -67,6 +70,11 @@ class PageParts(HTMLParser):
         elif self._picture is not None and tag == "img":
             self._picture["img"] = attrs
         if tag in ("img", "source"):
+            for address in [attrs.get("src")] + (attrs.get("srcset") or "").split(","):
+                if address and address.strip():
+                    self.sized.append(
+                        (address.split()[0], attrs.get("width"), attrs.get("height"))
+                    )
             if attrs.get("src"):
                 self.image_files.append(attrs["src"])
             for part in (attrs.get("srcset") or "").split(","):
@@ -171,6 +179,23 @@ class LandingPageTests(TestCase):
             css = static_text(path)
             for text in ["@import", "url(http", "url(//"]:
                 self.assertFalse(text in css, f"{path} has {text}")
+
+    def test_picture_sizes_match_the_files(self):
+        """width and height are the real size of each file, so nothing jumps or stretches.
+
+        The login and sign-up pages show the landing page's first picture too
+        (_auth_shot.html). After `make landing-shots`, update the numbers.
+        """
+        for url in ["/", reverse("login"), reverse("signup")]:
+            sized = parts_of(self.client.get(url)).sized
+            self.assertTrue(sized, url)
+            for address, width, height in sized:
+                with self.subTest(url=url, address=address):
+                    path = finders.find(address.removeprefix(settings.STATIC_URL))
+                    self.assertIsNotNone(path, address)
+                    self.assertEqual(
+                        (width, height), tuple(str(n) for n in webp_size(path))
+                    )
 
     def test_every_picture_has_a_dark_version(self):
         pictures = parts_of(self.client.get("/")).pictures

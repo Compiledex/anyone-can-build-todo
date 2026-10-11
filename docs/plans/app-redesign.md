@@ -646,3 +646,7 @@ Changes after the review (approved with changes):
 - Approved by the person (2026-10-11): the open questions became "Decided by the person". The
   secondary button change in `site.css` and its landing and auth test updates were added as
   Step 3b.
+- Changed during the build (code review, 2026-10-11): the filter links do **not** stack at 390px.
+  "All", "Not done" and "Done" stay one group in one row: it is about 190px wide, so it fits at
+  390 and at 320px with no horizontal scroll, and three short links in a row are quicker to
+  compare than a stack. The find bar itself still stacks (search, then sort, then filter).

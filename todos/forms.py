@@ -7,6 +7,17 @@ from .queries import SORT_OPTIONS
 from .tags import parse_tags
 
 
+class NoColon:
+    """Labels like "Notes", not "Notes:", as on the login and sign-up pages.
+
+    Put it first: class TodoForm(NoColon, forms.ModelForm).
+    """
+
+    def __init__(self, *args, **kwargs):
+        kwargs.setdefault("label_suffix", "")
+        super().__init__(*args, **kwargs)
+
+
 class NoteField(forms.CharField):
     """A text field that counts a line break as one character, as the browser does."""
 
@@ -14,7 +25,7 @@ class NoteField(forms.CharField):
         return super().to_python(value).replace("\r\n", "\n")
 
 
-class TodoForm(forms.ModelForm):
+class TodoForm(NoColon, forms.ModelForm):
     # Only YYYY-MM-DD, the format the browser's date picker sends. Other formats,
     # like 10/12/2026, can mean two different dates.
     due_date = forms.DateField(
@@ -92,7 +103,7 @@ class TodoForm(forms.ModelForm):
         return todo
 
 
-class SubtaskForm(forms.ModelForm):
+class SubtaskForm(NoColon, forms.ModelForm):
     """The title of a new step. The view sets the to-do, never the form."""
 
     class Meta:
@@ -100,7 +111,7 @@ class SubtaskForm(forms.ModelForm):
         fields = ["title"]
 
 
-class TodoListForm(forms.ModelForm):
+class TodoListForm(NoColon, forms.ModelForm):
     """The name of a new list, or a new name for a list.
 
     The view always gives an `instance` that already has its owner.
@@ -122,7 +133,7 @@ class TodoListForm(forms.ModelForm):
         return name
 
 
-class ShareForm(forms.Form):
+class ShareForm(NoColon, forms.Form):
     """The username of the person the owner shares a list with.
 
     A valid form gives the User in cleaned_data["username"].
@@ -133,7 +144,6 @@ class ShareForm(forms.Form):
         widget=forms.TextInput(
             attrs={
                 "aria-label": "Username to share with",
-                "placeholder": "Username",
                 "autocomplete": "off",
             }
         ),
@@ -158,7 +168,7 @@ class ShareForm(forms.Form):
         return user
 
 
-class TodoQueryForm(forms.Form):
+class TodoQueryForm(NoColon, forms.Form):
     """What the list page shows, read from the address (`request.GET`).
 
     Only reads, never saves. `q` is the search text; `status` is the filter

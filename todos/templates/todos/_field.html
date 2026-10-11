@@ -1,10 +1,12 @@
 {% comment %}
-  One form field, for any page that extends todos/site_base.html (today: login and
-  sign-up; later the app). Use it as {% include "todos/_field.html" %} with `field`.
+  One form field, for the login and sign-up pages (todos/site_base.html) and the app's
+  edit, new list and rename pages (base.html). Use it as
+  {% include "todos/_field.html" %} with `field`.
   The DOM order: the label (above the input), the input, its error (below the input),
   then Django's help text. Django gives the input aria-describedby (the ids of the help
   text and of the error) and aria-invalid="true" when it has an error, so a screen
-  reader reads them with the input. The look is in site.css (.field, .errorlist, .helptext).
+  reader reads them with the input. The look is in site.css for the visitor pages and in
+  app.css for the app (.field, .errorlist, .helptext).
 {% endcomment %}
 <div class="field">
   {{ field.label_tag }}

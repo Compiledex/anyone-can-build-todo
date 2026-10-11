@@ -32,21 +32,22 @@
     {% if can_reorder %}{% if not forloop.first or not forloop.last %}
       <form class="move" method="post" action="{% url 'todo_move' todo.pk %}">
         {% csrf_token %}
-        {% if not forloop.first %}<button type="submit" name="direction" value="up" aria-label="Move up: {{ todo.title }}" title="Move up: {{ todo.title }}">↑</button>{% endif %}
-        {% if not forloop.last %}<button type="submit" name="direction" value="down" aria-label="Move down: {{ todo.title }}" title="Move down: {{ todo.title }}">↓</button>{% endif %}
+        {% if not forloop.first %}<button class="button button-secondary button-compact" type="submit" name="direction" value="up" aria-label="Move up: {{ todo.title }}" title="Move up: {{ todo.title }}">↑</button>{% endif %}
+        {% if not forloop.last %}<button class="button button-secondary button-compact" type="submit" name="direction" value="down" aria-label="Move down: {{ todo.title }}" title="Move down: {{ todo.title }}">↓</button>{% endif %}
       </form>
     {% endif %}{% endif %}
-    <a href="{% url 'todo_edit' todo.pk %}" aria-label="Edit {{ todo.title }}">Edit</a>
+    <a class="button button-quiet button-compact" href="{% url 'todo_edit' todo.pk %}" aria-label="Edit {{ todo.title }}">Edit</a>
     <form method="post" action="{% url 'todo_toggle' todo.pk %}">
       {% csrf_token %}
       {# Back to this same address (search, filter) after the click. #}
       <input type="hidden" name="next" value="{{ back_url }}">
-      <button type="submit">{% if todo.done %}Undo{% else %}Done{% endif %}</button>
+      <button class="button button-secondary button-compact" type="submit">{% if todo.done %}Undo{% else %}Done{% endif %}</button>
     </form>
     <form method="post" action="{% url 'todo_delete' todo.pk %}">
       {% csrf_token %}
       <input type="hidden" name="next" value="{{ back_url }}">
-      <button type="submit">Delete</button>
+      {# Quiet gray; red on hover and on keyboard focus. #}
+      <button class="button button-quiet button-compact delete" type="submit">Delete</button>
     </form>
   </div>
   {# The steps of one to-do, inside its <li>. Opens and closes with no JavaScript. #}
@@ -62,14 +63,14 @@
             <form method="post" action="{% url 'subtask_toggle' step.pk %}">
               {% csrf_token %}
               {% if step.done %}
-                <button type="submit" aria-label="Undo: {{ step.title }}">Undo</button>
+                <button class="button button-quiet button-compact" type="submit" aria-label="Undo: {{ step.title }}">Undo</button>
               {% else %}
-                <button type="submit" aria-label="Done: {{ step.title }}">Done</button>
+                <button class="button button-quiet button-compact" type="submit" aria-label="Done: {{ step.title }}">Done</button>
               {% endif %}
             </form>
             <form method="post" action="{% url 'subtask_delete' step.pk %}">
               {% csrf_token %}
-              <button type="submit" aria-label="Delete step: {{ step.title }}">Delete</button>
+              <button class="button button-quiet button-compact delete" type="submit" aria-label="Delete step: {{ step.title }}">Delete</button>
             </form>
           </li>
         {% endfor %}
@@ -77,8 +78,13 @@
     {% endif %}
     <form class="add-step" method="post" action="{% url 'subtask_add' todo.pk %}">
       {% csrf_token %}
-      <input name="title" aria-label="New step for {{ todo.title }}" maxlength="200" required>
-      <button type="submit">Add step</button>
+      {# The label wraps the input, so the input needs no id. #}
+      <div class="field">
+        <label>New step
+          <input name="title" aria-label="New step for {{ todo.title }}" maxlength="200" required>
+        </label>
+      </div>
+      <button class="button button-secondary button-compact" type="submit">Add step</button>
     </form>
   </details>
   {% endwith %}

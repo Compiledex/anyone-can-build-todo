@@ -576,7 +576,7 @@ class EditTests(LoggedInTestCase):
         self.todo.description = "Oat milk"
         self.todo.save()
         response = self.client.get(self.url)
-        self.assertContains(response, "Notes:</label>")
+        self.assertContains(response, "Notes</label>")
         self.assertContains(response, '<textarea name="description"')
         self.assertContains(response, 'maxlength="2000"')
         self.assertContains(response, ">\nOat milk</textarea>")

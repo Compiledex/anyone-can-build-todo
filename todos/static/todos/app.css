@@ -1,0 +1,962 @@
+/* The look of the logged-in app pages (base.html and the pages that extend it).
+   base.html loads tokens.css (the colors, sizes and font, shared with the landing,
+   login and sign-up pages), then this file. This file sets no token: it only uses
+   them with var(). It never loads site.css (the visitor pages' CSS). */
+
+/* ---- Base and type ---- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2 {
+  margin: 0;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  font-weight: 650;
+  text-wrap: balance;
+}
+
+/* The list's name, "Edit to-do", "New list". A long name wraps, even one long word. */
+h1 {
+  font-size: 1.75rem;
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+h2 {
+  font-size: 1.125rem;
+}
+
+p {
+  margin: 0;
+}
+
+a {
+  color: var(--accent);
+  text-underline-offset: 0.2em;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+/* Dates and counts: every digit equally wide, so they line up. */
+time,
+.count {
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+/* Hidden on the screen, but read by screen readers. */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ---- The frame: one centered column, 46rem wide ---- */
+
+.container {
+  max-width: 46rem;
+  margin: 0 auto;
+  padding: 0 var(--space-5);
+}
+
+main.container {
+  padding-top: var(--space-5);
+  padding-bottom: var(--space-7);
+}
+
+/* The header bar: the wordmark on the left, the person and Log out on the right. */
+header.site {
+  border-bottom: 1px solid var(--border);
+}
+
+.site-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  min-height: 56px;
+}
+
+.wordmark {
+  color: var(--text);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.wordmark:hover {
+  color: var(--text);
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  font-size: 0.9375rem;
+}
+
+/* "Logged in as ..." may wrap to two lines on a small phone; it stays visible. */
+.user .who {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* ---- Focus: the same ring everywhere ---- */
+
+/* Only the outline changes: never the size, the corners or the edge. */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---- Buttons: the product's one vocabulary ----
+   The same class names and the same look as site.css (the visitor pages):
+   .button with .button-primary, .button-secondary, .button-danger or .button-quiet,
+   and a size: .button-small (40px, the same as .button here) or .button-compact
+   (32px, for the row, step and header buttons). A label never wraps. */
+
+.button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--control);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  line-height: 1.2;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--ease),
+    border-color var(--ease),
+    color var(--ease),
+    transform var(--ease);
+}
+
+/* Pressed: one pixel down. */
+.button:active {
+  transform: translateY(1px);
+}
+
+.button-primary {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+
+.button-primary:hover {
+  border-color: var(--accent-hover);
+  background: var(--accent-hover);
+  color: var(--on-accent);
+}
+
+.button-secondary:hover {
+  background: var(--band);
+  color: var(--text);
+}
+
+.button-danger {
+  border-color: var(--danger);
+  background: var(--danger);
+  color: var(--on-danger);
+}
+
+.button-danger:hover {
+  border-color: var(--danger-hover);
+  background: var(--danger-hover);
+  color: var(--on-danger);
+}
+
+/* No edge: for actions that are used often but must not shout. */
+.button-quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+}
+
+.button-quiet:hover {
+  background: var(--band);
+  color: var(--text);
+}
+
+/* Delete in a row or a step: gray, and red on hover and on keyboard focus. */
+.button-quiet.delete:hover,
+.button-quiet.delete:focus-visible {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.button-small {
+  min-height: var(--control-height-small);
+}
+
+.button-compact {
+  min-height: var(--control-height-compact);
+  padding: 0 var(--space-3);
+  font-size: 0.875rem;
+}
+
+.button-quiet.button-compact {
+  padding: 0 var(--space-2);
+}
+
+/* ---- Fields: label, input, error, help, in this order in the HTML ---- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.field > label {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+/* A label that wraps its input: for inputs written by hand in a template, which
+   must not get a new id. The text of the label stays above the input. */
+.field > label:has(input) {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+input:not([type="hidden"]),
+select,
+textarea {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--control);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 1rem; /* 16px or more, so a phone does not zoom in. */
+  font-weight: 400;
+  transition: border-color var(--ease);
+}
+
+textarea {
+  min-height: 6rem;
+  padding: var(--space-2) var(--space-3);
+  resize: vertical;
+}
+
+input::placeholder {
+  color: var(--muted);
+  opacity: 1;
+}
+
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--text);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  border-color: var(--accent);
+}
+
+/* An invalid field keeps its red edge, also with the focus ring around it. */
+:is(input, select, textarea)[aria-invalid="true"],
+:is(input, select, textarea)[aria-invalid="true"]:hover,
+:is(input, select, textarea)[aria-invalid="true"]:focus-visible {
+  border-color: var(--danger);
+}
+
+.errorlist {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--danger);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.helptext {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* ---- Edit, New list, Rename list, Delete list ---- */
+
+form.page-form {
+  display: grid;
+  gap: var(--space-4);
+  max-width: 36rem;
+  margin-top: var(--space-5);
+}
+
+.lead {
+  margin-top: var(--space-3);
+}
+
+.form-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+form.form-actions {
+  margin-top: var(--space-5);
+}
+
+/* Cancel is a plain <a> (a test reads the whole tag), so its secondary button
+   look comes from here. */
+.form-actions > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height-small);
+  padding: 0 var(--space-4);
+  border: 1px solid var(--control);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: background-color var(--ease);
+}
+
+.form-actions > a:hover {
+  background: var(--band);
+  color: var(--text);
+}
+
+/* ---- The list menu (nav.lists) ---- */
+
+nav.lists {
+  display: grid;
+  gap: var(--space-2);
+  font-size: 0.9375rem;
+}
+
+nav.lists .menu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-4);
+}
+
+.menu-label {
+  color: var(--muted);
+}
+
+/* A list's name is typed by a person: one long word must still wrap. */
+nav.lists a {
+  min-width: 0;
+  padding-bottom: 2px;
+  border-bottom: 2px solid transparent;
+  color: var(--text);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+  transition: border-color var(--ease);
+}
+
+nav.lists a:hover {
+  border-bottom-color: var(--border);
+  color: var(--text);
+}
+
+nav.lists a[aria-current="page"] {
+  border-bottom-color: var(--accent);
+  font-weight: 650;
+}
+
+/* "+ New list", the last link of "My lists". */
+#my-lists > a:last-child {
+  color: var(--accent);
+}
+
+/* ---- The list's name, with Rename and Delete list (or "Shared by ...") ---- */
+
+.list-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  margin: var(--space-6) 0 var(--space-5);
+}
+
+.list-actions {
+  display: flex;
+  gap: var(--space-1);
+  min-width: 0;
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+.list-actions a {
+  padding: var(--space-1) var(--space-2);
+  border-radius: var(--radius);
+  text-decoration: none;
+  transition: background-color var(--ease);
+}
+
+.list-actions a:hover {
+  background: var(--band);
+}
+
+.list-actions a.delete {
+  color: var(--danger);
+}
+
+/* ---- The add form: "New to-do" on one line, then Due date, Repeat, Priority, Add ---- */
+
+form.add {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.add-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-3);
+}
+
+/* Add lines up with the fields: one label line (0.875rem x 1.5) plus the gap. */
+.add-row > .button {
+  margin-top: calc(1.3125rem + var(--space-1));
+}
+
+/* ---- The find bar: search, sort, filter (in this order in the HTML) ---- */
+
+.find {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: var(--space-4);
+  margin-top: var(--space-6);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+form.search,
+form.sort {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+form.search .field {
+  flex: 1;
+}
+
+/* "Show all": a plain link (a test reads the whole tag), next to Search. */
+form.search > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height-small);
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+
+form.sort select {
+  width: auto;
+}
+
+/* The filter: three links in one box. The current one has the --band fill and,
+   because the fill alone is too faint (1.2 : 1), a 2px accent line under it. */
+nav.filter {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+nav.filter a {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-height-compact);
+  padding: 0 var(--space-3);
+  border-radius: var(--radius-label);
+  color: var(--muted);
+  font-size: 0.9375rem;
+  text-decoration: none;
+  white-space: nowrap;
+  transition:
+    background-color var(--ease),
+    color var(--ease);
+}
+
+nav.filter a:hover {
+  background: var(--band);
+  color: var(--text);
+}
+
+nav.filter a[aria-current="page"] {
+  background: var(--band);
+  color: var(--text);
+  font-weight: 600;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* "Clear the filter to change the order." */
+.find + .muted {
+  margin-top: var(--space-4);
+}
+
+/* ---- The to-do row (ul.todos > li) ----
+   The HTML of a row: .handle (only in the manual order), .main (.title, then
+   div.meta, then details.notes, then .tags), .actions (Move, Edit, Done/Undo,
+   Delete), then details.steps. A CSS grid puts each part in a named place (a grid
+   area), so a phone gets another layout from the same HTML:
+   - 768px and up: the text on the left, the buttons on the right, the steps under
+     both. The buttons take only the room they need, so a long title wraps instead
+     of being squeezed to one word per line.
+   - under 768px: the text, then the buttons on their own line, then the steps. */
+
+ul.todos {
+  margin: var(--space-4) 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+ul.todos > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "main actions"
+    "steps steps";
+  column-gap: var(--space-3);
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+/* The manual order: the drag handle gets its own column in front. */
+ul.todos[data-reorder-url] > li {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "handle main actions"
+    "handle steps steps";
+}
+
+.handle {
+  grid-area: handle;
+  color: var(--muted);
+  cursor: grab;
+  user-select: none;
+  line-height: 1.5;
+}
+
+ul.todos > li > .main {
+  grid-area: main;
+  display: grid;
+  align-content: start;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+ul.todos > li .title {
+  display: block;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+/* The facts under the title: priority, due date, Overdue, repeat. They wrap
+   inside .main, so they never push the buttons. */
+ul.todos > li .meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+/* The priority label. Low and Medium are gray; High is amber and bold. */
+.priority {
+  display: inline-block;
+  padding: 0 6px;
+  border: 1px solid currentColor;
+  border-radius: var(--radius-label);
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.priority-3 {
+  color: var(--priority-high);
+  font-weight: 650;
+}
+
+/* Overdue: the date and the label in red. No dot, no icon. */
+.overdue time,
+.overdue-label {
+  color: var(--danger);
+}
+
+.overdue-label {
+  font-weight: 650;
+}
+
+ul.todos > li .tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.tag {
+  padding: 0 6px;
+  border-radius: var(--radius-label);
+  background: var(--band);
+  color: var(--tag-text);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  white-space: nowrap;
+}
+
+/* A done row: the title (only the title) gray and crossed out. */
+ul.todos > li.done .title {
+  color: var(--muted);
+  font-weight: 400;
+  text-decoration: line-through;
+}
+
+ul.todos > li.done .priority {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+/* The buttons: one line, at the top of the row. */
+ul.todos > li > .actions {
+  grid-area: actions;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  align-self: start;
+  gap: var(--space-1);
+}
+
+/* The forms around Move, Done and Delete do not make their own boxes. */
+ul.todos > li > .actions form {
+  display: contents;
+}
+
+/* Notes and steps open and close with no JavaScript (<details>). */
+ul.todos details summary {
+  width: fit-content;
+  color: var(--muted);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+ul.todos details summary:hover {
+  color: var(--text);
+}
+
+/* The notes: at most 65 characters wide; a long link wraps. */
+details.notes p {
+  max-width: 65ch;
+  margin-top: var(--space-1);
+  color: var(--muted);
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+/* The steps, under the text and the buttons. Only .step-title is crossed out,
+   so a done to-do does not cross out its steps. */
+details.steps {
+  grid-area: steps;
+  min-width: 0;
+  margin-top: var(--space-2);
+}
+
+ul.steps {
+  margin: var(--space-2) 0 0;
+  padding: 0 0 0 var(--space-4);
+  border-left: 2px solid var(--border);
+  list-style: none;
+}
+
+ul.steps li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 2px 0;
+  font-size: 0.9375rem;
+}
+
+ul.steps .step-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+ul.steps li.done .step-title {
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+/* "New step": its label wraps the field; Add step lines up with the field. */
+form.add-step {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0 calc(var(--space-4) + 2px);
+}
+
+form.add-step .field {
+  flex: 1;
+}
+
+form.add-step input {
+  min-height: var(--control-height-compact);
+}
+
+/* No to-dos, or none that match: one calm gray line, not a row. */
+ul.todos > li.empty {
+  display: block;
+  padding: var(--space-6) 0;
+  border-bottom: 0;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+/* Drag and drop (reorder.js): the row being dragged. */
+ul.todos > li.dragging {
+  background: var(--drag-bg);
+  outline: 2px dashed var(--control);
+}
+
+/* ---- Clear completed: asks once more before it deletes ---- */
+
+details.clear-completed {
+  margin-top: var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+details.clear-completed summary {
+  width: fit-content;
+  color: var(--muted);
+  font-size: 0.9375rem;
+  cursor: pointer;
+}
+
+details.clear-completed summary:hover {
+  color: var(--text);
+}
+
+details.clear-completed p {
+  margin: var(--space-3) 0;
+}
+
+/* ---- Sharing (the owner) and Leave this list (a member) ---- */
+
+.sharing {
+  display: grid;
+  gap: var(--space-3);
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+ul.members {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+ul.members > li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+ul.members > li > .title {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+form.share {
+  display: flex;
+  align-items: end;
+  gap: var(--space-2);
+}
+
+form.share .field {
+  flex: 1;
+}
+
+form.leave {
+  margin-top: var(--space-7);
+  padding-top: var(--space-5);
+  border-top: 1px solid var(--border);
+}
+
+/* ---- Messages, at the top of the page ---- */
+
+.messages {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.message {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius);
+  background: var(--band);
+  color: var(--text);
+}
+
+/* messages.error (a bad step title, an unknown username): red on a pale red. */
+.message.error {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+/* ---- Under 768px ---- */
+
+@media (max-width: 767px) {
+  .container {
+    padding: 0 var(--space-4);
+  }
+
+  main.container {
+    padding-top: var(--space-4);
+  }
+
+  /* A row: the text, then the buttons on their own line, then the steps. */
+  ul.todos > li {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas:
+      "main"
+      "actions"
+      "steps";
+  }
+
+  ul.todos[data-reorder-url] > li {
+    grid-template-columns: auto minmax(0, 1fr);
+    grid-template-areas:
+      "handle main"
+      "handle actions"
+      "handle steps";
+  }
+
+  ul.todos > li > .actions {
+    flex-wrap: wrap;
+    margin-top: var(--space-2);
+  }
+
+  .list-head {
+    margin-top: var(--space-5);
+  }
+
+  /* Due date on its own line, Repeat and Priority side by side, then Add. */
+  .add-row {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+
+  .add-row .due,
+  .add-row > .button {
+    grid-column: 1 / -1;
+  }
+
+  .add-row > .button {
+    margin-top: 0;
+  }
+
+  /* The find bar: search, sort and filter on top of each other. */
+  .find {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  form.sort .field {
+    flex: 1;
+  }
+
+  form.sort select {
+    width: 100%;
+  }
+
+  nav.filter {
+    justify-self: start;
+  }
+}
+
+/* ---- Touch: under a finger, row and step buttons are 44px tall, 8px apart ----
+   The selectors are as specific as the rules they change (ul.todos > li > .actions),
+   or the 4px gap of the laptop layout would win. */
+
+@media (pointer: coarse) {
+  ul.todos > li > .actions,
+  ul.steps li {
+    gap: var(--space-2);
+  }
+
+  ul.todos > li > .actions .button,
+  ul.steps .button,
+  form.add-step .button,
+  form.add-step input {
+    min-height: var(--control-height-touch);
+  }
+}
+
+/* ---- Less motion, when the person asks for it ---- */
+
+/* Every element, with !important: a rule like `.field input` or `nav.lists a`
+   is more specific than a list of names here, and would keep its transition. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition: none !important;
+  }
+
+  .button:active {
+    transform: none;
+  }
+}

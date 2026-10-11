@@ -358,5 +358,10 @@ class AppPagesTests(LoggedInTestCase):
         self.assertTemplateUsed(response, "base.html")
         self.assertTemplateNotUsed(response, SITE_FRAME)
         self.assertNotContains(response, "todos/site.css")
-        # tokens.css is not checked here: the app redesign will load it from
-        # base.html on purpose, so the app and the visitor pages share the tokens.
+        # The app shares the tokens with the visitor pages, then has its own CSS.
+        stylesheets = [
+            a["href"] for a in parts_of(response).all("link", rel="stylesheet")
+        ]
+        self.assertEqual(
+            stylesheets, [static("todos/tokens.css"), static("todos/app.css")]
+        )
