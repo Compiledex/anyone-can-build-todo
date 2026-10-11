@@ -192,6 +192,13 @@ class SearchTests(LoggedInTestCase):
         response = self.search("ÅKER")
         self.assertEqual(self.shown(response), ["Handle"])
 
+    def test_search_case_folds_the_stored_tag_name(self):
+        # parse_tags keeps "ß" ("straße"); only folding the column finds "strasse".
+        self.add("Flytt").set_tags(parse_tags("Straße"))
+        self.add("Ring").set_tags(parse_tags("jobb"))
+        response = self.search("STRASSE")
+        self.assertEqual(self.shown(response), ["Flytt"])
+
     def test_nordic_search_keeps_other_users_out(self):
         theirs = self.add("Ærend i byen")  # alice's to-do, with a matching tag.
         theirs.set_tags(["ærend"])

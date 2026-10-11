@@ -48,7 +48,8 @@ def norwegian_key(text):
     A tuple of (group, number) pairs: 0 for spaces, digits and signs (before
     a), 1 for a to z, æ, ø, å, 2 for other letters (after å). Another letter
     with an accent counts as its base letter. A tuple, because the answer is
-    cached and must not be changeable.
+    cached and must not be changeable. `text` must be a str: SQLite never
+    passes NULL to a collation, and the title column is NOT NULL.
     """
     pairs = []
     for ch in casefold(text):

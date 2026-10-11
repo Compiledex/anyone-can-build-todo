@@ -361,7 +361,8 @@ pass.
 | `test_search_ignores_case_of_nordic_letters_in_title` | "Ærend på posten" and "Kjøp melk"; `?q=ærend` shows only "Ærend på posten", and `?q=ÆREND` does too. | Today's `icontains` (SQLite `LIKE` ignores case for A to Z only). |
 | `test_search_ignores_case_of_nordic_letters_in_notes` | Notes "Kjøp ØL og brus" on "Fest", and "Vask bilen" with no notes; `?q=øl` shows only "Fest". | Folding only the title. |
 | `test_search_ignores_case_of_nordic_letters_in_tags` | "Handle" with the tag `åker` (typed "Åker", stored `åker`), and "Ring" with the tag `jobb`; `?q=ÅKER` shows only "Handle". | Folding only the column, not the typed text (the tag is already lower case). |
-| `test_nordic_search_keeps_other_users_out` | alice has "Ærend i byen" with the tag `ærend`; bob's list has "Ærend for bob". bob searches **his** list for `ærend` (lower case, so today's `LIKE` does not find his "Ærend" and the test fails today): he sees only `["Ærend for bob"]` (the "does happen" case), and not alice's to-do. Same shape as `test_other_users_todos_never_match`. | A tag sub-query that starts from `Todo.objects` instead of `todos` (alice's to-do would then match through her tag). |
+| `test_nordic_search_keeps_other_users_out` | alice has "Ærend i byen" with the tag `ærend`; bob's list has "Ærend for bob". bob searches **his** list for `ærend` (lower case, so today's `LIKE` does not find his "Ærend" and the test fails today): he sees only `["Ærend for bob"]` (the "does happen" case), and not alice's to-do. Same shape as `test_other_users_todos_never_match`. | Folding only the typed text, not the title column (bob's "Ærend" is then not found). It can **not** catch a tag sub-query that starts from `Todo.objects`: the outer `todos` still holds only bob's list, so alice's to-do can never be shown. |
+| `test_search_case_folds_the_stored_tag_name` | "Flytt" with the tag made by `parse_tags("Straße")` (stored `straße`, because `.lower()` keeps `ß`), and "Ring" with the tag `jobb`; `?q=STRASSE` shows only "Flytt". | Folding only the typed text, not the tag column (`Contains("tags__name", folded)`). |
 
 `test_search_query_count_does_not_grow_with_rows`, `test_todo_with_two_matching_tags_is_shown_once`
 and `test_percent_sign_is_not_a_wildcard` stay and must still pass.
@@ -415,7 +416,9 @@ code on `main` (`2dc6747`):
   "Ärlig", because e is before l).
 - Fixed: `test_nordic_search_keeps_other_users_out` could not fail (the old version had no way for
   another user's row to match). It now copies `test_other_users_todos_never_match`: alice's to-do
-  has a matching tag, so a sub-query from `Todo.objects` would leak it.
+  has a matching tag, so a sub-query from `Todo.objects` would leak it. (Corrected in the code
+  review: it would not leak, because the outer `todos` limits the rows; the test guards the title
+  folding.)
 - Fixed: the new-connection test also checks the "does happen" direction (`'ø' < 'å'` is `1`).
 - Fixed: `make test` uses one process by default (`PARALLEL ?= 1` in the `Makefile`), so a step
   now runs `make test PARALLEL=2` once to cover the worker processes.
@@ -443,3 +446,14 @@ The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
 - `AGENTS.md`: the `norwegian` collation is only for `ORDER BY`, never for `=`, `UNIQUE`,
   `DISTINCT` or `GROUP BY`. The admin's title sort is under "Not part of this task".
   `norwegian_key` gets `functools.lru_cache` (so it returns a tuple).
+
+The code review (2026-10-11) said PASS WITH FIXES. What changed:
+
+- `test_nordic_search_keeps_other_users_out` does not catch a tag sub-query from `Todo.objects`
+  (the outer `todos` only holds the open list's rows, so another user's to-do can never be shown).
+  It guards the folding of the title. The table above now says so.
+- Nothing checked that the stored tag name is case folded (every tag in the tests was already
+  lower case). New test `test_search_case_folds_the_stored_tag_name` (`Straße`, `?q=STRASSE`); it
+  fails when `CaseFold` is taken off `tags__name`.
+- The docstring of `norwegian_key` says it expects a str: SQLite never passes NULL to a collation,
+  and the title column is NOT NULL.
