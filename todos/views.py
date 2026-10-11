@@ -15,6 +15,7 @@ from django.views.decorators.http import (
     require_safe,
 )
 
+from . import undo
 from .forms import ShareForm, SubtaskForm, TodoForm, TodoListForm, TodoQueryForm
 from .models import Subtask, Todo, TodoList
 from .ordering import parse_ids, save_order
@@ -129,6 +130,8 @@ def render_list_page(request, the_list, form):
     errors of a bad add.
     """
     is_owner = the_list.owner_id == request.user.id
+    # A delete that can no longer be undone: do not keep its to-do text around.
+    undo.drop_expired(request.session, timezone.now())
     # Search, filter and sort from the address. Only GET is read,
     # so an invalid add (a POST) shows the whole list.
     query_form = TodoQueryForm(request.GET)
@@ -357,10 +360,68 @@ def todo_toggle(request, pk):
 
 @require_POST
 def todo_delete(request, pk):
-    todo = get_visible_todo(request.user, pk)
-    the_list = todo.todo_list  # Read before the delete.
-    todo.delete()
+    """Delete at once, and keep a snapshot in the session for the Undo button."""
+    # Read inside the transaction: a second Delete at the same time waits for
+    # the first (IMMEDIATE), then gets 404 instead of a stale copy with no tags
+    # and no steps, which would replace the good snapshot.
+    with transaction.atomic():
+        todo = get_visible_todo(request.user, pk)
+        the_list = todo.todo_list  # Read before the delete.
+        snapshot = undo.take_snapshot(todo, request.user, timezone.now())
+        todo.delete()
+    request.session[undo.SESSION_KEY] = snapshot  # Only the last delete.
+    # The id in the tag ties this message to this delete (see base.html).
+    messages.success(
+        request, f"Deleted “{todo.title}”.", extra_tags=f"undo-delete-{snapshot['id']}"
+    )
     return redirect_back(request, the_list.get_absolute_url())
+
+
+@require_POST
+def todo_undo_delete(request, pk):
+    """Make the last deleted to-do again, for the person who deleted it.
+
+    The session is saved after the view, outside the database transaction, so
+    two posts close together can both read the snapshot. The real guard is the
+    "id exists" check inside the transaction, before anything is made.
+    """
+    now = timezone.now()
+    snapshot = request.session.get(undo.SESSION_KEY)
+    if not snapshot or snapshot["id"] != pk or snapshot["user"] != request.user.id:
+        # Already restored (a double click, a second tab): nothing to say.
+        # Anything else (a stranger, an older delete, after logout): 404.
+        todo = get_visible_todo(request.user, pk)
+        return redirect_back(
+            request, f"{todo.todo_list.get_absolute_url()}#todo-{todo.pk}"
+        )
+    del request.session[undo.SESSION_KEY]
+    with transaction.atomic():
+        visible_lists = TodoList.objects.visible_to(request.user)
+        the_list = visible_lists.filter(pk=snapshot["todo_list_id"]).first()
+        list_url = the_list.get_absolute_url() if the_list else reverse("todo_list")
+        existing = Todo.objects.filter(pk=pk).first()
+        if existing is not None:
+            if (
+                existing.todo_list_id == snapshot["todo_list_id"]
+                and existing.title == snapshot["title"]
+                and existing.created_at == undo.created_at(snapshot)
+            ):
+                # The same to-do, restored a moment ago by the other post.
+                return redirect_back(request, f"{list_url}#todo-{pk}")
+            # Another to-do got this id (after a table rebuild): never touch it.
+            messages.error(request, "Could not undo.")
+            return redirect(list_url)
+        if undo.is_expired(snapshot, now):
+            messages.info(request, "Too late to undo: the to-do stays deleted.")
+            return redirect(list_url)
+        if the_list is None:
+            messages.error(
+                request, "Could not undo: you can no longer see the list it was in."
+            )
+            return redirect("todo_list")
+        todo = undo.restore(snapshot, the_list)
+    messages.success(request, f"Restored “{todo.title}”.")
+    return redirect_back(request, f"{list_url}#todo-{todo.pk}")
 
 
 @require_http_methods(["GET", "POST"])

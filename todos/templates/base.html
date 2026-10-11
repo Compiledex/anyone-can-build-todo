@@ -35,7 +35,18 @@
     {% if messages %}
       <div class="messages" role="status">
         {% for message in messages %}
-          <p class="message{% if message.tags %} {{ message.tags }}{% endif %}">{{ message }}</p>
+          {# A <div>, not a <p>: a <p> cannot hold the Undo <form>. #}
+          <div class="message{% if message.tags %} {{ message.tags }}{% endif %}">
+            <span>{{ message }}</span>
+            {# Only the message of the delete that the session can still undo. #}
+            {% if undo_delete_tag and message.extra_tags == undo_delete_tag %}
+              <form class="undo" method="post" action="{% url 'todo_undo_delete' undo_delete_id %}">
+                {% csrf_token %}
+                <input type="hidden" name="next" value="{{ request.get_full_path }}#todo-{{ undo_delete_id }}">
+                <button class="button button-secondary button-compact" type="submit" aria-label="Undo delete: {{ undo_delete_title }}">Undo</button>
+              </form>
+            {% endif %}
+          </div>
         {% endfor %}
       </div>
     {% endif %}

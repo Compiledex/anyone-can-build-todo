@@ -1,6 +1,6 @@
 # Plan: Undo a deleted to-do
 
-Status: approved by the person (2026-10-11, plan card answered), not started
+Status: **done** (2026-10-11)
 
 Builds on: **edit-todo**, **subtasks**, **tags**, **recurring** (`repeated_from`, `next_copy`),
 **drag-and-drop** (`position`), **sharing** (members may delete), **safe-toggles** (Delete goes
@@ -400,3 +400,29 @@ WITH CHANGES. What changed:
   `request.session.undo_delete.id` in the template.
 - An expired snapshot no longer "lasts until the time limit": it stays until the next delete,
   Undo or logout, so the list page now drops it.
+
+## Built (2026-10-11)
+
+What turned out different from the plan above:
+
+- Built on `main` before A merged; `copy_fingerprint` was added to `SNAPSHOT_FIELDS` when the
+  branch merged `main` with A (the unit test failed until it did). A test checks that a restored,
+  unchanged copy still counts as unchanged. `take_snapshot` and `restore` handle
+  every field in `SNAPSHOT_FIELDS` the same way (`field.to_python`), so the name is all A needs.
+- `todos/undo.py` also has `is_expired`, `current_snapshot` (used by the context processor) and
+  `created_at` (for the "restored a moment ago" check).
+- Message levels: "Deleted" and "Restored" are `success`; "Too late to undo" is `info`; "Could
+  not undo." and "Could not undo: you can no longer see the list it was in." are `error`.
+- Two extra integration tests: `test_member_can_undo` (the "something happens" case of the
+  member test, on its own) and `test_no_undo_button_for_a_message_without_its_snapshot_after_login`
+  (a message cookie tagged `undo-delete-7` in a fresh session).
+- After the code review: `todo_delete` reads the to-do inside its transaction (a second Delete
+  at the same time gets 404 instead of replacing the snapshot with a stale copy);
+  `todo_undo_delete` finds the list inside its transaction too; the Undo button's `aria-label`
+  is "Undo delete: <title>" (the context processor also gives `undo_delete_title`), so it is not
+  confused with a row's "Undo: <title>".
+- Known limit: on a filtered page (for example "Not done"), Undo goes back to `next`, the same
+  filtered page with `#todo-<id>`. If the restored to-do does not match the filter (it was done),
+  the row is not shown there and the page opens at the top. Accepted.
+- The integration tests read only the messages added by one request (`added_messages`), because
+  the "Deleted" message is still unread when Undo is posted.

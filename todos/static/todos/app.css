@@ -876,6 +876,12 @@ details.leave {
   color: var(--text);
 }
 
+/* The Undo button after a Delete: on the same line as the text. */
+.message form.undo {
+  display: inline-block;
+  margin-left: var(--space-3);
+}
+
 /* messages.error (a bad step title, an unknown username): red on a pale red. */
 .message.error {
   background: var(--danger-bg);
