@@ -1,13 +1,48 @@
+import hashlib
+import json
+
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
 from django.db.models import Max, Q
-from django.db.models.functions import Lower
 from django.urls import reverse
 from django.utils import timezone
 
 from .recurrence import next_due_date
+from .sqlite_functions import casefold
 from .tags import MAX_TAG_LENGTH
+
+# The fields make_next_copy copies as they are. due_date (a new date), the tags
+# and the steps are copied too, and are always in the fingerprint. A field that a
+# copy should keep is added here, and then it is in the fingerprint too.
+COPIED_FIELDS = ("title", "description", "priority", "repeat")
+
+# Change this when fingerprint() changes shape. Then every stored fingerprint
+# differs, so every old copy counts as changed and Undo keeps it: no data is lost.
+FINGERPRINT_VERSION = "v1"
+
+
+def fingerprint(values, due_date, tag_names, step_titles):
+    """A SHA-256 hash (64 hex characters) of what a person can change on a to-do.
+
+    `values`: a dict with the COPIED_FIELDS. The notes have "\\r\\n" made "\\n"
+    (as NoteField does), so the same text always gives the same hash. Tag names
+    sorted, step titles in their order. Not done, not the steps' done state,
+    not position, not reminded_on. Starts with FINGERPRINT_VERSION.
+    """
+    fields = [values[name] for name in COPIED_FIELDS]
+    fields[COPIED_FIELDS.index("description")] = values["description"].replace(
+        "\r\n", "\n"
+    )
+    data = [
+        FINGERPRINT_VERSION,
+        *fields,
+        due_date.isoformat() if due_date else None,
+        sorted(tag_names),
+        list(step_titles),
+    ]
+    text = json.dumps(data, ensure_ascii=False)
+    return hashlib.sha256(text.encode()).hexdigest()
 
 
 class TodoListQuerySet(models.QuerySet):
@@ -28,6 +63,11 @@ class TodoList(models.Model):
         related_name="todo_lists",
     )
     name = models.CharField(max_length=100)
+    # casefold(name): the name in one case, for the unique rule ("Ærend" and
+    # "ærend" get the same key). Set by save() and clean(), never by a form.
+    # Up to 300: casefold can make a name longer ("ß" becomes "ss").
+    # Never change a name without save() (no QuerySet.update(name=...)).
+    name_key = models.CharField(max_length=300, editable=False, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     # The people the owner shared this list with. The owner is never a member.
     members = models.ManyToManyField(
@@ -39,18 +79,46 @@ class TodoList(models.Model):
     class Meta:
         ordering = ["created_at", "pk"]
         constraints = [
-            # One person cannot have "Work" and "work". On SQLite this ignores
-            # case only for A-Z, the same as `name__iexact` in TodoListForm.
+            # One person cannot have "Work" and "work", or "Ærend" and "ærend":
+            # the key is casefold(name), made in Python by save(), so this is a
+            # plain = rule that works with every SQLite tool.
             models.UniqueConstraint(
-                Lower("name"), "owner", name="unique_list_name_per_owner"
+                fields=["owner", "name_key"],
+                name="unique_list_name_key_per_owner",
+                # Shown in the admin; TodoListForm gives its own message.
+                violation_error_message=(
+                    "This owner already has a list with this name (ignoring case)."
+                ),
             ),
         ]
 
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        self.name_key = casefold(self.name)
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "name" in update_fields:
+            kwargs["update_fields"] = {*update_fields, "name_key"}
+        super().save(*args, **kwargs)
+
     def get_absolute_url(self):
         return reverse("list_detail", args=[self.pk])
+
+    def clean(self):
+        # A model form runs clean() before it checks the constraints, so the
+        # admin checks the unique rule with the new key.
+        super().clean()
+        self.name_key = casefold(self.name)
+
+    def validate_constraints(self, exclude=None):
+        # name_key is not a form field, so Django would skip the unique rule on
+        # it. When the name is checked, check the key too: then a duplicate
+        # typed in the admin is a form error, not a 500 page.
+        exclude = set(exclude or ())
+        if "name" not in exclude:
+            exclude.discard("name_key")
+        super().validate_constraints(exclude=exclude)
 
 
 class Tag(models.Model):
@@ -131,6 +199,11 @@ class Todo(models.Model):
     # so it is not shown twice on one day. Never copied by make_next_copy: a copy
     # starts never reminded. editable=False keeps it out of forms and the admin.
     reminded_on = models.DateField(null=True, blank=True, editable=False)
+    # On a copy: the fingerprint of what make_next_copy made (content_fingerprint()).
+    # "" on a to-do that is not a copy, and on copies made before this field existed.
+    copy_fingerprint = models.CharField(
+        max_length=64, blank=True, default="", editable=False
+    )
 
     class Meta:
         ordering = ["created_at", "pk"]  # pk: a fixed order for equal times.
@@ -200,13 +273,31 @@ class Todo(models.Model):
         except ObjectDoesNotExist:
             return None
 
+    def content_fingerprint(self):
+        """fingerprint() of this to-do as it is in the database now (two queries:
+        the tags and the steps)."""
+        values = {name: getattr(self, name) for name in COPIED_FIELDS}
+        tag_names = list(self.tags.values_list("name", flat=True))
+        step_titles = list(self.subtasks.values_list("title", flat=True))
+        return fingerprint(values, self.due_date, tag_names, step_titles)
+
+    def changed_since_copy(self):
+        """True when this copy no longer matches what make_next_copy made.
+
+        False for a to-do with no stored fingerprint (not a copy, or an old copy).
+        """
+        if not self.copy_fingerprint:
+            return False
+        return self.content_fingerprint() != self.copy_fingerprint
+
     def make_next_copy(self, today):
         """Make the next copy of a repeating to-do, and return it.
 
         Returns None, and makes nothing, when the to-do does not repeat, has no
         due date, has no next date (after 31 Dec 9999), or already has a copy.
         The copy is in the same list, so it has the same owner and members.
-        A new field that a copy should keep is added here, and only here.
+        A new field that a copy should keep is added to COPIED_FIELDS, and only
+        there. The copy stores its fingerprint, so Undo can see a later change.
         """
         if not self.repeat or self.due_date is None:
             return None
@@ -215,20 +306,24 @@ class Todo(models.Model):
         due_date = next_due_date(self.due_date, self.repeat, today)
         if due_date is None:
             return None
+        values = {name: getattr(self, name) for name in COPIED_FIELDS}
+        tags = list(self.tags.all())
+        step_titles = [step.title for step in self.subtasks.all()]
         copy = Todo.objects.create(
             todo_list=self.todo_list,
-            title=self.title,
-            description=self.description,
-            priority=self.priority,
-            repeat=self.repeat,
             due_date=due_date,
             repeated_from=self,
+            # From the values in memory, before the save: no second save.
+            copy_fingerprint=fingerprint(
+                values, due_date, [tag.name for tag in tags], step_titles
+            ),
+            **values,
         )
         # The same Tag rows; they already belong to the list owner.
-        copy.tags.set(self.tags.all())
+        copy.tags.set(tags)
         # The same steps, in the same order, none of them done yet.
         Subtask.objects.bulk_create(
-            Subtask(todo=copy, title=step.title) for step in self.subtasks.all()
+            Subtask(todo=copy, title=title) for title in step_titles
         )
         return copy
 

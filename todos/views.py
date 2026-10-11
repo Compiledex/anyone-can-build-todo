@@ -317,7 +317,8 @@ def todo_toggle(request, pk):
     The form says which state it wants, so a double click or an old tab does
     nothing when the to-do already has it: no flip, no copy, no message.
     Done on a repeating to-do makes its next copy; Undo removes that copy
-    again, unless it is already done, in another list, or has a done step.
+    again, unless it is already done, in another list, has a done step, or
+    was changed after it was made (Todo.changed_since_copy).
     """
     done = wanted_done(request)
     # Read the to-do inside the transaction, so a second click at the same time
@@ -343,6 +344,13 @@ def todo_toggle(request, pk):
                         request,
                         f"The next copy, due {due}, was kept, "
                         "because a step in it is already done.",
+                    )
+                elif copy.changed_since_copy():
+                    # Someone changed the copy: that is work too.
+                    messages.info(
+                        request,
+                        f"The next copy, due {due}, was kept, "
+                        "because it was changed after it was made.",
                     )
                 else:
                     copy.delete()  # Its steps go with it (on_delete=CASCADE).
@@ -418,16 +426,36 @@ def todo_undo_delete(request, pk):
 
 @require_http_methods(["GET", "POST"])
 def todo_edit(request, pk):
-    todo = get_visible_todo(request.user, pk)
-    # Read before the form: a ModelForm copies a valid typed title into `todo`,
-    # even when another field fails and nothing is saved.
-    saved_title = todo.title
+    """Show the edit form (GET), or save it (POST).
+
+    Turning on Repeat (it was Never) for a to-do that is already done makes
+    the next copy at once, with a message. Nothing new when Repeat only
+    changes kind, when the to-do is not done, or when a copy exists.
+    """
     if request.method == "POST":
-        form = TodoForm(request.POST, instance=todo)
-        if form.is_valid():
-            form.save()
+        copy = None
+        # Read the to-do inside the transaction, so `done` and `repeat` are the
+        # values in the database now (see transaction_mode in settings.py).
+        with transaction.atomic():
+            todo = get_visible_todo(request.user, pk)  # 404 for a stranger.
+            # Read before the form: a ModelForm copies a valid typed title into
+            # `todo`, even when another field fails and nothing is saved.
+            saved_title = todo.title
+            was_repeating = bool(todo.repeat)
+            form = TodoForm(request.POST, instance=todo)
+            valid = form.is_valid()
+            if valid:
+                form.save()
+                if todo.done and todo.repeat and not was_repeating:
+                    copy = todo.make_next_copy(timezone.localdate())
+        if valid:
+            if copy:
+                due = format_date(copy.due_date, "j M Y")
+                messages.info(request, f"Made the next copy, due {due}.")
             return redirect(todo.todo_list)
     else:
+        todo = get_visible_todo(request.user, pk)
+        saved_title = todo.title
         form = TodoForm(instance=todo)
     return render(
         request,

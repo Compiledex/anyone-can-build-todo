@@ -268,6 +268,41 @@ class MemberCanTests(SharingTestCase):
         eggs = self.groceries.todos.get(title="Eggs")
         self.assertEqual(eggs.repeat, Todo.Repeat.WEEKLY)
 
+    def test_member_edit_is_kept_on_owners_undo(self):
+        self.make_weekly_milk()
+        alice = self.client_for(self.alice)
+        alice.post(self.url("todo_toggle", self.milk.pk), {"done": "1"})
+        copy = Todo.objects.get(repeated_from=self.milk)
+        response = self.client.post(
+            self.url("todo_edit", copy.pk),
+            {
+                "title": "Milk",
+                "repeat": "weekly",
+                "due_date": f"{copy.due_date:%Y-%m-%d}",
+                "description": "Oat milk this time.",
+            },
+        )
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        response = alice.post(self.url("todo_toggle", self.milk.pk), {"done": "0"})
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        copy.refresh_from_db()
+        self.assertEqual(copy.description, "Oat milk this time.")
+        self.assertEqual(len(messages_of(response)), 1)
+        self.assertIn("because it was changed", messages_of(response)[0])
+
+    def test_member_turns_on_repeat_on_done_todo(self):
+        due = timezone.localdate() + timedelta(days=30)
+        Todo.objects.filter(pk=self.milk.pk).update(done=True, due_date=due)
+        response = self.client.post(
+            self.url("todo_edit", self.milk.pk),
+            {"title": "Milk", "repeat": "weekly", "due_date": f"{due:%Y-%m-%d}"},
+        )
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        copy = Todo.objects.get(repeated_from=self.milk)
+        self.assertEqual(copy.todo_list, self.groceries)
+        self.assertEqual(copy.due_date, due + timedelta(days=7))
+        self.assertEqual(self.bobs_list.todos.count(), 0)
+
     def test_member_can_set_repeat_on_edit(self):
         response = self.client.post(
             self.url("todo_edit", self.milk.pk),
@@ -571,6 +606,12 @@ class ShareTests(SharingTestCase):
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.assertTrue(self.groceries.members.filter(pk=self.carol.pk).exists())
         self.assertEqual(messages_of(response), ["Shared with carol."])
+
+    def test_shared_list_name_does_not_count(self):
+        errand = TodoList.objects.create(owner=self.alice, name="Ærend")
+        errand.members.add(self.bob)
+        self.client_for(self.bob).post(self.url("list_create"), {"name": "ærend"})
+        self.assertTrue(self.bob.todo_lists.filter(name="ærend").exists())
 
     def test_unknown_username_is_refused(self):
         response = self.share("nobody")

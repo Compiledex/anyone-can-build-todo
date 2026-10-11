@@ -1137,6 +1137,40 @@ class KeyboardStepsTests(BrowserTestCase):
         expect(page.get_by_text("Steps: 0 of 2 done")).to_be_visible()
 
 
+class KeepAChangedCopyTests(BrowserTestCase):
+    def test_undo_keeps_a_changed_copy(self):
+        """Done on a weekly to-do, change the copy, Undo: the changed copy stays."""
+        user = make_user_with_inbox()
+        the_list = user.todo_lists.get()
+        the_list.todos.create(
+            title="Water the plants",
+            due_date=timezone.localdate() + timedelta(days=3),
+            repeat="weekly",
+        )
+        self.log_in_as(user)
+        page = self.page
+        page.goto(f"{self.live_server_url}{the_list.get_absolute_url()}")
+
+        page.get_by_role("button", name="Done: Water the plants").click()
+        copy = page.locator("ul.todos > li:not(.done)")
+        expect(copy).to_have_count(1)
+        copy.get_by_role("link", name="Edit Water the plants").click()
+        page.get_by_label("Title").fill("Water the plants and the herbs")
+        page.get_by_role("button", name="Save").click()
+
+        changed = page.locator("ul.todos > li").filter(
+            has=page.locator(".title", has_text="Water the plants and the herbs")
+        )
+        expect(changed).to_have_count(1)
+        page.get_by_role("button", name="Undo: Water the plants").click()
+        expect(
+            page.get_by_text("was kept, because it was changed after it was made.")
+        ).to_be_visible()
+        expect(page.locator("ul.todos > li")).to_have_count(2)
+        expect(changed).to_have_count(1)
+        expect(changed).not_to_have_class(DONE)
+
+
 class DeleteAndUndoTests(BrowserTestCase):
     def test_delete_and_undo(self):
         """Delete by mistake, click Undo: the to-do is back in its place, with its step."""

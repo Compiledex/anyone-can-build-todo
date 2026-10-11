@@ -1,6 +1,6 @@
 # Plan: `make run` makes a daily backup first
 
-Status: approved by the person (2026-10-11, plan card answered), not started
+Status: **done** (2026-10-11)
 
 Builds on: **local-safety** (`todos/backup.py`, `backup_database`, `copy_sqlite`, the `backup_db`
 command, `make backup`, `make reset`, `/backups/` in `.gitignore`, `MakeResetTests` with a fake
@@ -108,7 +108,10 @@ database: ..."), exit code 1, and `make run` prints its warning.
 A failed delete during pruning comes **after** today's copy is safely saved, so it is not a
 failed backup: the command prints the "Saved" line, then `Warning: could not remove an old daily
 copy: <name>: <error>.` on stderr, and exits 0. `prune_daily` stops at the first failed delete
-and returns what it removed so far; the error goes up to the command as an `OSError` it catches.
+and raises `PruneError` (an `OSError` that carries `removed`, what it removed so far, and, set by
+`daily_backup`, `created`, today's new copy); the command catches it before other `OSError`s.
+(Built that way because a function cannot both return and raise: the command needs the new copy's
+name for the "Saved" line.)
 The person sees a different warning from "the daily backup did not work", which would be wrong
 here.
 

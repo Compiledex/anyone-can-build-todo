@@ -405,8 +405,9 @@ WITH CHANGES. What changed:
 
 What turned out different from the plan above:
 
-- Built on `main` before A merged, so `SNAPSHOT_FIELDS` has no `copy_fingerprint` yet; the
-  rebase on A adds it (the unit test fails until it does). `take_snapshot` and `restore` handle
+- Built on `main` before A merged; `copy_fingerprint` was added to `SNAPSHOT_FIELDS` when the
+  branch merged `main` with A (the unit test failed until it did). A test checks that a restored,
+  unchanged copy still counts as unchanged. `take_snapshot` and `restore` handle
   every field in `SNAPSHOT_FIELDS` the same way (`field.to_python`), so the name is all A needs.
 - `todos/undo.py` also has `is_expired`, `current_snapshot` (used by the context processor) and
   `created_at` (for the "restored a moment ago" check).

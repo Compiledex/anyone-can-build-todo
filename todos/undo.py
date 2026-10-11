@@ -31,6 +31,7 @@ SNAPSHOT_FIELDS = [
     "repeated_from_id",
     "position",
     "reminded_on",
+    "copy_fingerprint",
 ]
 
 
