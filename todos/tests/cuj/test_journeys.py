@@ -914,3 +914,36 @@ class TouchTests(BrowserTestCase):
                     self.assertGreaterEqual(box["height"], TOUCH_HEIGHT, boxes)
                 for gap in gaps(boxes):
                     self.assertGreaterEqual(gap, TOUCH_GAP, boxes)
+
+
+def hex_to_rgb(value):
+    """`#b42318` as the browser writes a computed color: `rgb(180, 35, 24)`."""
+    value = value.strip().lstrip("#")
+    red, green, blue = (int(value[i : i + 2], 16) for i in (0, 2, 4))
+    return f"rgb({red}, {green}, {blue})"
+
+
+class QuietDeleteTests(BrowserTestCase):
+    def test_row_delete_turns_red_on_keyboard_focus(self):
+        """The row Delete is gray at rest, and the error red when Tab reaches it."""
+        user = make_user_with_inbox()
+        the_list = user.todo_lists.get()
+        the_list.todos.create(title="Water the plants")
+        self.log_in_as(user)
+        page = self.page
+        page.goto(f"{self.live_server_url}{the_list.get_absolute_url()}")
+        done = page.get_by_role("button", name="Done", exact=True)
+        delete = page.get_by_role("button", name="Delete", exact=True)
+        color = "el => getComputedStyle(el).color"
+        resting = delete.evaluate(color)
+        danger = page.evaluate(
+            "getComputedStyle(document.documentElement).getPropertyValue('--danger')"
+        )
+
+        done.focus()
+        page.keyboard.press("Tab")  # The keyboard, so :focus-visible applies.
+        expect(delete).to_be_focused()
+        page.wait_for_function("document.getAnimations().length === 0")
+        focused = delete.evaluate(color)
+        self.assertEqual(focused, hex_to_rgb(danger))
+        self.assertNotEqual(focused, resting)
