@@ -1,6 +1,6 @@
 # Plan: an accessibility pass on the app pages
 
-Status: **approved** (2026-10-11, by the orchestrator for the person), not started.
+Status: **done** (2026-10-11)
 
 Builds on: **app-redesign** (#32: `base.html`, `app.css`, `_field.html`, the row grid, the 44px
 touch rule, and its "Decided by the person"), **accounts** (`accounts/forms.py`), **subtasks**,
@@ -90,7 +90,8 @@ the title, and CUJ tests read `ul.todos > li .title` text.
 Add to the `@media (pointer: coarse)` block in `app.css`:
 
 - `ul.todos details summary`, `details.clear-completed summary`, `details.leave summary` (new,
-  decision 9): `display: flex; align-items: center; min-height: var(--control-height-touch)`.
+  decision 9): `min-height` and `line-height: var(--control-height-touch)`. (Built so instead
+  of `display: flex`, which removes the open/closed triangle of a `<summary>` in Chromium.)
 - `nav.filter a`: `min-height: var(--control-height-touch)`; `nav.filter` gap `var(--space-2)`.
 - `nav.lists a` and `.list-actions a`: `display: inline-flex; align-items: center; min-height:
   var(--control-height-touch)`. `nav.lists .menu` gets only `row-gap: var(--space-2)` (its 16px
@@ -344,3 +345,22 @@ The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
   `autofocus`, and the `Error: ` title is the reliable part.
 - New last step: `make landing-shots`, and commit changed pictures (orchestrator's choice).
 - Left for the person: "Leave asks first" is a behaviour change to review.
+
+## Built (2026-10-11)
+
+What turned out different from the plan above:
+
+- The summaries under a finger use `line-height` (see decision 3), so the triangle stays.
+- Line numbers in the table of tests that must change had moved (safe-toggles added tests).
+  Besides the listed ones, three more test lines changed, for the same decisions:
+  `KeepThePlaceTests` in `test_journeys.py` (`name="Done"`/`"Delete", exact=True` became
+  `"Done: Task 30"`/`"Delete: Task 30"`, decision 1), `ColorSchemeTests` (its
+  `.visually-hidden` locator became `.priority-3 .visually-hidden`, because the row now has more
+  hidden text, decision 1), and `todos/tests/cuj/test_auth_pages.py`
+  `test_bad_password_shows_the_error_below_the_field` (the description starts with "Type the
+  same password again", decision 8).
+- `test_password_help_names_the_real_minimum` and `test_step_done_keeps_the_fragment` passed
+  before the code too: Django's own help text already names 8, and step Done/Delete already kept
+  the fragment. They guard against later changes.
+- `make landing-shots`: the pictures `list`, `order` and `share-member` changed (menu without
+  colons, the Move slot); their sizes did not.
