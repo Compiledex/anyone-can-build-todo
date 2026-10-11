@@ -625,9 +625,13 @@ class ReorderJourneyTests(BrowserTestCase):
         the_list = user.todo_lists.get()
         for title in ["First", "Second", "Third"]:
             the_list.todos.create(title=title)
-        sent = []
-        page.on(
-            "request", lambda r: sent.append(r.url) if "/reorder/" in r.url else None
+        # Record every fetch() of the page, so the test can read them, with no wait.
+        page.add_init_script(
+            "window.__fetchCalls = [];"
+            "const realFetch = window.fetch;"
+            "window.fetch = (...args) => {"
+            " window.__fetchCalls.push(String(args[0]));"
+            " return realFetch(...args); };"
         )
         self.log_in_as(user)
         page.goto(f"{self.live_server_url}{the_list.get_absolute_url()}?sort=manual")
@@ -637,19 +641,26 @@ class ReorderJourneyTests(BrowserTestCase):
         handle = (
             page.locator("ul.todos > li").filter(has_text="Third").locator(".handle")
         )
+        # The mouse only reaches what is on the screen: in a 720px-high window
+        # the last row starts near the bottom edge, and no drag would start.
+        page.locator("ul.todos").scroll_into_view_if_needed()
         start = handle.bounding_box()
         target = page.locator("ul.todos > li").filter(has_text="First").bounding_box()
         page.mouse.move(start["x"] + 2, start["y"] + 2)
         page.mouse.down()
         page.mouse.move(target["x"] + 5, target["y"] + 10, steps=5)
         page.mouse.move(target["x"] + 5, target["y"] + 2, steps=5)
+        # The drag really started (or the test would prove nothing).
+        expect(page.locator("li.dragging")).to_have_count(1)
         page.keyboard.press("Escape")
         page.mouse.up()
 
         expect(titles).to_have_text(["First", "Second", "Third"])
+        # reorder.js removes "dragging" in its dragend handler, and in that same
+        # handler it would call fetch(). So once no row is "dragging", any
+        # request is already recorded.
         expect(page.locator("li.dragging")).to_have_count(0)
-        page.wait_for_timeout(300)  # A request would be sent at once.
-        self.assertEqual(sent, [])
+        self.assertEqual(page.evaluate("window.__fetchCalls"), [])
 
 
 def overlaps(a, b):
