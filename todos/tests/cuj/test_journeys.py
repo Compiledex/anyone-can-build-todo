@@ -861,3 +861,56 @@ class OneProductTests(BrowserTestCase):
                 self.assertEqual(add.evaluate(BUTTON_LOOK), landing)
                 search = page.get_by_role("button", name="Search", exact=True)
                 self.assertEqual(search.evaluate(SECONDARY_LOOK), log_in)
+
+
+# Under a finger (WCAG 2.5.8 and the person's decision): a button at least 44px
+# tall, and at least 8px between two buttons, so a finger hits the right one.
+TOUCH_HEIGHT = 44
+TOUCH_GAP = 8
+
+
+def gaps(boxes):
+    """The space between each box and the next one on the same line, in pixels."""
+    return [
+        b["x"] - (a["x"] + a["width"]) for a, b in zip(boxes, boxes[1:], strict=False)
+    ]
+
+
+class TouchTests(BrowserTestCase):
+    def test_row_and_step_buttons_fit_a_finger(self):
+        """On a phone, row and step buttons are 44px tall and 8px apart."""
+        user = make_user_with_inbox()
+        the_list = user.todo_lists.get()
+        todo = the_list.todos.create(title="Water the plants")
+        todo.subtasks.create(title="Fill the can")
+        phone = self.browser.new_context(
+            viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True
+        )
+        self.addCleanup(phone.close)
+        self.log_in_as(user, phone)
+        page = phone.new_page()
+        page.goto(f"{self.live_server_url}{the_list.get_absolute_url()}?open={todo.pk}")
+        row = page.locator(f"#todo-{todo.pk}")
+        expect(row.locator("details.steps ul")).to_be_visible()
+
+        step = row.locator("ul.steps li").first
+        add_step = row.locator("form.add-step")
+        groups = {
+            "row": [
+                row.get_by_role("link", name="Edit Water the plants"),
+                row.get_by_role("button", name="Done", exact=True),
+                row.get_by_role("button", name="Delete", exact=True),
+            ],
+            "step": [step.locator(".button").nth(0), step.locator(".button").nth(1)],
+            "add step": [
+                add_step.locator("input[name=title]"),
+                add_step.locator("button"),
+            ],
+        }
+        for name, controls in groups.items():
+            with self.subTest(name):
+                boxes = [control.bounding_box() for control in controls]
+                for box in boxes:
+                    self.assertGreaterEqual(box["height"], TOUCH_HEIGHT, boxes)
+                for gap in gaps(boxes):
+                    self.assertGreaterEqual(gap, TOUCH_GAP, boxes)

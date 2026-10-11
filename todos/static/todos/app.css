@@ -927,16 +927,20 @@ form.leave {
   }
 }
 
-/* ---- Touch: under a finger, row and step buttons are 44px tall, 8px apart ---- */
+/* ---- Touch: under a finger, row and step buttons are 44px tall, 8px apart ----
+   The selectors are as specific as the rules they change (ul.todos > li > .actions),
+   or the 4px gap of the laptop layout would win. */
 
 @media (pointer: coarse) {
-  .actions,
+  ul.todos > li > .actions,
   ul.steps li {
     gap: var(--space-2);
   }
 
-  .actions .button,
-  ul.steps .button {
+  ul.todos > li > .actions .button,
+  ul.steps .button,
+  form.add-step .button,
+  form.add-step input {
     min-height: var(--control-height-touch);
   }
 }
