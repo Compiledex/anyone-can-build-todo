@@ -48,7 +48,12 @@ class TodoList(models.Model):
             # the key is casefold(name), made in Python by save(), so this is a
             # plain = rule that works with every SQLite tool.
             models.UniqueConstraint(
-                fields=["owner", "name_key"], name="unique_list_name_key_per_owner"
+                fields=["owner", "name_key"],
+                name="unique_list_name_key_per_owner",
+                # Shown in the admin; TodoListForm gives its own message.
+                violation_error_message=(
+                    "This owner already has a list with this name (ignoring case)."
+                ),
             ),
         ]
 

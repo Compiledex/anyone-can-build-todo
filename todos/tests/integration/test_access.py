@@ -168,7 +168,9 @@ class AdminTests(TestCase):
         add_url = "/admin/todos/todolist/add/"
         response = self.client.post(add_url, {"owner": alice.pk, "name": "ærend"})
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.context["adminform"].form.errors)
+        self.assertContains(
+            response, "This owner already has a list with this name (ignoring case)."
+        )
         self.assertEqual(alice.todo_lists.count(), 1)
         # The key is casefold with NFC, not lower(): "Straße" clashes with
         # "STRASSE", and "A" plus a ring with "Åker".
