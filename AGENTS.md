@@ -73,7 +73,7 @@ which is not in git.
 | `pyproject.toml`, `uv.lock` | The packages this project uses, and their exact versions. |
 | `.pre-commit-config.yaml` | The checks that run on every `git commit`. |
 | `Makefile` | Short commands. `make help` lists them. |
-| `.github/workflows/check.yml` | CI (checks GitHub runs by itself). On every push and every pull request, two jobs at the same time: `lint` (`uv sync --locked`, every commit check on every file, the migration check) and `test` (installs Chromium, then `manage.py test`, all three layers). It sets no `DJANGO_*` variable, so the settings use the laptop defaults. The team merges a PR only when both jobs are green (GitHub does not enforce it; branch protection is off). |
+| `.github/workflows/check.yml` | CI (checks GitHub runs by itself). On every push and every pull request, two jobs at the same time: `lint` (`uv sync --locked`, every commit check on every file, the migration check) and `test` (installs Chromium, then `manage.py test`, all three layers). It sets no `DJANGO_*` variable, so the settings use the laptop defaults. A PR can merge only when both jobs are green: GitHub enforces it with a ruleset on `main` that requires the `lint` and `test` checks, and that also blocks deleting or force-pushing `main`. |
 | `docs/plans/` | One plan per feature, written and approved before the code. **History**: they say what was decided and why, not how the code is now. Their Status line says which PR built them. |
 
 ## Commands

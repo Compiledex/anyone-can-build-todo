@@ -247,3 +247,5 @@ The plan is **approved**.
 - GitHub branch protection: the person turns it on for `main` themselves (require the `lint` and
   `test` checks), outside this plan. Until it is on, the CI row in AGENTS.md says it is a team rule
   that GitHub does not enforce; when it is on, that half-sentence is removed in a later change.
+- Branch protection turned on by the person on 2026-10-11 (ruleset main: lint and test required, no
+  force-push, no deletion).
