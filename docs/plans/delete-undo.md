@@ -1,6 +1,6 @@
 # Plan: Undo a deleted to-do
 
-Status: approved by the person (2026-10-11, plan card answered), not started
+Status: **done** (2026-10-11)
 
 Builds on: **edit-todo**, **subtasks**, **tags**, **recurring** (`repeated_from`, `next_copy`),
 **drag-and-drop** (`position`), **sharing** (members may delete), **safe-toggles** (Delete goes
@@ -400,3 +400,20 @@ WITH CHANGES. What changed:
   `request.session.undo_delete.id` in the template.
 - An expired snapshot no longer "lasts until the time limit": it stays until the next delete,
   Undo or logout, so the list page now drops it.
+
+## Built (2026-10-11)
+
+What turned out different from the plan above:
+
+- Built on `main` before A merged, so `SNAPSHOT_FIELDS` has no `copy_fingerprint` yet; the
+  rebase on A adds it (the unit test fails until it does). `take_snapshot` and `restore` handle
+  every field in `SNAPSHOT_FIELDS` the same way (`field.to_python`), so the name is all A needs.
+- `todos/undo.py` also has `is_expired`, `current_snapshot` (used by the context processor) and
+  `created_at` (for the "restored a moment ago" check).
+- Message levels: "Deleted" and "Restored" are `success`; "Too late to undo" is `info`; "Could
+  not undo." and "Could not undo: you can no longer see the list it was in." are `error`.
+- Two extra integration tests: `test_member_can_undo` (the "something happens" case of the
+  member test, on its own) and `test_no_undo_button_for_a_message_without_its_snapshot_after_login`
+  (a message cookie tagged `undo-delete-7` in a fresh session).
+- The integration tests read only the messages added by one request (`added_messages`), because
+  the "Deleted" message is still unread when Undo is posted.
