@@ -1,6 +1,6 @@
 # Plan: drag and drop to reorder the to-dos
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-10, PR #25). The decisions are in "Decided by the person" at the end.
 
 Builds on: accounts (#17), lists (#10), sharing (#18), subtasks (#16), recurring (#8), search
 (#12), filter (#13), sort (#14), and the wave 0 foundation (`TodoForm`, the partial

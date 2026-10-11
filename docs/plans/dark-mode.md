@@ -1,6 +1,6 @@
 # Plan: dark mode
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-09, PR #6). The decisions are in "Decided by the person" at the end.
 
 Builds on: wave 0 (the shared template `todos/templates/base.html` that every page extends, and
 the colors of the page as CSS variables on `:root`). It does not need accounts (wave 1, built at

@@ -1,6 +1,6 @@
 # Plan: a priority on a to-do (#9)
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-09, PR #14). The decisions are in "Decided by the person" at the end.
 
 Builds on: wave 0 (`TodoForm` in `todos/forms.py`, the partial template
 `todos/templates/todos/_todo_item.html`, colors as CSS variables on `:root`, the shared

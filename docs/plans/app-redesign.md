@@ -1,6 +1,7 @@
 # Plan: redesign of the app pages
 
-Status: **approved** by the person on 2026-10-11 (see "Decided by the person"). Not started.
+Status: **done** (2026-10-11, PR #32). Approved by the person on 2026-10-11
+(see "Decided by the person").
 
 Starts after: the row fix (#28) and the landing page (#29), both merged, **and** the login and
 sign-up redesign (`feature/auth-pages`), which creates `todos/static/todos/tokens.css`. Step 1b

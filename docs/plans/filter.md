@@ -1,6 +1,6 @@
 # Plan: filter the list (#13)
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-10, PR #23). The decisions are in "Decided by the person" at the end.
 
 Builds on: the test pyramid and the foundation refactor (wave 0: `TodoForm`, the partial
 `_todo_item.html`, `base.html`), accounts (#17), lists (#10), sharing (#18), and search (#12,

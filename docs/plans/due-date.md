@@ -1,6 +1,6 @@
 # Plan: a due date on a to-do (feature #6)
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-09, PR #10). The decisions are in "Decided by the person" at the end.
 This version includes the fixes from two adversarial reviews, and fits the build order (wave 2).
 
 **Builds on:**

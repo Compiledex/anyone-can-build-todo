@@ -1,6 +1,6 @@
 # Plan: the foundation refactor (wave 0)
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-09, PR #5). The decisions are in "Decided by the person" at the end.
 
 **Builds on:** the test pyramid (wave 0, merged): tests go in `todos/tests/unit/`,
 `todos/tests/integration/` or `todos/tests/cuj/`.

@@ -330,7 +330,9 @@ runs the same checks and the tests on every push.
 | `todos/static/todos/reorder.js` | Drag and drop to reorder the to-dos, in plain JavaScript |
 | `todos/tests/` | The tests, one folder per layer; `helpers.py` has a fake `osascript`, so no test shows a real notification |
 | `config/test_runner.py` | Sorts the tests into layers and counts them |
+| `.github/workflows/check.yml` | The checks and tests GitHub runs on every push and pull request |
 | `AGENTS.md` | Instructions for the AI assistant (Codex reads it; `CLAUDE.md` points Claude to it) |
+| `docs/plans/` | The plan for each feature, written before the code; history, not a description of the code today |
 
 ## Put it on the internet
 

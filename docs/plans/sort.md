@@ -1,6 +1,6 @@
 # Plan: sort the list
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-10, PR #24). The decisions are in "Decided by the person" at the end.
 
 Builds on: #17 accounts, #10 lists, #6 due date, #9 priority, #18 sharing, #16 subtasks,
 #12 search (`TodoQueryForm`, `apply_list_query`), #13 filter (`status`, `next`,

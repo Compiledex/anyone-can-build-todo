@@ -1,6 +1,6 @@
 # Plan: search the to-dos (#12)
 
-Status: **approved** — not started. The decisions are in "Decided by the person" at the end.
+Status: **done** (2026-10-10, PR #21). The decisions are in "Decided by the person" at the end.
 
 Builds on: the foundation refactor (`TodoForm`, `_todo_item.html`, CSS variables), #17 accounts,
 #10 lists, #5 description, #11 tags, #18 sharing.
