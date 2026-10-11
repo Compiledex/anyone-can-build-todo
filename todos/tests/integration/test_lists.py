@@ -121,6 +121,12 @@ class NewListTests(LoggedInTestCase):
         form.save()
         errand.refresh_from_db()
         self.assertEqual(errand.name_key, "øl")
+        # casefold, not lower(): "ß" becomes "ss".
+        street = TodoList.objects.create(owner=self.user, name="Straße")
+        self.assertEqual(street.name_key, "strasse")
+        # NFC first: "A" plus a combining ring becomes one "å".
+        field = TodoList.objects.create(owner=self.user, name="A\u030aker")
+        self.assertEqual(field.name_key, "\u00e5ker")
 
     def test_save_with_update_fields_name_sets_the_key(self):
         errand = TodoList.objects.create(owner=self.user, name="Ærend")

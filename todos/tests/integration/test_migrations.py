@@ -202,9 +202,11 @@ class FillListNameKeyMigrationTests(TransactionTestCase):
         Todo = apps.get_model("todos", "Todo")
         ana = User.objects.create(username="ana")
         ben = User.objects.create(username="ben")
-        # The old A-to-Z rule allows all four.
-        first, two, dup, dup2 = self.make_lists(
-            apps, ana, ["Ærø", "ærø (2)", "ærø", "ÆrØ"]
+        # The old A-to-Z rule allows all four. "ærø (2)" is the newest, so a
+        # free number must be checked against all the owner's keys, not only
+        # the ones seen so far.
+        first, dup, dup2, two = self.make_lists(
+            apps, ana, ["Ærø", "ærø", "ÆrØ", "ærø (2)"]
         )
         (bens,) = self.make_lists(apps, ben, ["ærø"])
         todo = Todo.objects.create(todo_list=dup, title="Milk")

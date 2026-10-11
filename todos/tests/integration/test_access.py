@@ -170,6 +170,16 @@ class AdminTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.context["adminform"].form.errors)
         self.assertEqual(alice.todo_lists.count(), 1)
+        # The key is casefold with NFC, not lower(): "Straße" clashes with
+        # "STRASSE", and "A" plus a ring with "Åker".
+        TodoList.objects.create(owner=alice, name="STRASSE")
+        TodoList.objects.create(owner=alice, name="\u00c5ker")
+        for typed in ["Straße", "A\u030aker"]:
+            with self.subTest(typed=typed):
+                response = self.client.post(add_url, {"owner": alice.pk, "name": typed})
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(response.context["adminform"].form.errors)
+                self.assertEqual(alice.todo_lists.count(), 3)
         response = self.client.post(add_url, {"owner": alice.pk, "name": "Hjem"})
         self.assertEqual(response.status_code, 302)
         self.assertTrue(alice.todo_lists.filter(name="Hjem").exists())
