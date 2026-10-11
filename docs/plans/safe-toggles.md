@@ -331,7 +331,7 @@ The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
 
 - The toggle test helpers take an explicit `done` argument, never derived from a possibly stale
   object; the new table "Existing tests that must change" lists them (`RedirectBackTests.toggle`
-  with 7 callers, 14 posts in `test_sharing.py`, `ToggleTests`, `RecurringTests.toggle`, steps,
+  with 6 callers, 14 posts in `test_sharing.py`, `ToggleTests`, `RecurringTests.toggle`, steps,
   reorder).
 - `test_filter.py` line ~222: Done gets `#todo-<pk>` and Delete `#todos`, so its `count=2` check
   becomes two checks; line ~142 keeps `count=2` (both `#todos`).

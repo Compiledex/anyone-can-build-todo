@@ -444,6 +444,8 @@ class DeleteTests(LoggedInTestCase):
         self.assertEqual(delete(first), f"{url}#todo-{second.pk}")
         self.assertEqual(delete(third), f"{url}#todo-{second.pk}")
         self.assertEqual(delete(second), f"{url}#todos")
+        # The anchor after the only row names an element that exists.
+        self.assertContains(self.client.get(url), 'id="todos"', count=1)
 
 
 def open_view_names(patterns):
@@ -1415,6 +1417,12 @@ class RecurringTests(LoggedInTestCase):
         self.weekly.refresh_from_db()
         self.assertTrue(self.weekly.done)
         self.assertEqual(self.copies_of(self.weekly).count(), 1)
+
+    def test_done_on_a_done_todo_makes_no_copy(self):
+        self.toggle(self.weekly, True)
+        self.copies_of(self.weekly).delete()
+        self.toggle(self.weekly, True)  # Already done: nothing happens.
+        self.assertFalse(self.copies_of(self.weekly).exists())
 
     def test_double_undo_removes_the_copy_once(self):
         self.toggle(self.weekly, True)

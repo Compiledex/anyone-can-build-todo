@@ -110,6 +110,15 @@ class SubtaskTests(LoggedInTestCase):
         step.refresh_from_db()
         self.assertFalse(step.done)
 
+    def test_step_toggle_updates_only_done(self):
+        step = self.make_step()
+        with CaptureQueriesContext(connection) as queries:
+            self.client.post(reverse("subtask_toggle", args=[step.pk]), {"done": "1"})
+        updates = [q["sql"] for q in queries if q["sql"].startswith("UPDATE")]
+        self.assertEqual(len(updates), 1, updates)
+        self.assertIn('SET "done" = ', updates[0])
+        self.assertNotIn('"title"', updates[0])
+
     def test_step_bad_done_value_is_400(self):
         step = self.make_step()
         url = reverse("subtask_toggle", args=[step.pk])
