@@ -4,12 +4,23 @@ These tests move the database back to an old migration and forward again.
 They only use the models as they were at that migration ("historical models"),
 never `todos.models`, so they keep working when later features change the models.
 If the migrations are renumbered, change the names below.
+
+One exception: FillPositionMigrationTests does not migrate the database. It calls
+the function of 0016_fill_todo_position directly on today's tables.
 """
 
+import datetime
+import importlib
+
+import django.apps
 from django.conf import settings
 from django.db import connection
 from django.db.migrations.executor import MigrationExecutor
 from django.test import TransactionTestCase
+from django.utils import timezone
+
+from accounts.tests.helpers import LoggedInTestCase
+from todos.models import Todo
 
 BEFORE = [("todos", "0002_todo_owner")]
 DATA_MIGRATION = [("todos", "0003_give_old_todos_an_owner")]
@@ -102,3 +113,28 @@ class DefaultListsTests(TransactionTestCase):
         Todo = apps.get_model("todos", "Todo")
         self.assertEqual(Todo.objects.get(pk=milk.pk).owner_id, ana.pk)
         self.assertEqual(Todo.objects.get(pk=call.pk).owner_id, ben.pk)
+
+
+class FillPositionMigrationTests(LoggedInTestCase):
+    def test_fill_migration_numbers_each_list(self):
+        # The file name starts with a number, so a normal import cannot load it.
+        migration = importlib.import_module("todos.migrations.0016_fill_todo_position")
+        now = timezone.now()
+        lists = {"alice": self.todo_list, "bob": self.other_list}
+        for the_list in lists.values():
+            # Made in the order C, B, A, but A is the oldest (created_at).
+            for minutes_ago, title in [(1, "C"), (2, "B"), (3, "A")]:
+                todo = Todo.objects.create(todo_list=the_list, title=title)
+                Todo.objects.filter(pk=todo.pk).update(
+                    created_at=now - datetime.timedelta(minutes=minutes_ago),
+                    position=0,
+                )
+
+        migration.fill_position(django.apps.apps, None)
+
+        for owner, the_list in lists.items():
+            with self.subTest(owner=owner):
+                numbered = list(
+                    the_list.todos.order_by("position").values_list("title", "position")
+                )
+                self.assertEqual(numbered, [("A", 1), ("B", 2), ("C", 3)])
