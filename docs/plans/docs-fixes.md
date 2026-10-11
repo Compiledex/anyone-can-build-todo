@@ -102,6 +102,14 @@ Special cases:
   still right: the plan's task was the code and the template, and the README says the person
   turns it on.
 
+### 1b. The rule for future plans
+
+From now on, the **implementer's last commit** on a feature branch sets the plan's Status line to
+`Status: **done** (<date in Tokyo>)`. The PR number is optional there (the PR may not exist yet);
+it can be added later if the repo keeps it. The orchestrator checks the line before merging. This
+rule goes into `AGENTS.md` (decision 3). The existing plans get the date **and** the PR number, as
+in the table above.
+
 ### 2. Fix the `todos/views.py` row in `AGENTS.md`
 
 Replace the sentence "Add, edit, clear completed and the step views still go to the plain list."
@@ -113,13 +121,14 @@ is right and stays.)
 
 | Where in `AGENTS.md` | New text (short version) |
 |---|---|
-| Table, new row after `Makefile` | `.github/workflows/check.yml`: CI (checks GitHub runs by itself). On every push and every pull request, two jobs at the same time: `lint` (`uv sync --locked`, every commit check on every file, the migration check) and `test` (installs Chromium, then `manage.py test`, all three layers). It sets no `DJANGO_*` variable, so the settings use the laptop defaults. A PR is merged only when both jobs are green. |
+| Table, new row after `Makefile` | `.github/workflows/check.yml`: CI (checks GitHub runs by itself). On every push and every pull request, two jobs at the same time: `lint` (`uv sync --locked`, every commit check on every file, the migration check) and `test` (installs Chromium, then `manage.py test`, all three layers). It sets no `DJANGO_*` variable, so the settings use the laptop defaults. The team merges a PR only when both jobs are green (GitHub does not enforce it; branch protection is off). |
 | Table, new row after `todos/models.py` | `todos/admin.py`: the admin pages at `/admin/` for `TodoList` (members chosen with a two-box picker) and `Todo` (with its steps on the same page). |
 | Table, new row near the landing pictures row | `scripts/landing_shots.py`, `scripts/landing_seed.py`: the tool behind `make landing-shots` (see the `todos/static/todos/landing/` row). |
 | Table, new row at the end | `docs/plans/`: one plan per feature, written and approved before the code. **History**: they say what was decided and why, not how the code is now. Their Status line says which PR built them. |
 | `config/settings.py` row, one sentence added | `TIME_ZONE` is `"Asia/Tokyo"` (the person's choice): "today" in the app is the date in Tokyo. |
-| Rules, new rule after "Run `make check`" | **"Today" is `timezone.localdate()`**, the date in `TIME_ZONE` (`Asia/Tokyo`). Never `date.today()` or `datetime.now()`, which use the computer's own time zone. Code that needs "today" takes it as an argument (like `make_next_copy(today)` and `send_reminders(user, today)`), so a test can pass any day. |
+| Rules, new rule after "Run `make check`" | **"Today" is `timezone.localdate()`**, the date in `TIME_ZONE` (`Asia/Tokyo`). Never `date.today()` or `datetime.now()`, which use the computer's own time zone. Code takes "today" as an argument where a test needs to choose the day (like `make_next_copy(today)`, `send_reminders(user, today)`, and `is_overdue(today=None)`, which falls back to `timezone.localdate()`); the view or command that calls it passes `timezone.localdate()`. |
 | Rules, new rule at the end | **`AGENTS.md` describes the code on `main`; the plans in `docs/plans/` are history.** When a plan and the code disagree, the code (and this file) win. When you change the code, update this file in the same PR; do not edit the body of an old plan, only its Status line. |
+| Rules, new rule after the plans rule | **A plan's Status line says when it was built.** The implementer's last commit on a feature branch sets the plan's line to `Status: **done** (<date in Tokyo>)`; the PR number is optional and may be added later. The orchestrator checks this line before merging. |
 | `## Commands`, one line after `make check` | "GitHub runs the same checks and all the tests on every push (see `.github/workflows/check.yml`)." |
 
 ### 4. `README.md` lines
@@ -158,13 +167,21 @@ behavior from a plan.
 
 None.
 
+## Working next to
+
+`docs/plans/safe-settings.md` also changes `AGENTS.md` (the `config/settings.py` row, new rows for
+`config/env.py` and `config/tests/`) and `README.md` ("Put it on the internet", "How it is put
+together"). **Merge order: this plan first** (it is docs only). Then safe-settings rebases on it,
+keeps the `TIME_ZONE` sentence in the `config/settings.py` row and the CI row, and sets its own
+Status line to done in its last commit (decision 1b).
+
 ## Not part of this task
+
+- Turning on branch protection on GitHub (open question c).
 
 - Rewriting the body of any plan.
 - Adding a plan for the landing page (#29) or the login pages (#31), which were built without a
   file in `docs/plans/`.
-- The safe-settings change (`docs/plans/safe-settings.md`). If it merges first, its `AGENTS.md`
-  rows are kept as they are.
 - Any code change, even a small one found while checking.
 
 ## Changes to files
@@ -197,18 +214,30 @@ No new tests (see decision 5). `make check` must pass, with the same test counts
 
 ## Open questions
 
-1. **Tokyo dates or UTC dates in the Status lines?** **Recommendation: Tokyo**, because it is the
-   person's time zone, the app's `TIME_ZONE`, and the dates the person already wrote in the plans
-   ("approved on 2026-10-11").
-2. **Should `test-pyramid.md` get the new form too, although it already says "done"?**
-   **Recommendation: yes**, one style for all plans; its "See Result at the end" stays.
-3. **Should `AGENTS.md` say "a PR is merged only when both CI jobs are green"?** It describes how
-   the team works, not the code. **Recommendation: yes**, one short sentence in the CI row, because
-   an agent that merges PRs must know it.
+1. **(c) Turn on GitHub branch protection for `main`?** Today it is off (checked with
+   `gh api repos/Compiledex/anyone-can-build-todo/branches/main`: `protected` is `false`), so "merge
+   only when CI is green" is a team habit, not a rule GitHub enforces. Branch protection would make
+   GitHub refuse a merge while a job is red. **Recommendation: yes, require the `lint` and `test`
+   checks before a merge**, but the person turns it on in the GitHub settings (it is an account
+   setting, so not the AI). It is not part of this plan.
+2. **(d) Status lines: date in Tokyo plus PR number, or only the PR number?** **Recommendation:
+   both**, with the date in Tokyo: it is the person's time zone, the app's `TIME_ZONE`, and the
+   dates the person already wrote in the plans ("approved on 2026-10-11"). The PR number links to
+   the code and the review.
 
 ## Review
 
-Not reviewed yet.
+The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
+
+- New decision 1b and an `AGENTS.md` rule: the implementer's last commit sets the plan's Status to
+  done with the Tokyo date (PR number optional); the orchestrator checks it before merging.
+- The CI row says the team merges only on green, and that GitHub does not enforce it (branch
+  protection is off). Branch protection is now open question (c).
+- The "today" rule: code takes `today` as an argument where a test needs to choose the day, and
+  the caller passes `timezone.localdate()` (`is_overdue(today=None)` falls back to it).
+- New section "Working next to": this plan merges before safe-settings.
+- Open questions are now (c) branch protection and (d) Tokyo date plus PR number. The
+  `test-pyramid.md` question was dropped: it simply gets the same form (decision 1).
 
 ## Decided by the person
 
