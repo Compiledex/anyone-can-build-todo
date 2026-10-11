@@ -15,7 +15,7 @@ layer_dirs = $(or $(wildcard */tests/$(1)),$(error No */tests/$(1) folders))
 
 help:
 	@echo "make setup            install Python and the packages, create the database, turn on the commit checks"
-	@echo "make run              start the server, then open http://127.0.0.1:8000"
+	@echo "make run              copy db.sqlite3 to backups/ (once a day, keeps 14), then start the server at http://127.0.0.1:8000"
 	@echo "make test             run every test, then show how many passed in each layer"
 	@echo "make unit             run only the unit tests (tests/unit/ folders)"
 	@echo "make integration      run only the integration tests (tests/integration/ folders)"
@@ -23,7 +23,7 @@ help:
 	@echo "make lint             look for mistakes and style problems (ruff check)"
 	@echo "make format           rewrite the code in the standard style (ruff format)"
 	@echo "make check            the commit checks on every file, the migration check, the tests"
-	@echo "make backup           copy db.sqlite3 to backups/ (safe while the server runs)"
+	@echo "make backup           copy db.sqlite3 to backups/ (safe while the server runs; kept until you delete it)"
 	@echo "make reset            ask, copy db.sqlite3 to backups/, then start again with an empty database"
 	@echo "make landing-shots    take the landing page's screenshots of the app again (scratch data)"
 	@echo "make worktree BRANCH=name"
@@ -35,7 +35,10 @@ setup:
 	uv run python manage.py migrate
 	uv run pre-commit install
 
+# A daily copy of db.sqlite3 first (at most one a day, the newest 14 are kept;
+# see todos/backup.py). If it fails, say so and start the app anyway.
 run:
+	@uv run python manage.py backup_db --daily || echo "Warning: the daily backup did not work (see the message above). The app starts anyway. Run make backup to try again."
 	uv run python manage.py runserver
 
 test:
@@ -62,6 +65,7 @@ check:
 	$(TEST)
 
 # A safe copy of db.sqlite3 in backups/db-YYYYMMDD-HHMMSS.sqlite3 (see todos/backup.py).
+# It is never deleted automatically (only make run's -daily copies are).
 backup:
 	uv run python manage.py backup_db
 
