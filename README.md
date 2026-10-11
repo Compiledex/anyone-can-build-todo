@@ -219,15 +219,17 @@ runs the same checks and the tests on every push.
 | `todos/management/commands/send_reminders.py` | The command `send_reminders --user <username>`, which launchd runs every morning |
 | `deploy/macos/com.anyone-can-build-todo.reminders.plist` | The launchd template you fill in to run the reminders at 08:00 |
 | `todos/views.py` | What happens when each address is visited |
-| `todos/templates/base.html` | The frame every page shares: the colors, the style, who is logged in, the messages |
+| `todos/templates/base.html` | The frame of the app pages: the header with who is logged in, and the messages |
+| `todos/static/todos/app.css` | The style of the app pages: buttons, fields, the list page and its rows |
 | `todos/templates/todos/todo_list.html` | The page you see: one list |
 | `todos/templates/todos/site_base.html` | The frame of the pages a visitor sees (landing, login, sign-up): the header and the footer |
-| `todos/static/todos/tokens.css` | The colors, sizes and font of those pages, in light and dark: the one place to change them |
+| `todos/static/todos/tokens.css` | The colors, sizes and font of every page (the visitor pages and the app), in light and dark: the one place to change them |
 | `todos/static/todos/site.css` | The shared style of those pages: header, footer, buttons, form fields |
 | `todos/templates/todos/_field.html` | One form field: label, input, error, help text |
 | `todos/templates/todos/landing.html` | The landing page: what a visitor who is not logged in sees at `/` |
 | `todos/static/todos/landing.css` | Where the landing page puts its sections |
-| `todos/static/todos/landing/` | The landing page's pictures: screenshots of the app, light and dark, with invented sample data |
+| `todos/static/todos/landing/` | The landing page's pictures: screenshots of the app, light and dark, with invented sample data. `make landing-shots` takes them again |
+| `scripts/landing_shots.py`, `scripts/landing_seed.py` | The tool behind `make landing-shots`: invented data in a scratch database, a server on a free port, the screenshots |
 | `todos/templates/todos/list_form.html` | The page to make or rename a list |
 | `todos/templates/todos/list_confirm_delete.html` | The page that asks before a list is deleted |
 | `todos/templates/todos/_todo_item.html` | One row of the list |
