@@ -2,11 +2,11 @@ from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist, ValidationError
 from django.db import models
 from django.db.models import Max, Q
-from django.db.models.functions import Lower
 from django.urls import reverse
 from django.utils import timezone
 
 from .recurrence import next_due_date
+from .sqlite_functions import casefold
 from .tags import MAX_TAG_LENGTH
 
 
@@ -28,6 +28,11 @@ class TodoList(models.Model):
         related_name="todo_lists",
     )
     name = models.CharField(max_length=100)
+    # casefold(name): the name in one case, for the unique rule ("Ærend" and
+    # "ærend" get the same key). Set by save() and clean(), never by a form.
+    # Up to 300: casefold can make a name longer ("ß" becomes "ss").
+    # Never change a name without save() (no QuerySet.update(name=...)).
+    name_key = models.CharField(max_length=300, editable=False, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     # The people the owner shared this list with. The owner is never a member.
     members = models.ManyToManyField(
@@ -39,18 +44,41 @@ class TodoList(models.Model):
     class Meta:
         ordering = ["created_at", "pk"]
         constraints = [
-            # One person cannot have "Work" and "work". On SQLite this ignores
-            # case only for A-Z, the same as `name__iexact` in TodoListForm.
+            # One person cannot have "Work" and "work", or "Ærend" and "ærend":
+            # the key is casefold(name), made in Python by save(), so this is a
+            # plain = rule that works with every SQLite tool.
             models.UniqueConstraint(
-                Lower("name"), "owner", name="unique_list_name_per_owner"
+                fields=["owner", "name_key"], name="unique_list_name_key_per_owner"
             ),
         ]
 
     def __str__(self):
         return self.name
 
+    def save(self, *args, **kwargs):
+        self.name_key = casefold(self.name)
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None and "name" in update_fields:
+            kwargs["update_fields"] = {*update_fields, "name_key"}
+        super().save(*args, **kwargs)
+
     def get_absolute_url(self):
         return reverse("list_detail", args=[self.pk])
+
+    def clean(self):
+        # A model form runs clean() before it checks the constraints, so the
+        # admin checks the unique rule with the new key.
+        super().clean()
+        self.name_key = casefold(self.name)
+
+    def validate_constraints(self, exclude=None):
+        # name_key is not a form field, so Django would skip the unique rule on
+        # it. When the name is checked, check the key too: then a duplicate
+        # typed in the admin is a form error, not a 500 page.
+        exclude = set(exclude or ())
+        if "name" not in exclude:
+            exclude.discard("name_key")
+        super().validate_constraints(exclude=exclude)
 
 
 class Tag(models.Model):

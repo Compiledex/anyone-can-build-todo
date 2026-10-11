@@ -154,3 +154,22 @@ class AdminTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Errands")
         self.assertContains(response, "carol")
+
+    def test_admin_duplicate_is_a_form_error(self):
+        admin = get_user_model().objects.create_user(
+            username="staffer",
+            password="unused-in-this-test",
+            is_staff=True,
+            is_superuser=True,
+        )
+        alice = make_user("alice")
+        TodoList.objects.create(owner=alice, name="Ærend")
+        self.client.force_login(admin)
+        add_url = "/admin/todos/todolist/add/"
+        response = self.client.post(add_url, {"owner": alice.pk, "name": "ærend"})
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context["adminform"].form.errors)
+        self.assertEqual(alice.todo_lists.count(), 1)
+        response = self.client.post(add_url, {"owner": alice.pk, "name": "Hjem"})
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(alice.todo_lists.filter(name="Hjem").exists())

@@ -4,6 +4,7 @@ from django.db import transaction
 
 from .models import Subtask, Todo, TodoList
 from .queries import SORT_OPTIONS
+from .sqlite_functions import casefold
 from .tags import parse_tags
 
 
@@ -125,12 +126,18 @@ class TodoListForm(NoColon, forms.ModelForm):
     def clean_name(self):
         # Django's own check skips the unique constraint, because `owner` is
         # not in the form. Without this, a duplicate name is a 500 error page.
+        # The same key as TodoList.save(), so "ærend" clashes with "Ærend".
+        # Only the owner's own lists count, never the lists shared with them.
         name = self.cleaned_data["name"]
-        others = TodoList.objects.filter(
-            owner=self.instance.owner, name__iexact=name
-        ).exclude(pk=self.instance.pk)
-        if others.exists():
-            raise forms.ValidationError(f"You already have a list called “{name}”.")
+        clash = (
+            TodoList.objects.filter(owner=self.instance.owner, name_key=casefold(name))
+            .exclude(pk=self.instance.pk)
+            .first()
+        )
+        if clash:
+            raise forms.ValidationError(
+                f"You already have a list called “{clash.name}”."
+            )
         return name
 
 

@@ -6,10 +6,13 @@ self.todo_list is alice's "Inbox" list and self.other_list is bob's list
 
 from datetime import timedelta
 
+from django.db import IntegrityError, transaction
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.html import escape
 
 from accounts.tests.helpers import LoggedInTestCase, make_user
+from todos.forms import TodoListForm
 from todos.models import Tag, Todo, TodoList
 
 
@@ -69,6 +72,76 @@ class NewListTests(LoggedInTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Cancel")
 
+    def test_nordic_name_in_other_case_is_refused(self):
+        # SQLite's LOWER() and LIKE only know A to Z; the rule must know every letter.
+        for existing, typed in [
+            ("Ærend", "ærend"),
+            ("øl", "ØL"),
+            ("Åker", "åKER"),
+            ("STRASSE", "straße"),
+        ]:
+            with self.subTest(existing=existing, typed=typed):
+                TodoList.objects.create(owner=self.user, name=existing)
+                response = self.client.post(reverse("list_create"), {"name": typed})
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response, escape(f"You already have a list called “{existing}”.")
+                )
+                self.assertEqual(
+                    self.user.todo_lists.exclude(pk=self.todo_list.pk).count(), 1
+                )
+                self.user.todo_lists.exclude(pk=self.todo_list.pk).delete()
+
+    def test_split_a_ring_counts_as_the_same(self):
+        # A Mac can send "å" as "a" plus a combining ring (U+030A).
+        TodoList.objects.create(owner=self.user, name="\u00c5ker")
+        response = self.client.post(reverse("list_create"), {"name": "A\u030aker"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "You already have a list called")
+        self.assertEqual(self.user.todo_lists.count(), 2)
+
+    def test_different_nordic_name_is_allowed(self):
+        TodoList.objects.create(owner=self.user, name="Ærend")
+        for name in ["Ærender", "Erend"]:
+            with self.subTest(name=name):
+                self.client.post(reverse("list_create"), {"name": name})
+                self.assertTrue(self.user.todo_lists.filter(name=name).exists())
+
+    def test_database_refuses_a_duplicate_key(self):
+        TodoList.objects.create(owner=self.user, name="Ærend")
+        with self.assertRaises(IntegrityError), transaction.atomic():
+            TodoList.objects.create(owner=self.user, name="ærend")
+        self.assertEqual(self.user.todo_lists.count(), 2)
+
+    def test_save_sets_the_key(self):
+        errand = TodoList.objects.create(owner=self.user, name="ÆRend")
+        self.assertEqual(errand.name_key, "ærend")
+        form = TodoListForm({"name": "ØL"}, instance=errand)
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        errand.refresh_from_db()
+        self.assertEqual(errand.name_key, "øl")
+
+    def test_save_with_update_fields_name_sets_the_key(self):
+        errand = TodoList.objects.create(owner=self.user, name="Ærend")
+        errand.name = "ÅKER"
+        errand.save(update_fields=["name"])
+        errand.refresh_from_db()
+        self.assertEqual(errand.name_key, "åker")
+
+    def test_same_nordic_name_as_another_person_is_allowed(self):
+        TodoList.objects.create(owner=self.other_user, name="Ærend")
+        response = self.client.post(reverse("list_create"), {"name": "ærend"})
+        errand = self.user.todo_lists.get(name="ærend")
+        self.assertRedirects(response, errand.get_absolute_url())
+
+    def test_message_escapes_the_name(self):
+        TodoList.objects.create(owner=self.user, name="<b>Æ</b>")
+        response = self.client.post(reverse("list_create"), {"name": "<b>æ</b>"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "&lt;b&gt;Æ&lt;/b&gt;")
+        self.assertNotContains(response, "<b>Æ</b>")
+
     def test_get_does_not_create(self):
         response = self.client.get(reverse("list_create"), {"name": "Work"})
         self.assertEqual(response.status_code, 200)
@@ -100,6 +173,25 @@ class RenameListTests(LoggedInTestCase):
         self.assertRedirects(response, work.get_absolute_url())
         work.refresh_from_db()
         self.assertEqual(work.name, "work")
+
+    def test_rename_to_other_case_of_own_name_works(self):
+        errand = TodoList.objects.create(owner=self.user, name="ærend")
+        url = reverse("list_rename", args=[errand.pk])
+        response = self.client.post(url, {"name": "Ærend"})
+        self.assertRedirects(response, errand.get_absolute_url())
+        errand.refresh_from_db()
+        self.assertEqual(errand.name, "Ærend")
+        self.assertContains(self.client.get(errand.get_absolute_url()), "Ærend")
+
+    def test_rename_to_another_lists_nordic_name_is_refused(self):
+        TodoList.objects.create(owner=self.user, name="Ærend")
+        home = TodoList.objects.create(owner=self.user, name="Hjem")
+        url = reverse("list_rename", args=[home.pk])
+        response = self.client.post(url, {"name": "ærend"})
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, escape("You already have a list called “Ærend”."))
+        home.refresh_from_db()
+        self.assertEqual(home.name, "Hjem")
 
 
 class DeleteListTests(LoggedInTestCase):
