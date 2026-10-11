@@ -16,7 +16,8 @@ from urllib.parse import quote
 
 DAILY_SUFFIX = "-daily"
 # The whole name of a daily copy; group 1 is its day. Always use fullmatch.
-DAILY_NAME = re.compile(r"db-(\d{8})-\d{6}-daily\.sqlite3")
+# [0-9], not \d: \d also matches other scripts' digits, like "٢".
+DAILY_NAME = re.compile(r"db-([0-9]{8})-[0-9]{6}-daily\.sqlite3")
 # How many daily copies stay, today's included.
 DAILY_KEEP = 14
 
@@ -155,8 +156,11 @@ def daily_backup(source, folder, now, keep=DAILY_KEEP):
             created = backup_database(source, folder, now, suffix=DAILY_SUFFIX)
         except FileExistsError:
             # Another run made a copy in this same second: today's copy exists.
-            created = None
+            # Anything else (`folder` is a file, or a folder or a link has
+            # today's name) is a failed copy.
             protect = folder / f"db-{now:%Y%m%d-%H%M%S}{DAILY_SUFFIX}.sqlite3"
+            if protect.is_symlink() or not protect.is_file():
+                raise
         else:
             if created is None:  # The source went away just now.
                 return None, []

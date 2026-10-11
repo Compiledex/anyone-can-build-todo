@@ -311,13 +311,76 @@ class DailyBackupTests(TempDatabaseTestCase):
         (self.folder / DAILY_NAME).write_bytes(b"made a moment ago")
         self.assertEqual(daily_backup(self.source, self.folder, NOW), (None, []))
         self.assertEqual(self.files_in_folder(), [DAILY_NAME])
-        # Two runs at once: the other one reserved the name between our look
-        # at the folder and our copy.
+        # Two runs at once: the other one made today's copy between our look
+        # at the folder and our copy. The old copies are still pruned.
         (self.folder / DAILY_NAME).unlink()
+        old = self.make_old_daily_copies(date(2026, 9, 21))
+
+        def other_run_was_first(source, folder, now, suffix=""):
+            (Path(folder) / DAILY_NAME).write_bytes(b"made by the other run")
+            raise FileExistsError("taken")
+
         with mock.patch(
-            "todos.backup.backup_database", side_effect=FileExistsError("taken")
+            "todos.backup.backup_database", side_effect=other_run_was_first
         ):
-            self.assertEqual(daily_backup(self.source, self.folder, NOW), (None, []))
+            created, removed = daily_backup(self.source, self.folder, NOW)
+        self.assertIsNone(created)
+        self.assertEqual([path.name for path in removed], old[:7])
+        self.assertEqual(self.files_in_folder(), [*old[7:], DAILY_NAME])
+
+    def test_prunes_when_todays_copy_is_already_there(self):
+        old = self.make_old_daily_copies(date(2026, 9, 21))
+        todays = "db-20261011-060000-daily.sqlite3"
+        future = "db-20270101-000000-daily.sqlite3"
+        (self.folder / todays).write_bytes(b"made this morning")
+        (self.folder / future).write_bytes(b"")
+        created, removed = daily_backup(self.source, self.folder, NOW)
+        self.assertIsNone(created)
+        self.assertEqual([path.name for path in removed], old[:8])
+        self.assertEqual(self.files_in_folder(), [*old[8:], todays, future])
+        self.assertEqual((self.folder / todays).read_bytes(), b"made this morning")
+
+    def test_folder_that_is_a_file_is_a_failed_copy(self):
+        not_a_folder = self.tmp / "backups-file"
+        not_a_folder.write_bytes(b"")
+        with (
+            mock.patch(
+                "todos.management.commands.backup_db.timezone.now",
+                return_value=NOW_UTC,
+            ),
+            self.assertRaisesMessage(CommandError, "Could not copy the database"),
+        ):
+            call_command(
+                "backup_db",
+                "--daily",
+                source=str(self.source),
+                folder=str(not_a_folder),
+                stdout=io.StringIO(),
+                stderr=io.StringIO(),
+            )
+
+    def test_something_else_with_todays_name_is_a_failed_copy(self):
+        (self.folder / DAILY_NAME).mkdir()
+        with self.assertRaisesMessage(CommandError, "Could not copy the database"):
+            self.daily()
+        outside = self.tmp / "outside.sqlite3"
+        outside.write_bytes(b"not a backup")
+        (self.folder / DAILY_NAME).rmdir()
+        (self.folder / DAILY_NAME).symlink_to(outside)
+        with self.assertRaisesMessage(CommandError, "Could not copy the database"):
+            self.daily()
+        self.assertEqual(outside.read_bytes(), b"not a backup")
+
+    def test_failed_daily_copy_is_a_command_error(self):
+        old = self.make_old_daily_copies(date(2026, 9, 21))
+        with (
+            mock.patch(
+                "todos.backup.copy_sqlite", side_effect=sqlite3.OperationalError("full")
+            ),
+            self.assertRaisesMessage(CommandError, "Could not copy the database: full"),
+        ):
+            self.daily()
+        self.assertEqual(self.files_in_folder(), old)
 
     def test_todays_copy_is_never_pruned(self):
         # Names from the future (a wrong clock) sort after today's copy.
@@ -351,6 +414,8 @@ class DailyBackupTests(TempDatabaseTestCase):
             "xdb-20200101-000000-daily.sqlite3",
             "db-20200101-000000-daily.sqlite3.tmp",
             "db-2020010-000000-daily.sqlite3",
+            # Arabic-Indic digits: \d would match them, [0-9] does not.
+            "db-\u0662\u0660\u0662\u0660\u0660\u0661\u0660\u0661-000000-daily.sqlite3",
         ]:
             (self.folder / name).write_bytes(b"")
         (self.folder / "db-20200101-000000-daily.sqlite3").write_bytes(b"")
