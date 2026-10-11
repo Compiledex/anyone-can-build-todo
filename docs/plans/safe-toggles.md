@@ -1,6 +1,6 @@
 # Plan: Done and Undo say what they want, and keep your place
 
-Status: **approved** (2026-10-11, by the orchestrator for the person), not started.
+Status: **done** (2026-10-11)
 
 Builds on: **recurring** (`make_next_copy`, `get_next_copy`, the Undo rule in `todo_toggle`),
 **subtasks** (`subtask_toggle`, `back_to_steps`), **sharing** (members may mark done and undo),
@@ -205,7 +205,7 @@ that object can be stale (the test already clicked, the database changed, the ob
 
 | Test or helper | Change | Why |
 |---|---|---|
-| `test_filter.py` `RedirectBackTests.toggle(data=None, client=None, **extra)` (7 callers) | `toggle(done, data=None, client=None, **extra)`; it adds `done` to the posted data. Each caller says which state it wants. | 400 without `done`. |
+| `test_filter.py` `RedirectBackTests.toggle(data=None, client=None, **extra)` (6 callers) | `toggle(done, data=None, client=None, **extra)`; it adds `done` to the posted data. Each caller says which state it wants. | 400 without `done`. |
 | `test_filter.py` `test_row_forms_carry_current_address` (line ~142) | The hidden `next` value becomes `{url}?q=milk&amp;status=open#todos` (the only row, with a filter: both Done and Delete use the anchor after removal). `count=2` stays. | Decision 3. |
 | `test_filter.py` `test_bad_add_page_links_go_to_the_list` (line ~222) | The one `count=2` check becomes two checks, each `count=1`: Done's `next` is `{url}#todo-<pk>`, Delete's is `{url}#todos`. | Decision 3: no filter, so Done keeps its row and Delete goes to the list. |
 | `test_sharing.py`, the 14 posts to `todo_toggle` (and `make_weekly_milk` users) | Each post sends `done`; where a local helper exists, it gets the `done` argument. | 400 without `done`. |
@@ -255,7 +255,7 @@ that object can be stale (the test already clicked, the database changed, the ob
 | `ToggleTests.test_next_with_a_fragment_keeps_the_same_site_rule` | `next` = `//evil.example/#todo-1`, `/\evil.example#todo-1`, `#todo-1` (subtests; the last one is refused by `redirect_back`'s own `startswith("/")` rule, not by Django): goes to the list; `next` = `/lists/<pk>/?q=a#todo-<pk>`: goes there. | A change that accepts a fragment-only or other-site address. |
 | `DeleteTests.test_delete_goes_to_the_next_row` | Three to-dos: Delete on the first goes to `#todo-<second>`, on the last to `#todo-<second>`; the only to-do goes to `#todos`. | No fragment, or the deleted row's own anchor. |
 | `RecurringTests.test_double_done_keeps_one_copy` | `self.weekly`: two posts with `done=1`. The original is done and there is exactly one copy. | Today: the second click is an Undo and deletes the copy. |
-| `RecurringTests.test_double_undo_removes_the_copy_once` | Done, then two posts with `done=0`: not done, no copy, exactly one "was removed." message in all. | A second Undo doing anything. |
+| `RecurringTests.test_double_undo_removes_the_copy_once` | Done, then two posts with `done=0`: not done, no copy, exactly one "was removed." message in all (the test loads the list page between the posts, as the browser does, so the first message is shown and not read again). | A second Undo doing anything. |
 | `RecurringTests.test_undo_of_an_open_todo_keeps_a_kept_copy` | Done, mark a step of the copy done, Undo (kept, as in recurring-undo-steps), Undo again: the copy and its done step are still there, and the second Undo adds no message. | Running the Undo rule when nothing changes. |
 
 `todos/tests/integration/test_sharing.py` (`MemberCanTests`; alice and bob each have a client):
