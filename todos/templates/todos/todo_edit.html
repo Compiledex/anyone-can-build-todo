@@ -1,11 +1,16 @@
 {% extends "base.html" %}
 
-{% block title %}Edit to-do{% endblock %}
+{# saved_title: the title in the database, not a typed one that was not saved. #}
+{% block title %}{% if form.errors %}Error: {% endif %}Edit “{{ saved_title }}” – To-do list{% endblock %}
 
 {% block content %}
-  <h1>Edit to-do</h1>
+  <h1>Edit “{{ saved_title }}”</h1>
   <form class="page-form" method="post" action="{% url 'todo_edit' todo.pk %}">
     {% csrf_token %}
+    {% if form.errors %}
+      {# Focus goes here when the page opens, so a screen reader reads it first. #}
+      <p class="form-error-summary" role="alert" tabindex="-1" autofocus>Not saved. Fix what is marked below.</p>
+    {% endif %}
     {{ form.non_field_errors }}
     {# Each field: its label, the input, its error, its help text, in this order. #}
     {% for field in form %}{% include "todos/_field.html" %}{% endfor %}

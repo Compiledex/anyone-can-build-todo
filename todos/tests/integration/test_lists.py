@@ -173,7 +173,47 @@ class ListNameIsEscapedTests(LoggedInTestCase):
                 self.assertNotContains(response, "<b>x</b>")
                 self.assertContains(response, "&lt;b&gt;x&lt;/b&gt;")
         response = self.client.get(the_list.get_absolute_url())
-        self.assertContains(response, "<title>&lt;b&gt;x&lt;/b&gt;</title>")
+        self.assertContains(
+            response, "<title>&lt;b&gt;x&lt;/b&gt; – To-do list</title>"
+        )
+
+
+ALERT = (
+    '<p class="form-error-summary" role="alert" tabindex="-1" autofocus>'
+    "Not saved. Fix what is marked below.</p>"
+)
+
+
+class PageTitleTests(LoggedInTestCase):
+    def test_page_titles(self):
+        pk = self.todo_list.pk
+        for url, title in [
+            (self.todo_list.get_absolute_url(), "Inbox – To-do list"),
+            (reverse("list_create"), "New list – To-do list"),
+            (reverse("list_rename", args=[pk]), "Rename list – To-do list"),
+            (reverse("list_delete", args=[pk]), "Delete list – To-do list"),
+        ]:
+            with self.subTest(url=url):
+                response = self.client.get(url)
+                self.assertContains(response, f"<title>{title}</title>")
+                self.assertNotContains(response, "form-error-summary")
+
+    def test_bad_new_list_and_rename_say_error(self):
+        TodoList.objects.create(owner=self.user, name="Work")
+        for url, title in [
+            (reverse("list_create"), "New list"),
+            (reverse("list_rename", args=[self.todo_list.pk]), "Rename list"),
+        ]:
+            with self.subTest(url=url):
+                response = self.client.post(url, {"name": "work"})
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(
+                    response, f"<title>Error: {title} – To-do list</title>"
+                )
+                self.assertContains(response, ALERT, count=1)
+        self.todo_list.refresh_from_db()
+        self.assertEqual(self.todo_list.name, "Inbox")
+        self.assertEqual(self.user.todo_lists.count(), 2)
 
 
 class PrivacyTests(LoggedInTestCase):

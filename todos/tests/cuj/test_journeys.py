@@ -104,12 +104,12 @@ class KeepThePlaceTests(BrowserTestCase):
         page.goto(f"{self.live_server_url}{the_list.get_absolute_url()}")
 
         row_30 = page.locator(f"#todo-{todos[29].pk}")
-        row_30.get_by_role("button", name="Done", exact=True).click()
+        row_30.get_by_role("button", name="Done: Task 30").click()
         expect(row_30).to_have_class(DONE)
         expect(row_30).to_be_in_viewport()
         expect(page.get_by_label("New to-do")).not_to_be_focused()
 
-        row_30.get_by_role("button", name="Delete", exact=True).click()
+        row_30.get_by_role("button", name="Delete: Task 30").click()
         expect(row_30).to_have_count(0)
         expect(page.locator(f"#todo-{todos[30].pk}")).to_be_in_viewport()
 
@@ -173,7 +173,7 @@ class ColorSchemeTests(BrowserTestCase):
         expect(roof.locator(".priority-3")).to_have_text("Priority: High")
         # "Priority: " is for screen readers: in the page, but not seen. With
         # display: none it would have no box at all, and screen readers skip it.
-        hidden = roof.locator(".visually-hidden")
+        hidden = roof.locator(".priority-3 .visually-hidden")
         expect(hidden).to_be_attached()
         box = hidden.bounding_box()
         self.assertIsNotNone(box)
@@ -464,7 +464,15 @@ class ShareAListTests(BrowserTestCase):
             alice_page.get_by_role("listitem").filter(has_text="Eggs")
         ).to_be_visible()
 
-        bob_page.get_by_role("button", name="Leave this list").click()
+        # Leaving asks first: the button is hidden until the question opens.
+        yes_leave = bob_page.get_by_role("button", name="Yes, leave the list")
+        expect(yes_leave).to_be_hidden()
+        bob_page.get_by_text("Leave this list").click()
+        expect(
+            bob_page.get_by_text("Only alice can share it with you again.")
+        ).to_be_visible()
+        expect(bob_page.get_by_role("heading", name="Groceries")).to_be_visible()
+        yes_leave.click()
         expect(bob_page.get_by_text("You left the list.")).to_be_visible()
         expect(bob_page.get_by_role("heading", name="Bob's stuff")).to_be_visible()
         expect(bob_lists.get_by_role("link", name="Groceries (alice)")).to_have_count(0)
@@ -535,7 +543,7 @@ class BreakATodoIntoStepsTests(BrowserTestCase):
 
         # Finish the to-do. Its steps keep their own look: a not-done step is
         # not crossed out, a done step still is.
-        house.get_by_role("button", name="Done", exact=True).click()
+        house.get_by_role("button", name="Done: Move house").click()
         expect(house).to_have_class(DONE)
         page.get_by_text("Steps: 1 of 2 done").click()
         expect(van.locator(".step-title")).not_to_have_css(
@@ -717,9 +725,9 @@ class RowLayoutTests(BrowserTestCase):
                             )
                         )
 
-                        # exact: not the steps' "Done: Read the meter" buttons.
-                        done = row.get_by_role("button", name="Done", exact=True)
-                        delete = row.get_by_role("button", name="Delete", exact=True)
+                        # The full names: not the steps' "Done: Read the meter".
+                        done = row.get_by_role("button", name=f"Done: {LONG_TITLE}")
+                        delete = row.get_by_role("button", name=f"Delete: {LONG_TITLE}")
                         done, delete = done.bounding_box(), delete.bounding_box()
                         self.assertEqual(done["y"], delete["y"], (done, delete))
 
@@ -901,11 +909,17 @@ def gaps(boxes):
 
 class TouchTests(BrowserTestCase):
     def test_row_and_step_buttons_fit_a_finger(self):
-        """On a phone, row and step buttons are 44px tall and 8px apart."""
+        """On a phone, every small control of the list page is 44px tall and 8px
+        apart: row and step buttons, summaries, filter links, menu links, and
+        Rename and Delete list."""
         user = make_user_with_inbox()
         the_list = user.todo_lists.get()
-        todo = the_list.todos.create(title="Water the plants")
+        todo = the_list.todos.create(
+            title="Water the plants", description="The big one first."
+        )
         todo.subtasks.create(title="Fill the can")
+        the_list.todos.create(title="Old task", done=True)  # For Clear completed.
+        user.todo_lists.create(name="Work")  # Two lists in the menu.
         phone = self.browser.new_context(
             viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True
         )
@@ -921,13 +935,25 @@ class TouchTests(BrowserTestCase):
         groups = {
             "row": [
                 row.get_by_role("link", name="Edit Water the plants"),
-                row.get_by_role("button", name="Done", exact=True),
-                row.get_by_role("button", name="Delete", exact=True),
+                row.get_by_role("button", name="Done: Water the plants"),
+                row.get_by_role("button", name="Delete: Water the plants"),
             ],
             "step": [step.locator(".button").nth(0), step.locator(".button").nth(1)],
             "add step": [
                 add_step.locator("input[name=title]"),
                 add_step.locator("button"),
+            ],
+            "steps summary": [row.locator("details.steps > summary")],
+            "notes summary": [row.locator("details.notes > summary")],
+            "clear completed": [page.locator("details.clear-completed > summary")],
+            "filter": [page.locator("nav.filter a").nth(n) for n in range(3)],
+            "list menu": [
+                page.locator("#my-lists a").nth(n)
+                for n in range(3)  # + New list
+            ],
+            "list actions": [
+                page.get_by_role("link", name="Rename"),
+                page.get_by_role("link", name="Delete list"),
             ],
         }
         for name, controls in groups.items():
@@ -955,8 +981,8 @@ class QuietDeleteTests(BrowserTestCase):
         self.log_in_as(user)
         page = self.page
         page.goto(f"{self.live_server_url}{the_list.get_absolute_url()}")
-        done = page.get_by_role("button", name="Done", exact=True)
-        delete = page.get_by_role("button", name="Delete", exact=True)
+        done = page.get_by_role("button", name="Done: Water the plants")
+        delete = page.get_by_role("button", name="Delete: Water the plants")
         color = "el => getComputedStyle(el).color"
         resting = delete.evaluate(color)
         danger = page.evaluate(
@@ -998,3 +1024,70 @@ class ReducedMotionTests(BrowserTestCase):
             with self.subTest(address=address):
                 page.goto(self.live_server_url + address)
                 self.assertEqual(page.evaluate(MOVING), [])
+
+
+class MoveSlotTests(BrowserTestCase):
+    def test_move_buttons_keep_their_slot(self):
+        """In the manual order, Edit, Done and Delete are in the same place on the
+        first row (no Move up), a middle row and the last row (no Move down)."""
+        user = make_user_with_inbox()
+        the_list = user.todo_lists.get()
+        titles = ["First", "Second", "Third"]
+        for title in titles:
+            the_list.todos.create(title=title)
+        self.log_in_as(user)
+        page = self.page
+        for width in [1280, 390]:
+            with self.subTest(width=width):
+                page.set_viewport_size({"width": width, "height": 800})
+                page.goto(
+                    f"{self.live_server_url}{the_list.get_absolute_url()}?sort=manual"
+                )
+                expect(page.locator("ul.todos > li .title")).to_have_text(titles)
+                places = []
+                for title in titles:
+                    row = page.locator("ul.todos > li").filter(has_text=title)
+                    places.append(
+                        [
+                            row.get_by_role(
+                                "link", name=f"Edit {title}"
+                            ).bounding_box()["x"],
+                            row.get_by_role(
+                                "button", name=f"Done: {title}"
+                            ).bounding_box()["x"],
+                            row.get_by_role(
+                                "button", name=f"Delete: {title}"
+                            ).bounding_box()["x"],
+                        ]
+                    )
+                self.assertEqual(places[0], places[1], places)
+                self.assertEqual(places[1], places[2], places)
+                # The empty slot is not a button and is not read out.
+                expect(page.get_by_role("button", name="Move up: First")).to_have_count(
+                    0
+                )
+                expect(page.locator(".move-slot[aria-hidden=true]")).to_have_count(2)
+
+
+class KeyboardStepsTests(BrowserTestCase):
+    def test_add_steps_with_the_keyboard(self):
+        """After "Add step", the cursor is in "New step" again: type, Enter, type."""
+        user = make_user_with_inbox()
+        the_list = user.todo_lists.get()
+        the_list.todos.create(title="Move house")
+        self.log_in_as(user)
+        page = self.page
+        page.goto(f"{self.live_server_url}{the_list.get_absolute_url()}")
+        page.get_by_text("Add steps").click()
+        field = page.get_by_label("New step for Move house")
+        field.fill("Pack books")
+        field.press("Enter")
+        expect(page.locator("li.step").filter(has_text="Pack books")).to_be_visible()
+        expect(field).to_be_focused()
+        expect(page.get_by_label("New to-do")).not_to_be_focused()
+
+        page.keyboard.type("Book a van")  # No click: the field has the cursor.
+        page.keyboard.press("Enter")
+        expect(page.locator("li.step").filter(has_text="Book a van")).to_be_visible()
+        expect(page.locator("li.step")).to_have_count(2)
+        expect(page.get_by_text("Steps: 0 of 2 done")).to_be_visible()

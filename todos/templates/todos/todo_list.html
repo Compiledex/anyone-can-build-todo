@@ -1,12 +1,12 @@
 {% extends "base.html" %}
 {% load static %}
 
-{% block title %}{{ the_list.name }}{% endblock %}
+{% block title %}{{ the_list.name }} – To-do list{% endblock %}
 
 {% block content %}
   <nav class="lists" aria-label="Your lists">
     <p class="menu" id="my-lists">
-      <span class="menu-label">My lists:</span>
+      <span class="menu-label">My lists</span>
       {% for a_list in my_lists %}
         <a href="{{ a_list.get_absolute_url }}"{% if a_list.pk == the_list.pk %} aria-current="page"{% endif %}>{{ a_list.name }}</a>
       {% endfor %}
@@ -14,7 +14,7 @@
     </p>
     {% if shared_lists %}
       <p class="menu" id="shared-lists">
-        <span class="menu-label">Shared with me:</span>
+        <span class="menu-label">Shared with me</span>
         {% for a_list in shared_lists %}
           <a href="{{ a_list.get_absolute_url }}"{% if a_list.pk == the_list.pk %} aria-current="page"{% endif %}>{{ a_list.name }} ({{ a_list.owner.username }})</a>
         {% endfor %}
@@ -43,7 +43,7 @@
     <div class="field">
       <label>New to-do
         <input name="title" aria-label="New to-do" placeholder="What needs doing?" maxlength="200"
-               required autofocus value="{{ form.title.value|default_if_none:'' }}"
+               required{% if not request.GET.open %} autofocus{% endif %} value="{{ form.title.value|default_if_none:'' }}"
                {% if form.title.errors %}aria-invalid="true" aria-describedby="{{ form.title.auto_id }}_error"{% endif %}>
       </label>
       {{ form.title.errors }}
@@ -166,10 +166,15 @@
       </form>
     </section>
   {% else %}
-    <form class="leave" method="post" action="{% url 'list_leave' the_list.pk %}">
-      {% csrf_token %}
-      <button class="button button-secondary" type="submit">Leave this list</button>
-    </form>
+    {# Asks once more: coming back needs the owner to share the list again. #}
+    <details class="leave">
+      <summary>Leave this list</summary>
+      <form method="post" action="{% url 'list_leave' the_list.pk %}">
+        {% csrf_token %}
+        <p>Leave “{{ the_list.name }}”? Only {{ the_list.owner.username }} can share it with you again.</p>
+        <button class="button button-secondary" type="submit">Yes, leave the list</button>
+      </form>
+    </details>
   {% endif %}
   {% if can_reorder %}
     {# defer: runs after the page is read, so it can find the list. #}
