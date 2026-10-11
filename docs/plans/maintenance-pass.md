@@ -86,6 +86,10 @@ collects pictures, `srcset` files and sizes; that part stays in `test_landing.py
 `class LandingParts(PageParts)` that adds only those. (Merging the image code into the shared
 class would make it big for one page.)
 
+Rule for the merge: if moving a test to the shared `PageParts` would change what any assertion
+checks, that file keeps its own parser and the PR says why. Also keep `test_search.py` line ~141
+checking exactly 3 matches.
+
 Each test file keeps a one-line wrapper where it has its own defaults (for example
 `test_reminders.py`'s `add` with `due_date=TODAY`, `test_reorder.py`'s `shown(client)` with the
 manual order), and the wrapper calls the shared helper.
@@ -144,12 +148,12 @@ tests of this plan).
 - `.button-small` stays in `app.css`, with a comment: "Not used by an app page today; kept so the
   app and the visitor pages share one button vocabulary."
 
-### 5. `signup` gets `@require_http_methods(["GET", "POST"])`
+### 5. `signup` gets `@require_http_methods(["GET", "HEAD", "POST"])`
 
-Under `@login_not_required` (that one stays on top, as on `todo_list`). `GET` and `POST` work as
-today. Any other method, also `HEAD`, now gets `405` (checked with Django 5.2), the same as the
-other form views (`list_create`, `todo_edit`). This is the one visible change, only for methods a
-browser never sends to this page.
+Under `@login_not_required` (that one stays on top, as on `todo_list`). `GET`, `HEAD` and `POST`
+work as today (`HEAD` gives 200 today, like the login and landing pages, and keeps doing so). Any
+other method, like `PUT` or `DELETE`, now gets `405`. This is the one visible change, only for
+methods a browser never sends to this page.
 
 ### 6. `Todo.Meta.ordering = ["created_at", "pk"]`
 
@@ -174,14 +178,11 @@ earlier plan added one). It only fixes the order of to-dos made in the same micr
 ### 8. Two tests that were missing, and no timed wait
 
 - `test_reorder.py` `test_move_up_on_first_changes_nothing` (the mirror of the "Move down" test).
-- `test_escape_cancels_a_drag`: before the drag, an init script wraps `window.fetch` so every
-  call is recorded in `window.__fetchCalls`, and adds a `dragend` listener on `document` in the
-  **bubbling** phase that counts in `window.__dragEnds`. `reorder.js` handles `dragend` on the
-  `<ul>`, which comes first while the event bubbles up, and calls `fetch` there synchronously.
-  So after `page.wait_for_function("window.__dragEnds === 1")`, any request would already be in
-  `window.__fetchCalls`. The test then checks it is empty. No timeout. If Chromium does not fire
-  `dragend` after Escape in Playwright, the test fails clearly at the wait, and the builder keeps
-  the old check and says so in the PR.
+- `test_escape_cancels_a_drag`: before the page loads, an init script wraps `window.fetch` so
+  every call is recorded in `window.__fetchCalls`. The test keeps its existing wait for
+  `li.dragging` to have count 0. `reorder.js` removes that class in its `dragend` handler and, in
+  the same handler, would call `fetch` at once. So when the wait is over, any request is already
+  in `window.__fetchCalls`; the test reads it and checks it is empty. The 300ms wait goes away.
 
 ## Security
 
@@ -234,13 +235,19 @@ split from the real file (class names may have grown).
 
 Each step is its own commit, and `make check` passes after each one.
 
-1. Note the per-layer test counts from `make test`.
+1. Note the per-layer test counts from `make test`, and the number of tests per class in
+   `test_views.py`. Baseline on `main` (`1d1c4b7`, before the earlier plans add tests): Toggle 4,
+   Delete 4, List 12, Add 15, Edit 23, Priority 10, Tag 14, Recurring 28, plus `LoginRequiredTests`,
+   `OnlyMyDataTests` and `AdminTests` (count them again at build time, after the earlier plans).
+   The total before and after the split must be the same.
 2. Add the helpers; switch each test file to them, one file at a time.
 3. Split `test_views.py`; move `FillPositionMigrationTests`. Same counts as step 1.
-4. **Tests first** for the two missing tests: `test_move_up_on_first_changes_nothing` (it passes
+4. **Tests first** for the missing tests: `test_move_up_on_first_changes_nothing` (it passes
    at once: it pins today's behaviour; show that it fails if `todo_move` stops checking
-   `0 <= there`), and an `accounts` test that `PUT` to signup is `405` (it fails before decision
-   5). Then decision 5.
+   `0 <= there`), `test_signup_methods` (it fails before decision 5) and
+   `test_todos_with_the_same_time_come_back_by_pk` (written before decision 6; it may pass by
+   chance today, so show that it fails with `ordering = ["created_at", "-pk"]` as a quick check).
+   Then decision 5.
 5. Decisions 3 (each fact once) and 4 (CSS).
 6. Decision 6 and its migration (`makemigrations --check` clean afterwards).
 7. The CUJ change; `make cuj`.
@@ -251,8 +258,8 @@ Each step is its own commit, and `make check` passes after each one.
 | Layer, file, test | What it checks | The break that fails it |
 |---|---|---|
 | Integration, `test_reorder.py` `test_move_up_on_first_changes_nothing` | "Move up" on the first row: redirect to `?sort=manual#todo-<pk>`, positions and shown order unchanged. | `todo_move` wrapping around (moving the first row to the end) or crashing at index `-1`. |
-| Integration, `accounts/tests/integration/test_accounts.py` `test_signup_only_get_and_post` | `PUT` and `DELETE` to `/accounts/signup/` give 405; `GET` gives 200. | No method rule on `signup`. |
-| Unit, `todos/tests/unit/test_models.py` `test_todo_default_order_has_a_tiebreak` | `Todo._meta.ordering == ["created_at", "pk"]`. | Removing the tiebreak. |
+| Integration, `accounts/tests/integration/test_accounts.py` `test_signup_methods` | `PUT` and `DELETE` to `/accounts/signup/` give 405; `GET` and `HEAD` give 200. | No method rule on `signup`, or a rule that drops `HEAD`. |
+| Integration, `todos/tests/integration/test_views.py` `ListTests.test_todos_with_the_same_time_come_back_by_pk` | Three to-dos in one list, then one `update(created_at=<one fixed time>)` on all of them: `[t.pk for t in the_list.todos.all()]` equals the sorted pks. | Removing `"pk"` from `Todo.Meta.ordering` (then SQLite may return equal times in any order). |
 | CUJ, `test_escape_cancels_a_drag` (changed) | No reorder `fetch` after Escape, checked after `dragend`, with no timed wait. | `reorder.js` sending on a cancelled drag. |
 
 Everything else is a move or a rewrite of how a test is written; what each test checks does not
@@ -265,7 +272,7 @@ change. The per-layer counts prove that no test was lost.
 - The split of `test_views.py` as in decision 2; `FillPositionMigrationTests` goes to
   `test_migrations.py`.
 - `.button-small` stays in `app.css` with a comment.
-- `signup` allows only `GET` and `POST`.
+- `signup` allows `GET`, `HEAD` and `POST` (`HEAD` gives 200 today).
 - README: folders and main files, then "see AGENTS.md"; test counts as an example.
 
 ## Left for the person
@@ -296,5 +303,16 @@ Verification by the planner (2026-10-11), against `main` (`6c7169b`):
   with `site.css`), so `app.css`'s copy is unused but kept on purpose.
 - **Checked**: the hidden-input tests (`test_sort.py` lines 113-118, `test_filter.py` line 97)
   compare HTML, not text, so a loop is allowed.
-- **Checked**: `require_http_methods(["GET", "POST"])` refuses `HEAD` too; that matches the other
-  form views (`list_create`, `todo_edit`).
+- **Checked**: `require_http_methods(["GET", "POST"])` would refuse `HEAD` (tried with Django
+  5.2), so `HEAD` is in the list.
+
+The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
+
+- `signup` gets `require_http_methods(["GET", "HEAD", "POST"])`; the test checks `PUT` 405 and
+  `HEAD` 200.
+- The unit test that only read `Todo._meta.ordering` (it would pass by copying the line) became an
+  integration test: to-dos with the same `created_at` come back by `pk`.
+- Baseline counts per class for the split; the total must match. A test whose assertion would
+  change keeps its own parser. `test_search.py` line ~141 keeps exactly 3 matches.
+- The CUJ fix is simpler: the existing wait for `li.dragging` count 0, then read
+  `window.__fetchCalls`; no extra `dragend` listener.

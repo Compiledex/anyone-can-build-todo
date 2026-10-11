@@ -55,9 +55,15 @@ under Due date, the field to fix.
   ```
 
   It opens `source` **read-only** (`sqlite3.connect(f"file:{source}?mode=ro", uri=True)`), so a
-  missing file is never created as an empty database. It makes `folder` if needed. If the target
-  name already exists (two backups in the same second), it raises `FileExistsError` and writes
-  nothing. Plain Python and the standard library only.
+  missing file is never created as an empty database. It makes `folder` if needed. Then:
+  1. It **reserves the final name** with `open(target, "xb")` (create, fail if it exists). Two
+     backups in the same second: the second gets `FileExistsError` and writes nothing. No "check,
+     then create" gap.
+  2. It writes the copy to a **temporary name in the same folder** (`.db-...sqlite3.tmp`).
+  3. It **renames** the temporary file over the reserved (empty) final name (`os.replace`, one
+     step on the same disk). So `backups/` never holds a half-written file with the final name.
+  If the copy fails, it removes both the temporary file and the reserved empty file.
+  Plain Python and the standard library only.
 - New `todos/management/commands/backup_db.py`: `uv run python manage.py backup_db`. The source
   is `settings.DATABASES["default"]["NAME"]`, the folder `settings.BASE_DIR / "backups"`, the time
   `timezone.localtime()` (the app's time zone, the same "today" as everywhere else). Two options,
@@ -100,7 +106,7 @@ reset:
 
 ### 3. `backups/` is not in git
 
-`.gitignore` gets `backups/`, with a comment: "Copies of db.sqlite3 from make backup and make
+`.gitignore` gets `/backups/` (only the folder at the top of the project), with a comment: "Copies of db.sqlite3 from make backup and make
 reset. Your data: never commit it." Old copies are kept; the person deletes them by hand (the
 README says so).
 
@@ -108,7 +114,8 @@ README says so).
 
 A short new section after "Run it on your laptop": what `make backup` does and where the file
 goes; that `make reset` asks and makes a copy; how to **restore**: stop the server (`Ctrl+C`),
-copy the backup over `db.sqlite3` (`cp backups/db-<time>.sqlite3 db.sqlite3`), start again; and
+copy the backup over `db.sqlite3` (`cp backups/db-<time>.sqlite3 db.sqlite3`), run `make setup`
+(or `uv run python manage.py migrate`) so an older copy gets the newest tables, start again; and
 that copying the `backups/` folder to another disk or cloud is what really protects the data.
 The contents line at the top gets the new link.
 
@@ -118,15 +125,16 @@ In `search()` (after nordic-letters):
 
 ```python
 folded = casefold(q)
-tag_text = folded.lstrip("#")  # Tags are stored without "#" (parse_tags).
+tag_text = folded.lstrip("#").strip()  # Tags are stored without "#" (parse_tags).
 ...
 | Q(pk__in=with_matching_tag)   # only when tag_text is not empty
 ```
 
 - The title and the notes are still searched for the whole text (`#work`), so a to-do titled
   "Fix #work bug" is still found.
-- The tag part uses the text without leading `#`, the same rule as `parse_tags` (`lstrip("#")`).
-- `#` alone, or `###`: the tag part is empty, so the tag sub-query is **left out** (an empty
+- The tag part uses the text without leading `#` and without spaces at the ends (`# work` finds
+  `work`), like `parse_tags`.
+- `#` alone, `###` or `# `: the tag part is empty, so the tag sub-query is **left out** (an empty
   `Contains` would match every tag). Title and notes are still searched for `#`.
 - Still one sub-query, still from `todos`, so a to-do with two matching tags is shown once, and no
   other person's rows are read.
@@ -167,6 +175,9 @@ backup files stay and are harmless.
 ## Working next to
 
 Merge order: **safe-toggles → accessibility-pass → local-safety (this) → maintenance-pass**.
+local-safety has **no dependency** on the first two (no shared code file, only different
+`AGENTS.md` rows and different classes in `test_views.py`), so it may be built in parallel with
+them; whichever merges later rebases.
 
 - nordic-letters (merged first) wrote today's `search()`; this plan adds only the `#` rule.
 - safe-toggles and accessibility-pass change templates and `views.py`; this plan does not touch
@@ -209,7 +220,8 @@ Merge order: **safe-toggles → accessibility-pass → local-safety (this) → m
    checkout's file, never port 8000): `make backup` makes a file in `backups/`; `make reset` then
    Enter says "Nothing was deleted." and the file is unchanged; `make reset` then `yes` makes a
    second copy and an empty database; `make reset CONFIRM=yes` copies without asking. Say what
-   you saw in the PR.
+   you saw in the PR. **Never run `make reset` with `CONFIRM=yes`, or answer `yes`, outside the
+   worktree**: in the main checkout it would replace the person's real data.
 4. `search()`.
 5. `Todo.clean()` and `TodoForm.full_clean`.
 6. README and `AGENTS.md`. `make check`. Commit. Last commit: Status `**done** (<date>)`.
@@ -220,13 +232,16 @@ Merge order: **safe-toggles → accessibility-pass → local-safety (this) → m
 
 `SimpleTestCase` (no Django database): each test makes a temporary folder and a small SQLite file
 with the standard `sqlite3` module (one table, two rows), so the person's data is never near it.
+Every call of the function and of the command **always** passes the temporary source and folder
+(`--source`, `--folder`), so no test ever writes to the real `backups/`.
 
 | Test | What it checks | The break that fails it |
 |---|---|---|
 | `test_backup_copies_the_rows` | `backup_database` returns `folder / "db-20261011-081500.sqlite3"` for a fixed `now`; the copy has the two rows and passes `PRAGMA integrity_check`. | A wrong name, or a copy that is not a database. |
 | `test_backup_makes_the_folder` | A folder that does not exist yet is made. | Failing on the first backup. |
 | `test_missing_source_makes_nothing` | No source file: returns `None`, no file in the folder, and **no source file is created**. | Opening the source read-write (SQLite would create an empty file). |
-| `test_never_overwrites` | A file with the target name exists: `FileExistsError`, and that file is unchanged. | Overwriting an older backup. |
+| `test_never_overwrites` | A file with the target name exists: `FileExistsError`, that file is unchanged, and no temporary file is left. | Overwriting an older backup, or a check-then-create instead of `open(target, "xb")`. |
+| `test_failed_copy_leaves_no_file` | The copy step raises (patched): no final file and no `.tmp` file in the folder. | Leaving a half-written or empty backup. |
 | `test_source_is_not_changed` | The source's bytes are the same before and after. | Writing to the source. |
 | `test_command_prints_where_the_copy_is` | `call_command("backup_db", source=..., folder=...)` prints "Saved a copy in" and the file exists; with a missing source it prints "No database yet". | A command that does not call the function. |
 | `test_make_reset_copies_before_deleting` | Runs `make -n reset CONFIRM=yes` (a dry run: it only prints the commands) in a subprocess (skipped if `make` is not installed); the output contains `backup_db` before `rm -f db.sqlite3`, and the `read answer` question. | Someone removing the copy or the question from the `Makefile`. |
@@ -237,7 +252,7 @@ with the standard `sqlite3` module (one table, two rows), so the person's data i
 |---|---|---|
 | `test_hash_finds_the_tag` | A to-do tagged `work`: `?q=%23work` shows it; `?q=%23WORK` too. | Today's code (finds nothing). |
 | `test_hash_still_searches_titles` | A to-do titled "Fix #work bug" with no tags is found by `#work`. | Searching titles without the `#`. |
-| `test_hash_alone_does_not_match_every_tag` | Two to-dos, one tagged `home`, neither has `#` in title or notes: `?q=%23` shows none. | An empty tag search that matches every tag. |
+| `test_hash_alone_does_not_match_every_tag` | Two to-dos, one tagged `home`, neither has `#` in title or notes: `?q=%23` and `?q=%23%20` show none. | An empty tag search that matches every tag. |
 | `test_hash_search_shows_a_todo_once` | A to-do with tags `work` and `workshop`: `#work` shows it once. | A join instead of the sub-query. |
 | `test_hash_search_stays_in_the_list` | bob's to-do tagged `work` is not shown on alice's list for `#work`. | Starting from `Todo.objects`. |
 
@@ -285,3 +300,14 @@ Verification by the planner (2026-10-11), against `main` (`6c7169b`) and `featur
   database, so the command takes `--source` and `--folder` for the tests instead of patching
   settings.
 - Changed from the request: ask first, then copy (a "no" leaves no file). Same safety.
+
+The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
+
+- The backup reserves the final name with `open(target, "xb")`, writes to a temporary name in the
+  same folder, then renames; a failed copy leaves nothing. New test.
+- Tests always pass `--source` and `--folder`, so nothing goes to the real `backups/`.
+- The manual step warns: never `CONFIRM=yes` or `yes` outside the worktree.
+- `.gitignore` uses `/backups/`; the README restore runs `make setup` (migrate) after an older
+  copy.
+- `#` search: `folded.lstrip("#").strip()`, and the tag sub-query is left out when empty.
+- "Working next to": this plan may be built in parallel with the first two.

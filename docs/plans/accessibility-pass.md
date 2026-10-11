@@ -93,7 +93,8 @@ Add to the `@media (pointer: coarse)` block in `app.css`:
   decision 9): `display: flex; align-items: center; min-height: var(--control-height-touch)`.
 - `nav.filter a`: `min-height: var(--control-height-touch)`; `nav.filter` gap `var(--space-2)`.
 - `nav.lists a` and `.list-actions a`: `display: inline-flex; align-items: center; min-height:
-  var(--control-height-touch)`; `nav.lists .menu` and `.list-actions` gap `var(--space-2)`.
+  var(--control-height-touch)`. `nav.lists .menu` gets only `row-gap: var(--space-2)` (its 16px
+  column gap stays); `.list-actions` gap `var(--space-2)`.
 
 CSS only, only under a finger; the laptop look does not change.
 
@@ -102,8 +103,12 @@ CSS only, only under a finger; the laptop look does not change.
 On the edit, new list and rename pages (`todo_edit.html`, `list_form.html`), when `form.errors`:
 
 - `<title>` starts with `Error: ` (the GOV.UK pattern).
-- Above the fields, one line: `<p class="form-error-summary" role="alert">Not saved. Fix what is
-  marked below.</p>`. The errors stay under their fields, as today. No list of links: these forms
+- Above the fields, one line: `<p class="form-error-summary" role="alert" tabindex="-1"
+  autofocus>Not saved. Fix what is marked below.</p>`. `tabindex="-1"` lets it take focus
+  without joining the Tab order, and `autofocus` puts the focus there when the page opens, so a
+  screen reader reads it first (no JavaScript; these pages have no other autofocus). Screen
+  readers do not reliably announce a `role="alert"` that is already in the page when it loads, so
+  the reliable parts are the `Error: ` title and the focus; `role="alert"` is only extra. The errors stay under their fields, as today. No list of links: these forms
   have one to six fields.
 - `.form-error-summary` in `app.css`: `--danger` text, the existing message box look. No new
   token.
@@ -157,8 +162,11 @@ even when another field fails. `base.html`'s default title stays "To-do list".
 `accounts/forms.py`, `SignupForm.__init__` sets the help texts (the checks stay Django's own):
 
 - Username: "Up to 150 characters: letters, numbers and @ . + - _ (no spaces)."
-- Password: "At least 8 characters. Not only numbers, not a common password, and not too close
-  to your username."
+- Password: "Use at least 8 characters. Not only numbers, not a common password, and not too
+  close to your username." (It starts with "Use", so the existing check in
+  `accounts/tests/integration/test_auth_pages.py`
+  `test_signup_help_text_is_shown_and_linked_to_its_input`, which looks for the lower-case
+  "at least 8 characters", still passes; only its comment, if it names Django's text, changes.)
 - Password confirmation: "Type the same password again."
 
 The "8" comes from the `MinimumLengthValidator` in `AUTH_PASSWORD_VALIDATORS` (its default). A
@@ -237,7 +245,7 @@ Merge order: **safe-toggles → accessibility-pass (this) → local-safety → m
 | `todos/templates/todos/todo_edit.html` | `<title>`, `<h1>` with `saved_title`, `Error: `, the alert line (4, 7). |
 | `todos/templates/todos/list_form.html`, `list_confirm_delete.html` | `<title>` (7); `list_form.html` also `Error: ` and the alert line (4). |
 | `todos/views.py` | `back_to_steps(todo, *, to_new_step=False)`; `subtask_add` passes `True`; `todo_edit` passes `saved_title`. |
-| `todos/static/todos/app.css` | The coarse-pointer rules (3), `.move-slot` and the fixed Move width (6), `.form-error-summary` (4), `details.leave` like `details.clear-completed`. |
+| `todos/static/todos/app.css` | The coarse-pointer rules (3), `.move-slot` and the fixed Move width (6), `.form-error-summary` (4), `details.leave` like `details.clear-completed`, taking over `form.leave`'s `margin-top`, `padding-top` and `border-top` (the form is now inside it). |
 | `accounts/forms.py` | `SignupForm` help texts (8). |
 | Tests | See "Tests" and the table of tests that must change. |
 | `AGENTS.md` | Rows for `_todo_item.html`, `todo_list.html`, `todo_edit.html`, `list_form.html`, `views.py` (`back_to_steps`), `app.css` (touch rule list), `accounts/forms.py` (help texts). |
@@ -250,7 +258,11 @@ Merge order: **safe-toggles → accessibility-pass (this) → local-safety → m
 2. Decisions 1, 2 and 9 (templates), 7 and 4 (titles, alert), 8 (sign-up).
 3. Decision 5 (`back_to_steps`, the two autofocus rules).
 4. Decisions 3 and 6 (CSS) with the CUJ tests; `make cuj`.
-5. `make test`; update the docs; `make check`; commit. Last commit: Status `**done** (<date>)`.
+5. `make test`; update the docs; `make check`; commit.
+6. The landing page shows real screenshots of the app. Run `make landing-shots` (scratch data, a
+   free port, never `db.sqlite3`) and, if pictures changed, commit them after
+   `todos/tests/unit/test_webp_size.py` and the landing width and height tests pass. Last commit:
+   Status `**done** (<date>)`.
 
 ## Tests
 
@@ -263,7 +275,7 @@ Merge order: **safe-toggles → accessibility-pass (this) → local-safety → m
 | `test_subtasks.py` `test_steps_summary_names_the_todo` | "Add steps" plus hidden " to <title>"; "Steps: 1 of 2 done" plus hidden " in <title>"; "Steps: 1 of 2 done" is still one piece of text. | Breaking the visible text, or no name. |
 | `test_subtasks.py` `test_after_add_step_the_step_field_has_autofocus` | `subtask_add` redirects to `?open=<pk>` (no `#`); that page's "New step for <title>" input has `autofocus`, other rows' do not, and "New to-do" has none. | A fragment on the add redirect (the browser would skip autofocus), or two autofocus fields. |
 | `test_subtasks.py` `test_step_done_keeps_the_fragment` | Step Done and Delete still go to `?open=<pk>#todo-<pk>`. | Moving the cursor on every step click. |
-| `test_views.py` `EditTests.test_bad_edit_says_error_in_title_and_alert` | An empty title: `<title>` starts with `Error: Edit “`, the page has `role="alert"` with "Not saved."; a valid GET has neither. | No title prefix or no alert. |
+| `test_views.py` `EditTests.test_bad_edit_says_error_in_title_and_alert` | An empty title: `<title>` starts with `Error: Edit “`, the page has the summary with `role="alert"`, `tabindex="-1"`, `autofocus` and "Not saved."; a valid GET has neither. | No title prefix or no alert. |
 | `test_views.py` `EditTests.test_title_and_heading_use_the_saved_title` | A valid new title with bad tags: `<h1>` and `<title>` show the **old** title. | Using the half-validated instance. |
 | `test_lists.py` `test_bad_new_list_and_rename_say_error` | Duplicate names on New list and Rename: `Error: ` in `<title>` and the alert line. | Leaving out one page. |
 | `test_lists.py` `test_page_titles` | List, New list, Rename, Delete list titles end with ` – To-do list`. | A missing suffix. |
@@ -290,9 +302,12 @@ Merge order: **safe-toggles → accessibility-pass (this) → local-safety → m
 - Move slot: an empty, hidden-from-readers span of the same width.
 - Sign-up help texts as in decision 8.
 - Leave asks first with a gray (secondary) button, not a red one.
+- The landing screenshots are taken again after this plan (`make landing-shots`).
 
 ## Left for the person
 
+- **"Leave this list" now asks first.** This is a change in behaviour (one more click). Review it
+  when you are back; it is easy to undo.
 - **Lighter list HTML** (`{% spaceless %}` or fewer wrappers). Recommended: not now; it changes
   many exact-HTML tests for a small gain on a local app.
 - **Renaming the `todo_list` URL and view to `home`.** Recommended: not now; many tests and
@@ -317,3 +332,15 @@ Verification by the planner (2026-10-11), against `main` (`6c7169b`):
   fails, so the heading would show an unsaved title. Decision 7 passes `saved_title`.
 - Changed from the request: the "Done: " text is put before the title span, not inside it, to
   keep an existing exact test and the CUJ title reads.
+
+The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
+
+- The password help starts with "Use at least 8 characters", so
+  `test_signup_help_text_is_shown_and_linked_to_its_input` (lower-case "at least 8 characters")
+  keeps passing.
+- Under a finger, `nav.lists .menu` gets only a bigger row gap (the 16px column gap stays);
+  `details.leave` takes over `form.leave`'s top margin, padding and line.
+- No claim that `role="alert"` is announced on load; the error summary gets `tabindex="-1"` and
+  `autofocus`, and the `Error: ` title is the reliable part.
+- New last step: `make landing-shots`, and commit changed pictures (orchestrator's choice).
+- Left for the person: "Leave asks first" is a behaviour change to review.

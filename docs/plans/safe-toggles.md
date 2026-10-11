@@ -87,8 +87,12 @@ order). This plan adds a fragment to that value, in the template:
 | Button | `next` | Why |
 |---|---|---|
 | Done / Undo, no filter | `{{ back_url }}#todo-<pk>` | The row stays on the page. |
-| Done / Undo, with a filter (`status` set) | `{{ back_url }}#<anchor after removal>` | With "Not done", a done row leaves the page (and with "Done", an undone row). |
+| Done / Undo, with a filter (the **cleaned** `status` is `open` or `done`) | `{{ back_url }}#<anchor after removal>` | With "Not done", a done row leaves the page (and with "Done", an undone row). |
 | Delete | `{{ back_url }}#<anchor after removal>` | The row is gone. |
+
+"With a filter" means the cleaned `status` that `render_list_page` already gives the template
+(from `TodoQueryForm`), never `request.GET`: `?status=bogus` shows every row, so it counts as no
+filter.
 
 The **anchor after removal** is the next row of the page as shown (`todo-<pk of the next row>`),
 or, for the last row, the row before it, or, for the only row, `todos` (the list itself; the
@@ -118,8 +122,9 @@ the row is still shown.
 
 `url_has_allowed_host_and_scheme` looks at the scheme and the host, not the fragment. Checked
 on 2026-10-11 with Django 5.2: `/lists/1/?q=a#todo-5` and `/lists/1/#todos` are accepted;
-`//evil.example/#todo-1`, `/\evil.example#todo-1` and `#todo-1` (no leading `/`) are refused, so
-they fall back to the list. A fragment is never run as code by the browser, so even
+`//evil.example/#todo-1` and `/\evil.example#todo-1` are refused. `#todo-1` alone passes
+Django's check (it has no host), but `redirect_back` refuses it with its own `startswith("/")`
+rule. Either way they fall back to the list. A fragment is never run as code by the browser, so even
 `/lists/1/#javascript:...` (accepted) is harmless. `back_url` cannot carry a `#` of its own:
 `request.GET.urlencode()` writes `#` as `%23`. Tests pin all of this.
 
@@ -183,13 +188,30 @@ local-safety → maintenance-pass**.
 | `todos/templates/todos/_todo_item.html` | Hidden `done` in the to-do's Done/Undo form and in each step's Done/Undo form; `next` with the fragment (decision 3). |
 | `todos/templates/todos/todo_list.html` | `id="todos"` on `<ul class="todos">`. |
 | `todos/tests/unit/test_anchors.py` (new) | Unit tests for `anchors_after_removal`. |
-| `todos/tests/integration/test_views.py` | New tests in `ToggleTests`, `DeleteTests`, `RecurringTests`; `RecurringTests.toggle` and the other toggle posts send `done`. |
-| `todos/tests/integration/test_subtasks.py` | New step tests; the toggle posts send `done`. |
+| `todos/tests/integration/test_views.py` | New tests in `ToggleTests`, `DeleteTests`, `RecurringTests`; the existing toggle posts send `done` (see "Existing tests that must change"). |
+| `todos/tests/integration/test_subtasks.py` | New step tests; the step toggle posts send `done`. |
 | `todos/tests/integration/test_sharing.py` | Two-member tests; the toggle posts send `done`. |
-| `todos/tests/integration/test_filter.py` | Lines 142 and 222 compare the whole hidden `next` input: the value now ends with the anchor (the reason: the place is kept). The toggle post sends `done`. |
+| `todos/tests/integration/test_filter.py` | The hidden `next` checks and `RedirectBackTests.toggle()` (see below). |
 | `todos/tests/integration/test_reorder.py` | Its one toggle post sends `done`. |
 | `todos/tests/cuj/test_journeys.py` | New `test_done_keeps_the_place`. |
 | `AGENTS.md` | `todos/views.py` row (toggle reads `done`, nothing happens when already in that state, 400 for a bad value; Done/Undo/Delete go back to the row or the next row); `_todo_item.html` row (hidden `done`, `next` with the anchor); `todo_list.html` row (`id="todos"`); intro ("marking it done makes its next copy" stays true). |
+
+## Existing tests that must change
+
+A toggle post without `done` is now 400, so every test that posts to `todo_toggle` or
+`subtask_toggle` must send it. Rule: **a helper takes `done` as an explicit argument** (`True`
+or `False`, sent as `"1"` or `"0"`). It never reads `todo.done` from a Python object, because
+that object can be stale (the test already clicked, the database changed, the object did not).
+
+| Test or helper | Change | Why |
+|---|---|---|
+| `test_filter.py` `RedirectBackTests.toggle(data=None, client=None, **extra)` (7 callers) | `toggle(done, data=None, client=None, **extra)`; it adds `done` to the posted data. Each caller says which state it wants. | 400 without `done`. |
+| `test_filter.py` `test_row_forms_carry_current_address` (line ~142) | The hidden `next` value becomes `{url}?q=milk&amp;status=open#todos` (the only row, with a filter: both Done and Delete use the anchor after removal). `count=2` stays. | Decision 3. |
+| `test_filter.py` `test_bad_add_page_links_go_to_the_list` (line ~222) | The one `count=2` check becomes two checks, each `count=1`: Done's `next` is `{url}#todo-<pk>`, Delete's is `{url}#todos`. | Decision 3: no filter, so Done keeps its row and Delete goes to the list. |
+| `test_sharing.py`, the 14 posts to `todo_toggle` (and `make_weekly_milk` users) | Each post sends `done`; where a local helper exists, it gets the `done` argument. | 400 without `done`. |
+| `test_views.py` `ToggleTests` (the existing tests) and `RecurringTests.toggle(todo, client=None)` | `toggle(todo, done, client=None)`; every caller passes `True` or `False`. | 400 without `done`. |
+| `test_subtasks.py`, the step toggle posts | Send `done`. | 400 without `done`. |
+| `test_reorder.py`, its one toggle post | Sends `done=1`. | 400 without `done`. |
 
 ## Steps
 
@@ -229,8 +251,8 @@ local-safety → maintenance-pass**.
 | `ToggleTests.test_bad_done_value_from_stranger_is_404` | bob posts `done=x` for alice's to-do: 404, not 400. | Checking `done` before finding the to-do (it would tell that the to-do exists). |
 | `ToggleTests.test_page_sends_the_state_it_wants` | On the list page an open to-do's form has `<input type="hidden" name="done" value="1">` and a done one `value="0"` (`assertInHTML` on the form). | A template that leaves `done` out. |
 | `ToggleTests.test_done_goes_back_to_its_row` | The `next` posted from the page (read from the page's hidden input) ends with `#todo-<pk>`, and the redirect keeps it (`assertRedirects`, `fetch_redirect_response=False`). | No fragment. |
-| `ToggleTests.test_done_in_not_done_filter_goes_to_the_next_row` | `?status=open` with three to-dos: the middle row's Done `next` ends with `#todo-<third pk>`. | Pointing at the row that leaves the page. |
-| `ToggleTests.test_next_with_a_fragment_keeps_the_same_site_rule` | `next` = `//evil.example/#todo-1`, `/\evil.example#todo-1`, `#todo-1` (subtests): goes to the list; `next` = `/lists/<pk>/?q=a#todo-<pk>`: goes there. | A change that accepts a fragment-only or other-site address. |
+| `ToggleTests.test_done_in_not_done_filter_goes_to_the_next_row` | `?status=open` with three to-dos: the middle row's Done `next` ends with `#todo-<third pk>`. With `?status=bogus` (all rows shown) it ends with `#todo-<middle pk>`. | Pointing at the row that leaves the page, or reading `request.GET` instead of the cleaned status. |
+| `ToggleTests.test_next_with_a_fragment_keeps_the_same_site_rule` | `next` = `//evil.example/#todo-1`, `/\evil.example#todo-1`, `#todo-1` (subtests; the last one is refused by `redirect_back`'s own `startswith("/")` rule, not by Django): goes to the list; `next` = `/lists/<pk>/?q=a#todo-<pk>`: goes there. | A change that accepts a fragment-only or other-site address. |
 | `DeleteTests.test_delete_goes_to_the_next_row` | Three to-dos: Delete on the first goes to `#todo-<second>`, on the last to `#todo-<second>`; the only to-do goes to `#todos`. | No fragment, or the deleted row's own anchor. |
 | `RecurringTests.test_double_done_keeps_one_copy` | `self.weekly`: two posts with `done=1`. The original is done and there is exactly one copy. | Today: the second click is an Undo and deletes the copy. |
 | `RecurringTests.test_double_undo_removes_the_copy_once` | Done, then two posts with `done=0`: not done, no copy, exactly one "was removed." message in all. | A second Undo doing anything. |
@@ -276,6 +298,8 @@ local-safety → maintenance-pass**.
   it bites you.
 - **A warning when two members edit the same to-do at the same time.** The last Save wins today.
   Recommended: not now; the app has a few people per list.
+- **A tab opened before this update** sends no `done` and gets a bare "400 Bad Request" page;
+  reloading the page fixes it. Recommended: accept it (one Mac, one reload).
 - **Undo keeping a copy that was edited** (title, notes, priority, tags). Recommended: not now
   (see recurring-undo-steps).
 
@@ -289,7 +313,8 @@ flight:
 - Confirmed: Done/Undo/Delete redirect to `next` without a fragment; `todo_move` and
   `back_to_steps` already use `#todo-<pk>`.
 - Confirmed with Django 5.2 (a small script): `url_has_allowed_host_and_scheme` accepts same-site
-  paths with a fragment and refuses `//evil.example/#...`, a backslash and `#...` alone.
+  paths with a fragment and refuses `//evil.example/#...` and a backslash. `#...` alone passes
+  Django's check; `redirect_back`'s own `startswith("/")` rule refuses it.
 - Confirmed in Chromium (a small Playwright script): autofocus is skipped when the address has a
   fragment that names an element, and used when it has none. So the request "drop the autofocus
   or only use it without a fragment" needs **no code**: the browser already does the second.
@@ -301,3 +326,17 @@ flight:
   keep `todos` a `QuerySet`; `list(todos)` only fills its cache. Written into decision 3.
 - Found while checking: in a "Not done" or "Done" filter the toggled row leaves the page, so its
   own anchor would point nowhere and the autofocus would win. Decision 3 uses the next row there.
+
+The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
+
+- The toggle test helpers take an explicit `done` argument, never derived from a possibly stale
+  object; the new table "Existing tests that must change" lists them (`RedirectBackTests.toggle`
+  with 7 callers, 14 posts in `test_sharing.py`, `ToggleTests`, `RecurringTests.toggle`, steps,
+  reorder).
+- `test_filter.py` line ~222: Done gets `#todo-<pk>` and Delete `#todos`, so its `count=2` check
+  becomes two checks; line ~142 keeps `count=2` (both `#todos`).
+- Wording: Django's check accepts `#todo-1`; `redirect_back` refuses it with its own
+  `startswith("/")` rule. The subtest stays.
+- "With a filter" means the cleaned `status`, not `request.GET` (`?status=bogus` shows all rows);
+  a test case added.
+- Left for the person: a tab opened before the update gets a bare 400 until reloaded.
