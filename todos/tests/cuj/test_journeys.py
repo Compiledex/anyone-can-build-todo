@@ -740,6 +740,12 @@ class RowLayoutTests(BrowserTestCase):
                                 actions["x"], title["x"] + title["width"]
                             )
                             self.assertLessEqual(abs(actions["y"] - title["y"]), 8)
+                            # A mouse: the summaries keep their small laptop size
+                            # (the 44px is only for a finger).
+                            for part in ["details.notes", "details.steps"]:
+                                summary = row.locator(f"{part} > summary")
+                                height = summary.bounding_box()["height"]
+                                self.assertLess(height, TOUCH_HEIGHT, part)
                         else:
                             self.assertGreaterEqual(
                                 actions["y"], main["y"] + main["height"]
@@ -898,6 +904,8 @@ class OneProductTests(BrowserTestCase):
 # tall, and at least 8px between two buttons, so a finger hits the right one.
 TOUCH_HEIGHT = 44
 TOUCH_GAP = 8
+# The computed display of an element; a <summary> with its triangle is "list-item".
+DISPLAY = "el => getComputedStyle(el).display"
 
 
 def gaps(boxes):
@@ -963,6 +971,28 @@ class TouchTests(BrowserTestCase):
                     self.assertGreaterEqual(box["height"], TOUCH_HEIGHT, boxes)
                 for gap in gaps(boxes):
                     self.assertGreaterEqual(gap, TOUCH_GAP, boxes)
+        # Taller, but still a <summary> with its open/closed triangle.
+        for name in ["steps summary", "notes summary", "clear completed"]:
+            with self.subTest(name, check="triangle"):
+                self.assertEqual(groups[name][0].evaluate(DISPLAY), "list-item")
+
+    def test_leave_summary_fits_a_finger(self):
+        """A member's "Leave this list" is 44px tall under a finger, triangle kept."""
+        owner = make_user("bob")
+        groceries = TodoList.objects.create(owner=owner, name="Groceries")
+        member = make_user_with_inbox()
+        groceries.members.add(member)
+        phone = self.browser.new_context(
+            viewport={"width": 390, "height": 844}, has_touch=True, is_mobile=True
+        )
+        self.addCleanup(phone.close)
+        self.log_in_as(member, phone)
+        page = phone.new_page()
+        page.goto(f"{self.live_server_url}{groceries.get_absolute_url()}")
+        leave = page.locator("details.leave > summary")
+        expect(leave).to_have_text("Leave this list")
+        self.assertGreaterEqual(leave.bounding_box()["height"], TOUCH_HEIGHT)
+        self.assertEqual(leave.evaluate(DISPLAY), "list-item")
 
 
 def hex_to_rgb(value):
