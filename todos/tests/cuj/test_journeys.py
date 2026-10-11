@@ -1135,3 +1135,33 @@ class KeyboardStepsTests(BrowserTestCase):
         expect(page.locator("li.step").filter(has_text="Book a van")).to_be_visible()
         expect(page.locator("li.step")).to_have_count(2)
         expect(page.get_by_text("Steps: 0 of 2 done")).to_be_visible()
+
+
+class DeleteAndUndoTests(BrowserTestCase):
+    def test_delete_and_undo(self):
+        """Delete by mistake, click Undo: the to-do is back in its place, with its step."""
+        user = make_user_with_inbox()
+        the_list = user.todo_lists.get()
+        the_list.todos.create(title="Buy milk")
+        middle = the_list.todos.create(title="Call the bank")
+        middle.subtasks.create(title="Find the card")
+        the_list.todos.create(title="Water plants")
+        self.log_in_as(user)
+        page = self.page
+        page.goto(f"{self.live_server_url}{the_list.get_absolute_url()}")
+
+        rows = page.locator("ul.todos > li")
+        page.get_by_role("button", name="Delete: Call the bank").click()
+        expect(page.get_by_text("Deleted “Call the bank”.")).to_be_visible()
+        expect(rows).to_have_count(2)
+
+        page.get_by_role("button", name="Undo", exact=True).click()
+        expect(page.get_by_text("Restored “Call the bank”.")).to_be_visible()
+        expect(rows).to_have_count(3)
+        expect(rows.nth(0)).to_contain_text("Buy milk")
+        expect(rows.nth(1)).to_contain_text("Call the bank")
+        expect(rows.nth(2)).to_contain_text("Water plants")
+        restored = page.locator(f"#todo-{middle.pk}")
+        expect(restored).to_be_in_viewport()
+        expect(restored.get_by_text("Steps: 0 of 1 done")).to_be_visible()
+        expect(page.get_by_role("button", name="Undo", exact=True)).to_have_count(0)

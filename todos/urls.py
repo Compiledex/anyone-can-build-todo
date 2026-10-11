@@ -24,6 +24,7 @@ urlpatterns = [
     path("lists/<int:pk>/reorder/", views.todo_reorder, name="todo_reorder"),
     path("<int:pk>/toggle/", views.todo_toggle, name="todo_toggle"),
     path("<int:pk>/delete/", views.todo_delete, name="todo_delete"),
+    path("<int:pk>/undo-delete/", views.todo_undo_delete, name="todo_undo_delete"),
     path("<int:pk>/edit/", views.todo_edit, name="todo_edit"),
     path("<int:pk>/move/", views.todo_move, name="todo_move"),
     path("<int:todo_pk>/subtasks/add/", views.subtask_add, name="subtask_add"),
