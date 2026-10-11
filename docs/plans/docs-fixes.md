@@ -1,6 +1,6 @@
 # Plan: make the docs match the code
 
-Status: **draft**. Not reviewed, not approved.
+Status: **approved** (2026-10-11), not started.
 
 Builds on: every merged feature (PRs #1 to #33). Changes only Markdown files: no code, no
 migration.
@@ -239,6 +239,11 @@ The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
 - Open questions are now (c) branch protection and (d) Tokyo date plus PR number. The
   `test-pyramid.md` question was dropped: it simply gets the same form (decision 1).
 
-## Decided by the person
+## Decided by the person (2026-10-11)
 
-Nothing yet.
+The plan is **approved**.
+
+- Status lines use the Tokyo date and the PR number, as in the table.
+- GitHub branch protection: the person turns it on for `main` themselves (require the `lint` and
+  `test` checks), outside this plan. Until it is on, the CI row in AGENTS.md says it is a team rule
+  that GitHub does not enforce; when it is on, that half-sentence is removed in a later change.

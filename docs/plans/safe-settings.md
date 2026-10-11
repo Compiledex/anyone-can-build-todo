@@ -1,6 +1,6 @@
 # Plan: the app refuses to start with unsafe production settings
 
-Status: **draft**. Not reviewed, not approved.
+Status: **approved** (2026-10-11), not started.
 
 Builds on: **foundation** and **accounts** (the settings in `config/settings.py` that read
 `DJANGO_SECRET_KEY`, `DJANGO_DEBUG` and `DJANGO_ALLOWED_HOSTS` from environment variables), and the
@@ -328,6 +328,11 @@ The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
 - New section "Working next to": docs-fixes merges first.
 - Open questions cut to two: (a) and (b).
 
-## Decided by the person
+## Decided by the person (2026-10-11)
 
-Nothing yet.
+The plan is **approved**.
+
+- `DJANGO_DEBUG` accepts only `True` or `False` (any case, spaces at the ends removed). Any other
+  value, including an empty one, stops the app.
+- A host is **not** forced to set `DJANGO_DEBUG` explicitly for now: the `check --deploy` step in the
+  build already stops a deploy with debug on.
