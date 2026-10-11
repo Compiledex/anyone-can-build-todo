@@ -8,7 +8,9 @@ from django.urls import reverse
 from django.utils import dateformat, timezone
 
 from accounts.tests.helpers import LoggedInTestCase, make_user
+from todos import models as todo_models
 from todos.models import Subtask, Tag, Todo, TodoList
+from todos.ordering import save_order
 from todos.tests.helpers import count_queries, messages_of
 
 
@@ -467,3 +469,282 @@ class RecurringTests(LoggedInTestCase):
         self.assertContains(response, "Repeats every Monday")
         self.assertContains(response, "Repeats daily")
         self.assertContains(response, "Repeats monthly")
+
+    # Undo keeps a copy that was changed after it was made, and Repeat turned on
+    # for a done to-do makes the copy at once (docs/plans/recurring-copy-rules.md).
+
+    def edit(self, todo, client=None, **changes):
+        """Post the edit page of `todo` with its own values, and these changes."""
+        todo.refresh_from_db()
+        values = {
+            "title": todo.title,
+            "due_date": todo.due_date.isoformat() if todo.due_date else "",
+            "repeat": todo.repeat,
+            "description": todo.description,
+            "priority": str(todo.priority),
+            "tag_names": ", ".join(tag.name for tag in todo.tags.all()),
+        }
+        values.update(changes)
+        return (client or self.client).post(
+            reverse("todo_edit", args=[todo.pk]), values
+        )
+
+    def changed_message(self):
+        next_due = self.due + timedelta(days=7)
+        return (
+            f"The next copy, due {dateformat.format(next_due, 'j M Y')}, was kept, "
+            "because it was changed after it was made."
+        )
+
+    def removed_message(self):
+        next_due = self.due + timedelta(days=7)
+        return (
+            f"The next copy, due {dateformat.format(next_due, 'j M Y')}, was removed."
+        )
+
+    def full_original(self):
+        """A weekly to-do with notes (a line break), two tags and two steps."""
+        todo = Todo.objects.create(
+            title="Clean the house",
+            todo_list=self.todo_list,
+            repeat="weekly",
+            due_date=self.due,
+            description="Kitchen first.\r\nThen the hall.",
+            priority=Todo.Priority.HIGH,
+        )
+        todo.set_tags(["home", "chores"])
+        Subtask.objects.create(todo=todo, title="Floors")
+        Subtask.objects.create(todo=todo, title="Windows")
+        return todo
+
+    def fresh_copy(self):
+        return self.full_original().make_next_copy(timezone.localdate())
+
+    def test_new_copy_has_its_fingerprint(self):
+        original = self.full_original()
+        self.toggle(original, True)
+        copy = self.copies_of(original).get()
+        self.assertEqual(len(copy.copy_fingerprint), 64)
+        self.assertEqual(copy.copy_fingerprint, copy.content_fingerprint())
+        self.assertFalse(copy.changed_since_copy())
+        original.refresh_from_db()
+        self.assertEqual(original.copy_fingerprint, "")
+
+    def test_copy_has_every_copied_field(self):
+        original = self.full_original()
+        copy = original.make_next_copy(timezone.localdate())
+        copy.refresh_from_db()
+        for name in todo_models.COPIED_FIELDS:
+            with self.subTest(field=name):
+                self.assertEqual(getattr(copy, name), getattr(original, name))
+
+    def test_fingerprint_starts_with_the_version(self):
+        values = {"title": "A", "description": "", "priority": 2, "repeat": "daily"}
+        first = todo_models.fingerprint(values, self.due, ["home"], ["Step"])
+        with mock.patch("todos.models.FINGERPRINT_VERSION", "v2"):
+            second = todo_models.fingerprint(values, self.due, ["home"], ["Step"])
+        self.assertNotEqual(first, second)
+
+    def test_fingerprint_changes_for_each_field(self):
+        def add_tag(copy):
+            copy.set_tags(["home", "chores", "new"])
+
+        def remove_tag(copy):
+            copy.set_tags(["home"])
+
+        def rename_step(copy):
+            copy.subtasks.filter(title="Floors").update(title="Floors and stairs")
+
+        changes = {
+            "title": lambda c: Todo.objects.filter(pk=c.pk).update(title="Other"),
+            "notes": lambda c: Todo.objects.filter(pk=c.pk).update(description="x"),
+            "priority": lambda c: Todo.objects.filter(pk=c.pk).update(priority=1),
+            "due date": lambda c: Todo.objects.filter(pk=c.pk).update(
+                due_date=c.due_date + timedelta(days=1)
+            ),
+            "repeat": lambda c: Todo.objects.filter(pk=c.pk).update(repeat="daily"),
+            "add a tag": add_tag,
+            "remove a tag": remove_tag,
+            "add a step": lambda c: Subtask.objects.create(todo=c, title="Dust"),
+            "delete a step": lambda c: c.subtasks.filter(title="Windows").delete(),
+            "rename a step": rename_step,
+        }
+        for name, change in changes.items():
+            with self.subTest(change=name):
+                copy = self.fresh_copy()
+                self.assertFalse(copy.changed_since_copy())
+                change(copy)
+                copy.refresh_from_db()
+                self.assertTrue(copy.changed_since_copy())
+
+    def test_fingerprint_ignores_done_and_order(self):
+        copy = self.fresh_copy()
+        step = copy.subtasks.first()
+        step.done = True
+        step.save()
+        self.assertFalse(copy.changed_since_copy())
+        step.done = False
+        step.save()
+        self.assertFalse(copy.changed_since_copy())
+        Todo.objects.filter(pk=copy.pk).update(reminded_on=timezone.localdate())
+        ids = list(self.todo_list.todos.values_list("pk", flat=True))
+        save_order(self.todo_list, list(reversed(ids)))
+        copy.refresh_from_db()
+        self.assertFalse(copy.changed_since_copy())
+
+    def test_undo_keeps_an_edited_copy(self):
+        self.toggle(self.weekly, True)
+        copy = self.copies_of(self.weekly).get()
+        self.edit(copy, title="Water the plants and the herbs")
+        response = self.toggle(self.weekly, False)
+        copy.refresh_from_db()
+        self.assertEqual(copy.title, "Water the plants and the herbs")
+        self.assertEqual(messages_of(response), [self.changed_message()])
+
+    def test_undo_keeps_a_copy_with_an_added_step(self):
+        self.toggle(self.weekly, True)
+        copy = self.copies_of(self.weekly).get()
+        self.client.post(reverse("subtask_add", args=[copy.pk]), {"title": "Feed"})
+        response = self.toggle(self.weekly, False)
+        self.assertTrue(Todo.objects.filter(pk=copy.pk).exists())
+        self.assertEqual([s.title for s in copy.subtasks.all()], ["Feed"])
+        self.assertEqual(messages_of(response), [self.changed_message()])
+
+    def test_undo_keeps_a_copy_with_a_removed_step(self):
+        self.add_two_steps()
+        self.toggle(self.weekly, True)
+        copy = self.copies_of(self.weekly).get()
+        step = copy.subtasks.get(title="Check the soil")
+        self.client.post(reverse("subtask_delete", args=[step.pk]))
+        response = self.toggle(self.weekly, False)
+        self.assertTrue(Todo.objects.filter(pk=copy.pk).exists())
+        self.assertEqual([s.title for s in copy.subtasks.all()], ["Fill the can"])
+        self.assertEqual(messages_of(response), [self.changed_message()])
+
+    def test_undo_removes_a_copy_changed_back(self):
+        self.toggle(self.weekly, True)
+        copy = self.copies_of(self.weekly).get()
+        self.client.post(reverse("subtask_add", args=[copy.pk]), {"title": "Feed"})
+        step = copy.subtasks.get()
+        self.client.post(reverse("subtask_delete", args=[step.pk]))
+        response = self.toggle(self.weekly, False)
+        self.assertFalse(Todo.objects.filter(pk=copy.pk).exists())
+        self.assertEqual(messages_of(response), [self.removed_message()])
+
+    def test_undo_removes_a_copy_saved_without_changes(self):
+        self.weekly.description = "By the window.\nAnd the hall."
+        self.weekly.save()
+        self.weekly.set_tags(["home", "plants"])
+        self.toggle(self.weekly, True)
+        copy = self.copies_of(self.weekly).get()
+        response = self.edit(copy)
+        self.assertRedirects(response, self.todo_list.get_absolute_url())
+        response = self.toggle(self.weekly, False)
+        self.assertFalse(Todo.objects.filter(pk=copy.pk).exists())
+        self.assertEqual(messages_of(response), [self.removed_message()])
+
+    def test_undo_with_done_step_and_edit_says_the_step_message(self):
+        self.add_two_steps()
+        self.toggle(self.weekly, True)
+        copy = self.copies_of(self.weekly).get()
+        self.edit(copy, title="Water the plants today")
+        first = copy.subtasks.get(title="Fill the can")
+        self.client.post(reverse("subtask_toggle", args=[first.pk]), {"done": "1"})
+        response = self.toggle(self.weekly, False)
+        self.assertTrue(Todo.objects.filter(pk=copy.pk).exists())
+        self.assertEqual(messages_of(response), [self.kept_message()])
+
+    def test_old_copy_without_fingerprint_is_removed(self):
+        self.toggle(self.weekly, True)
+        copy = self.copies_of(self.weekly).get()
+        Todo.objects.filter(pk=copy.pk).update(copy_fingerprint="", title="Changed")
+        response = self.toggle(self.weekly, False)
+        self.assertFalse(Todo.objects.filter(pk=copy.pk).exists())
+        self.assertEqual(messages_of(response), [self.removed_message()])
+
+    def test_double_undo_after_kept_copy_does_nothing(self):
+        self.toggle(self.weekly, True)
+        copy = self.copies_of(self.weekly).get()
+        self.edit(copy, title="Water the plants and the herbs")
+        first = self.toggle(self.weekly, False)
+        self.assertEqual(messages_of(first), [self.changed_message()])
+        self.client.get(self.todo_list.get_absolute_url())  # Shows the message.
+        second = self.toggle(self.weekly, False)
+        self.assertEqual(messages_of(second), [])
+        self.assertTrue(Todo.objects.filter(pk=copy.pk).exists())
+
+    # Turning on Repeat on a done to-do (todo_edit).
+
+    TODAY = date(2026, 10, 20)  # A Tuesday.
+
+    def done_once(self, **fields):
+        """A done to-do due Thursday 1 Oct 2026 that does not repeat."""
+        fields.setdefault("done", True)
+        return Todo.objects.create(
+            title="Call the dentist",
+            todo_list=self.todo_list,
+            due_date=date(2026, 10, 1),
+            **fields,
+        )
+
+    def edit_today(self, todo, client=None, **changes):
+        with mock.patch("todos.views.timezone.localdate", return_value=self.TODAY):
+            return self.edit(todo, client=client, **changes)
+
+    def test_edit_turn_on_repeat_on_done_todo_makes_copy(self):
+        todo = self.done_once()
+        response = self.edit_today(todo, repeat="weekly")
+        self.assertRedirects(response, self.todo_list.get_absolute_url())
+        copy = self.copies_of(todo).get()
+        # The first Thursday after the 1st, in steps of a week, after the 20th.
+        self.assertEqual(copy.due_date, date(2026, 10, 22))
+        self.assertFalse(copy.done)
+        self.assertEqual(copy.todo_list, self.todo_list)
+        self.assertEqual(
+            messages_of(response), ["Made the next copy, due 22 Oct 2026."]
+        )
+        self.assertFalse(copy.changed_since_copy())
+
+    def test_edit_turn_on_repeat_on_open_todo_makes_no_copy(self):
+        todo = self.done_once(done=False)
+        response = self.edit_today(todo, repeat="weekly")
+        self.assertRedirects(response, self.todo_list.get_absolute_url())
+        todo.refresh_from_db()
+        self.assertEqual(todo.repeat, Todo.Repeat.WEEKLY)
+        self.assertFalse(self.copies_of(todo).exists())
+        self.assertEqual(messages_of(response), [])
+
+    def test_edit_change_repeat_kind_makes_no_copy(self):
+        todo = self.done_once(repeat="weekly")
+        self.assertFalse(self.copies_of(todo).exists())  # Its copy was deleted.
+        response = self.edit_today(todo, repeat="monthly")
+        todo.refresh_from_db()
+        self.assertEqual(todo.repeat, Todo.Repeat.MONTHLY)
+        self.assertFalse(self.copies_of(todo).exists())
+        self.assertEqual(messages_of(response), [])
+
+    def test_edit_rereads_the_todo_inside_the_transaction(self):
+        todo = self.done_once(done=False)
+        page = self.client.get(reverse("todo_edit", args=[todo.pk]))
+        self.assertEqual(page.status_code, 200)
+        self.toggle(todo, True)  # Another tab marks it done.
+        self.edit_today(todo, repeat="weekly")
+        self.assertEqual(self.copies_of(todo).count(), 1)
+
+    def test_edit_turn_on_repeat_when_copy_exists_makes_no_second(self):
+        self.toggle(self.weekly, True)
+        copy = self.copies_of(self.weekly).get()
+        self.edit(self.weekly, repeat="")
+        response = self.edit(self.weekly, repeat="weekly")
+        self.assertRedirects(response, self.todo_list.get_absolute_url())
+        self.assertEqual([c.pk for c in self.copies_of(self.weekly)], [copy.pk])
+        self.assertEqual(messages_of(response), [])
+
+    def test_invalid_edit_makes_no_copy(self):
+        todo = self.done_once()
+        response = self.edit_today(todo, repeat="weekly", title="")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "This field is required.")
+        todo.refresh_from_db()
+        self.assertEqual(todo.repeat, Todo.Repeat.NEVER)
+        self.assertFalse(self.copies_of(todo).exists())
