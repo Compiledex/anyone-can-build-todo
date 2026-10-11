@@ -66,6 +66,31 @@ def back_to_steps(todo):
     return redirect(f"{url}?open={todo.pk}#todo-{todo.pk}")
 
 
+def anchors_after_removal(pks):
+    """For each row: the anchor to open after it leaves the page.
+
+    The next row, else the row before, else the list itself ("todos").
+    Only numbers from the database go in, so a fragment never holds request text.
+    """
+    anchors = {}
+    for i, pk in enumerate(pks):
+        if i + 1 < len(pks):
+            anchors[pk] = f"todo-{pks[i + 1]}"
+        elif i > 0:
+            anchors[pk] = f"todo-{pks[i - 1]}"
+        else:
+            anchors[pk] = "todos"
+    return anchors
+
+
+def wanted_done(request):
+    """The state the Done/Undo button asks for: "1" is True, "0" is False.
+
+    Anything else, also no value, is None: the caller answers 400.
+    """
+    return {"1": True, "0": False}.get(request.POST.get("done"))
+
+
 def redirect_back(request, default):
     """Go back to the safe address in POST "next", or else to `default`.
 
@@ -106,6 +131,13 @@ def render_list_page(request, the_list, form):
     # Where Done, Undo and Delete go back to: this list, with the same query.
     # Not request.get_full_path(): after a bad add that is .../add/ (POST only).
     back_url = f"{list_url}?{request.GET.urlencode()}" if request.GET else list_url
+    # Where each row goes after it leaves the page (Delete, or Done in a filter).
+    # list() fills the queryset's cache: todos stays a QuerySet, the template reads
+    # the cache, and the number of queries does not change.
+    rows = list(todos)
+    anchors = anchors_after_removal([todo.pk for todo in rows])
+    for todo in rows:
+        todo.anchor_after_removal = anchors[todo.pk]
     # Each link keeps the other values (the search) and changes only status.
     filter_links = [
         {
@@ -252,14 +284,24 @@ def todo_add(request, pk):
 
 @require_POST
 def todo_toggle(request, pk):
-    """Done or Undo. Done on a repeating to-do makes its next copy; Undo removes
-    that copy again, unless it is already done, in another list, or has a done
-    step."""
+    """Done (POST done=1) or Undo (done=0); any other value is 400.
+
+    The form says which state it wants, so a double click or an old tab does
+    nothing when the to-do already has it: no flip, no copy, no message.
+    Done on a repeating to-do makes its next copy; Undo removes that copy
+    again, unless it is already done, in another list, or has a done step.
+    """
+    done = wanted_done(request)
     # Read the to-do inside the transaction, so a second click at the same time
     # waits and then sees the new value (see transaction_mode in settings.py).
     with transaction.atomic():
-        todo = get_visible_todo(request.user, pk)
-        todo.done = not todo.done
+        todo = get_visible_todo(request.user, pk)  # 404 before 400: reveals nothing.
+        if done is None:
+            return HttpResponseBadRequest("Done must be 0 or 1.")
+        if todo.done == done:
+            # Already so: nothing to do.
+            return redirect_back(request, todo.todo_list.get_absolute_url())
+        todo.done = done
         todo.save()
         if todo.done:
             todo.make_next_copy(timezone.localdate())
@@ -390,9 +432,17 @@ def subtask_add(request, todo_pk):
 
 @require_POST
 def subtask_toggle(request, pk):
-    subtask = get_visible_subtask(request.user, pk)
-    subtask.done = not subtask.done
-    subtask.save()  # The to-do itself does not change.
+    """Done (POST done=1) or Undo (done=0) for a step; any other value is 400.
+
+    Setting a value twice is safe, so this needs no transaction.
+    """
+    subtask = get_visible_subtask(request.user, pk)  # 404 before 400.
+    done = wanted_done(request)
+    if done is None:
+        return HttpResponseBadRequest("Done must be 0 or 1.")
+    if subtask.done != done:
+        subtask.done = done
+        subtask.save(update_fields=["done"])  # The to-do itself does not change.
     return back_to_steps(subtask.todo)
 
 

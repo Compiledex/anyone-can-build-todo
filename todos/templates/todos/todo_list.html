@@ -116,7 +116,7 @@
   {% elif current_sort == "manual" %}
     <p class="muted">Clear the filter to change the order.</p>
   {% endif %}
-  <ul class="todos"{% if can_reorder %} data-reorder-url="{% url 'todo_reorder' the_list.pk %}"{% endif %}>
+  <ul class="todos" id="todos"{% if can_reorder %} data-reorder-url="{% url 'todo_reorder' the_list.pk %}"{% endif %}>
     {% for todo in todos %}
       {% include "todos/_todo_item.html" %}
     {% empty %}
