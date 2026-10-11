@@ -1,6 +1,6 @@
 # Plan: the app refuses to start with unsafe production settings
 
-Status: **approved** (2026-10-11), not started.
+Status: **done** (2026-10-11). Approved 2026-10-11. Built as planned; `config/env.py` also has a small helper `is_strong(key)` for the three limits.
 
 Builds on: **foundation** and **accounts** (the settings in `config/settings.py` that read
 `DJANGO_SECRET_KEY`, `DJANGO_DEBUG` and `DJANGO_ALLOWED_HOSTS` from environment variables), and the
