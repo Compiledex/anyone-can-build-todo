@@ -1,6 +1,6 @@
 # To-do list: short commands for this project. Type `make help` to see them.
 
-.PHONY: help setup run test unit integration cuj lint format check reset worktree
+.PHONY: help setup run test unit integration cuj lint format check reset worktree landing-shots
 
 # How many processes run the tests. 1 is fastest while there are few tests:
 # each extra process has to start Python and Django again. Try PARALLEL=auto
@@ -24,6 +24,7 @@ help:
 	@echo "make format           rewrite the code in the standard style (ruff format)"
 	@echo "make check            the commit checks on every file, the migration check, the tests"
 	@echo "make reset            delete db.sqlite3 and create it again, empty"
+	@echo "make landing-shots    take the landing page's screenshots of the app again (scratch data)"
 	@echo "make worktree BRANCH=name"
 	@echo "                      give a branch its own folder, .claude/worktrees/name"
 
@@ -62,6 +63,11 @@ check:
 reset:
 	rm -f db.sqlite3
 	uv run python manage.py migrate
+
+# The landing page's pictures of the app, light and dark. Invented data in a
+# scratch database in a temporary folder (never db.sqlite3), on a free port.
+landing-shots:
+	uv run python scripts/landing_shots.py
 
 # Every branch gets its own worktree: its own folder and its own files, so
 # several people or agents can work at the same time.
