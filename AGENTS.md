@@ -74,7 +74,7 @@ which is not in git.
 | `.pre-commit-config.yaml` | The checks that run on every `git commit`. |
 | `Makefile` | Short commands. `make help` lists them. |
 | `.github/workflows/check.yml` | CI (checks GitHub runs by itself). On every push and every pull request, two jobs at the same time: `lint` (`uv sync --locked`, every commit check on every file, the migration check) and `test` (installs Chromium, then `manage.py test`, all three layers). It sets no `DJANGO_*` variable, so the settings use the laptop defaults. A PR can merge only when both jobs are green: GitHub enforces it with a ruleset on `main` that requires the `lint` and `test` checks, and that also blocks deleting or force-pushing `main`. |
-| `docs/plans/` | One plan per feature, written and approved before the code. **History**: they say what was decided and why, not how the code is now. Their Status line says which PR built them. |
+| `docs/plans/` | One plan per feature, written and approved before the code. **History**: they say what was decided and why, not how the code is now. Their Status line says when they were built (the older ones also name the PR). |
 
 ## Commands
 
@@ -87,7 +87,8 @@ This project uses **uv** to install Python and the packages. Run every Python co
 - `make unit` / `make integration` / `make cuj` — run only one layer
 - `make lint` / `make format` — Ruff: find mistakes, and rewrite code in the standard style
 - `make check` — every commit check on every file, the migration check, then the tests
-  (GitHub runs the same checks and all the tests on every push; see `.github/workflows/check.yml`)
+  (GitHub runs the same checks and all the tests on every push and pull request; see
+  `.github/workflows/check.yml`)
 - `make landing-shots` — retake the landing page's screenshots of the app (a scratch database, a free port)
 
 Add a package with `uv add <name>`, never with `pip install`. After changing `models.py`, run
@@ -101,7 +102,8 @@ Add a package with `uv add <name>`, never with `pip install`. After changing `mo
   `date.today()` or `datetime.now()`, which use the computer's own time zone. Code takes "today"
   as an argument where a test needs to choose the day (like `make_next_copy(today)`,
   `send_reminders(user, today)`, and `is_overdue(today=None)`, which falls back to
-  `timezone.localdate()`); the view or command that calls it passes `timezone.localdate()`.
+  `timezone.localdate()`); the view or command that calls it passes `timezone.localdate()` (a
+  template calls `is_overdue` with no argument, so it uses its fallback).
 - **Never put a secret in the code.** Passwords, keys and tokens go in environment variables.
 - **Use what Django already has** — forms, the admin, `get_object_or_404`, the test client — before
   writing your own.
