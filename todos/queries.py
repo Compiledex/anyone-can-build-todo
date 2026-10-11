@@ -7,8 +7,11 @@ that would be every user's to-dos.
 
 from urllib.parse import urlencode
 
-from django.db.models import F, Q
-from django.db.models.functions import Lower
+from django.db.models import F, Func, Q, TextField
+from django.db.models.functions import Collate
+from django.db.models.lookups import Contains
+
+from .sqlite_functions import CASEFOLD, COLLATION, casefold
 
 DEFAULT_SORT = "created"
 
@@ -22,26 +25,39 @@ SORT_OPTIONS = {
     "due": ("Due date", (F("due_date").asc(nulls_last=True), "created_at", "pk")),
     # Priority is 1 Low, 2 Medium, 3 High, never empty: biggest first.
     "priority": ("Priority", (F("priority").desc(), "created_at", "pk")),
-    # Lower ignores case, but only for A-Z on SQLite.
-    "title": ("Title", (Lower("title"), "created_at", "pk")),
+    # Norwegian order: a to z, then æ, ø, å; upper and lower case are the same
+    # (see todos/sqlite_functions.py).
+    "title": ("Title", (Collate("title", COLLATION), "created_at", "pk")),
     # The order the people of the list chose by drag and drop or Move (#15).
     "manual": ("Manual", ("position", "created_at", "pk")),
 }
 
 
-def search(todos, q):
-    """The to-dos whose title, notes or a tag name contain `q`, ignoring case.
+class CaseFold(Func):
+    """casefold(column) in SQL: the column in one case (see sqlite_functions)."""
 
-    `icontains` escapes `%` and `_`, so they are normal letters here.
+    function = CASEFOLD
+    output_field = TextField()
+
+
+def search(todos, q):
+    """The to-dos whose title, notes or a tag name contain `q`.
+
+    It ignores case for every letter (also æ, ø, å): both the column and `q`
+    are case folded the same way. `Contains` escapes `%` and `_`, so they are
+    normal letters here.
     """
     if not q:
         return todos
+    folded = casefold(q)
     # A sub-query, not a join: a to-do with two matching tags is shown once.
     # It starts from `todos` too, so it never reads other people's rows.
-    with_matching_tag = todos.filter(tags__name__icontains=q).values("pk")
+    with_matching_tag = todos.filter(Contains(CaseFold("tags__name"), folded)).values(
+        "pk"
+    )
     return todos.filter(
-        Q(title__icontains=q)
-        | Q(description__icontains=q)
+        Q(Contains(CaseFold("title"), folded))
+        | Q(Contains(CaseFold("description"), folded))
         | Q(pk__in=with_matching_tag)
     )
 
