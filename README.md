@@ -8,8 +8,9 @@ The pictures below are real screenshots of the app, with invented sample data. T
 light or dark GitHub theme. To take them again after the app changes, run `make landing-shots`.
 
 **Contents:** [What it does](#what-it-does) · [Run it on your laptop](#run-it-on-your-laptop) ·
-[Reminders on your Mac](#reminders-on-your-mac) · [Tests](#tests) · [Checks](#checks) ·
-[How it is put together](#how-it-is-put-together) · [Put it on the internet](#put-it-on-the-internet)
+[Back up your data](#back-up-your-data) · [Reminders on your Mac](#reminders-on-your-mac) ·
+[Tests](#tests) · [Checks](#checks) · [How it is put together](#how-it-is-put-together) ·
+[Put it on the internet](#put-it-on-the-internet)
 
 ## What it does
 
@@ -181,6 +182,45 @@ Test layers
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
 `make test` is step 8. `make help` lists the rest.
+
+## Back up your data
+
+All your accounts, lists and to-dos are in one file, `db.sqlite3`. A **backup** is a copy of that
+file, so you can get your data back after a mistake.
+
+**Make a copy.** Run:
+
+```bash
+make backup
+```
+
+It saves a copy in the folder `backups/`, with the date and time in the name, for example
+`backups/db-20261011-081500.sqlite3`. It is safe while the server runs: it uses SQLite's own copy,
+not a plain file copy. Without `make`: `uv run python manage.py backup_db`.
+
+**`make reset` asks first.** It deletes `db.sqlite3` and starts again with an empty database. So it
+first asks you to type `yes` (anything else stops, and nothing is deleted), then it makes a copy in
+`backups/`, and only then deletes the database.
+
+**Get your data back (restore).**
+
+1. Stop the server: press `Ctrl+C` in its terminal.
+2. Copy the backup you want over `db.sqlite3`:
+
+   ```bash
+   cp backups/db-20261011-081500.sqlite3 db.sqlite3
+   ```
+
+3. Run `make setup` (or `uv run python manage.py migrate`), so an older copy gets the newest
+   tables.
+4. Start the server again with `make run`.
+
+**Good to know.**
+
+- `backups/` is not in git, and the copies stay until you delete them by hand.
+- A copy holds all your data, also the accounts (with their password hashes). Do not share it.
+- A copy on the same Mac does not help if the Mac breaks. Copy the `backups/` folder to an
+  external disk or a cloud folder now and then: that is what really keeps your data safe.
 
 ## Reminders on your Mac
 

@@ -2,6 +2,8 @@
 __pycache__/
 *.pyc
 db.sqlite3
+# Copies of db.sqlite3 from make backup and make reset. Your data: never commit it.
+/backups/
 staticfiles/
 .DS_Store
 .env
