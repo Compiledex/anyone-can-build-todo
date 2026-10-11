@@ -678,9 +678,7 @@ class LeaveRemoveTests(SharingTestCase):
         response = self.client_for(self.bob).post(
             self.url("list_leave", self.groceries.pk)
         )
-        self.assertRedirects(
-            response, reverse("todo_list"), fetch_redirect_response=False
-        )
+        self.assertRedirects(response, reverse("home"), fetch_redirect_response=False)
         self.assertFalse(self.groceries.members.filter(pk=self.bob.pk).exists())
         self.assertStillMilk()
 
@@ -762,25 +760,25 @@ class LeaveRemoveTests(SharingTestCase):
 
 class HomeTests(SharingTestCase):
     def test_home_prefers_own_list(self):
-        response = self.client_for(self.bob).get(reverse("todo_list"))
+        response = self.client_for(self.bob).get(reverse("home"))
         self.assertRedirects(response, self.bobs_list.get_absolute_url())
 
     def test_home_goes_to_shared_list_without_own_list(self):
         bob = self.client_for(self.bob)
         bob.post(self.url("list_delete", self.bobs_list.pk))
-        response = bob.get(reverse("todo_list"))
+        response = bob.get(reverse("home"))
         self.assertRedirects(response, self.groceries.get_absolute_url())
 
     def test_home_never_goes_to_a_list_you_cannot_see(self):
         carol = self.client_for(self.carol)
         carol.post(self.url("list_delete", self.carols_list.pk))
-        response = carol.get(reverse("todo_list"))
+        response = carol.get(reverse("home"))
         self.assertRedirects(response, reverse("list_create"))
 
         bob = self.client_for(self.bob)
         bob.post(self.url("list_delete", self.bobs_list.pk))
         bob.post(self.url("list_leave", self.groceries.pk))
-        response = bob.get(reverse("todo_list"))
+        response = bob.get(reverse("home"))
         self.assertRedirects(response, reverse("list_create"))
 
 
@@ -825,4 +823,4 @@ class NewListCancelTests(SharingTestCase):
         bob = self.client_for(self.bob)
         bob.post(self.url("list_delete", self.bobs_list.pk))
         response = bob.get(reverse("list_create"))
-        self.assertContains(response, f'href="{reverse("todo_list")}">Cancel</a>')
+        self.assertContains(response, f'href="{reverse("home")}">Cancel</a>')

@@ -13,14 +13,14 @@ from .forms import SignupForm
 def signup(request):
     """Make a new account with an "Inbox" list, log in with it, and go to the list."""
     if request.user.is_authenticated:
-        return redirect("todo_list")
+        return redirect("home")
     if request.method == "POST":
         form = SignupForm(request.POST)
         if form.is_valid():
             user = form.save()
             TodoList.objects.create(owner=user, name="Inbox")
             login(request, user)
-            return redirect("todo_list")
+            return redirect("home")
     else:
         form = SignupForm()
     return render(request, "registration/signup.html", {"form": form})

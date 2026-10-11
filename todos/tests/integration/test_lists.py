@@ -22,12 +22,12 @@ class HomeTests(LoggedInTestCase):
         TodoList.objects.filter(pk=work.pk).update(
             created_at=timezone.now() + timedelta(days=1)
         )
-        response = self.client.get(reverse("todo_list"))
+        response = self.client.get(reverse("home"))
         self.assertRedirects(response, self.todo_list.get_absolute_url())
 
     def test_home_without_lists_goes_to_new_list(self):
         carol = make_user("carol")
-        response = self.client_for(carol).get(reverse("todo_list"))
+        response = self.client_for(carol).get(reverse("home"))
         self.assertRedirects(response, reverse("list_create"))
 
 
@@ -218,15 +218,13 @@ class DeleteListTests(LoggedInTestCase):
         work = TodoList.objects.create(owner=self.user, name="Work")
         Todo.objects.create(title="Send report", todo_list=work)
         response = self.client.post(reverse("list_delete", args=[self.todo_list.pk]))
-        self.assertRedirects(
-            response, reverse("todo_list"), fetch_redirect_response=False
-        )
+        self.assertRedirects(response, reverse("home"), fetch_redirect_response=False)
         self.assertFalse(TodoList.objects.filter(pk=self.todo_list.pk).exists())
         self.assertEqual([t.title for t in Todo.objects.all()], ["Send report"])
 
     def test_delete_last_list_then_home_goes_to_new(self):
         self.client.post(reverse("list_delete", args=[self.todo_list.pk]))
-        response = self.client.get(reverse("todo_list"))
+        response = self.client.get(reverse("home"))
         self.assertRedirects(response, reverse("list_create"))
 
 

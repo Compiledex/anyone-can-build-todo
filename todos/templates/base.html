@@ -19,7 +19,7 @@
   {% if user.is_authenticated %}
     <header class="site">
       <div class="container site-inner">
-        <a class="wordmark" href="{% url 'todo_list' %}">To-do list</a>
+        <a class="wordmark" href="{% url 'home' %}">To-do list</a>
         <div class="user">
           <span class="who">Logged in as {{ user.username }}</span>
           <form method="post" action="{% url 'logout' %}">

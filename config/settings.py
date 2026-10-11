@@ -139,7 +139,7 @@ AUTH_PASSWORD_VALIDATORS = [
 # Accounts: these are URL names, from accounts/urls.py and todos/urls.py.
 
 LOGIN_URL = "login"
-LOGIN_REDIRECT_URL = "todo_list"
+LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "login"
 
 

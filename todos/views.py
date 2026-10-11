@@ -215,7 +215,7 @@ def render_list_page(request, the_list, form):
 
 @login_not_required  # A visitor must see the landing page. It shows no user data.
 @require_safe  # GET and HEAD only.
-def todo_list(request):
+def home(request):
     """`/`. A visitor who is not logged in sees the landing page.
 
     A logged-in person is only sent on: to the oldest own list, else to the
@@ -273,7 +273,7 @@ def list_delete(request, pk):
     the_list = get_object_or_404(TodoList, pk=pk, owner=request.user)
     if request.method == "POST":
         the_list.delete()  # Its to-dos are deleted too.
-        return redirect("todo_list")
+        return redirect("home")
     return render(
         request,
         "todos/list_confirm_delete.html",
@@ -398,7 +398,7 @@ def todo_undo_delete(request, pk):
     with transaction.atomic():
         visible_lists = TodoList.objects.visible_to(request.user)
         the_list = visible_lists.filter(pk=snapshot["todo_list_id"]).first()
-        list_url = the_list.get_absolute_url() if the_list else reverse("todo_list")
+        list_url = the_list.get_absolute_url() if the_list else reverse("home")
         existing = Todo.objects.filter(pk=pk).first()
         if existing is not None:
             if (
@@ -418,7 +418,7 @@ def todo_undo_delete(request, pk):
             messages.error(
                 request, "Could not undo: you can no longer see the list it was in."
             )
-            return redirect("todo_list")
+            return redirect("home")
         todo = undo.restore(snapshot, the_list)
     messages.success(request, f"Restored “{todo.title}”.")
     return redirect_back(request, f"{list_url}#todo-{todo.pk}")
@@ -535,7 +535,7 @@ def list_leave(request, pk):
     the_list = get_object_or_404(TodoList, pk=pk, members=request.user)  # Members only.
     the_list.members.remove(request.user)  # The to-dos they added stay.
     messages.success(request, "You left the list.")
-    return redirect("todo_list")
+    return redirect("home")
 
 
 @require_POST

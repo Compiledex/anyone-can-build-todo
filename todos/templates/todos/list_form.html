@@ -23,7 +23,7 @@
         <a href="{{ the_list.get_absolute_url }}">Cancel</a>
       {% elif has_lists %}
         {# With no lists, `/` would only send the person back to this page. #}
-        <a href="{% url 'todo_list' %}">Cancel</a>
+        <a href="{% url 'home' %}">Cancel</a>
       {% endif %}
     </div>
   </form>

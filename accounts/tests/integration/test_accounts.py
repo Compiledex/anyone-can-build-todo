@@ -15,7 +15,7 @@ LOGOUT_URL = "/accounts/logout/"
 
 def is_logged_in(client):
     # `/` sends a logged-in person to a list, and shows a visitor the landing page.
-    response = client.get(reverse("todo_list"), follow=True)
+    response = client.get(reverse("home"), follow=True)
     return "Logged in as" in response.content.decode()
 
 
@@ -185,7 +185,7 @@ class LogoutTests(TestCase):
         response = self.client.post(LOGOUT_URL, {"next": "https://evil.example/"})
         self.assertRedirects(response, LOGIN_URL, fetch_redirect_response=False)
         # Logged out, `/` is the landing page, not a list.
-        response = self.client.get(reverse("todo_list"))
+        response = self.client.get(reverse("home"))
         self.assertTemplateUsed(response, "todos/landing.html")
         self.assertNotContains(response, "Logged in as")
 
@@ -199,6 +199,6 @@ class LogoutTests(TestCase):
         self.assertTrue(is_logged_in(self.client))
 
     def test_header_shows_username_and_logout_button(self):
-        response = self.client.get(reverse("todo_list"), follow=True)
+        response = self.client.get(reverse("home"), follow=True)
         self.assertContains(response, "Logged in as alice")
         self.assertContains(response, f'<form method="post" action="{LOGOUT_URL}"')
