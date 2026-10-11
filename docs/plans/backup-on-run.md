@@ -55,11 +55,17 @@ def daily_copies(folder):
     """The daily copies in `folder`, oldest first (by name, which is by time).
 
     Only regular files (not links, not folders) whose whole name matches
-    DAILY_NAME. Never a .tmp file, never another backup, never anything else.
+    DAILY_NAME (DAILY_NAME.fullmatch(name), never .match or .search). Never a
+    .tmp file, never another backup, never anything else.
     """
 
-def prune_daily(folder, keep):
-    """Delete all but the newest `keep` daily copies. Returns the deleted paths."""
+def prune_daily(folder, keep, protect):
+    """Delete all but the newest `keep` daily copies. Returns the deleted paths.
+
+    `protect` (today's copy: the one just made, or the one already there) is
+    never deleted and counts as one of the `keep`. Of the others, the newest
+    keep - 1 by name stay.
+    """
 
 def daily_backup(source, folder, now, keep=DAILY_KEEP):
     """Make today's daily copy unless one exists, then prune.
@@ -80,7 +86,10 @@ def daily_backup(source, folder, now, keep=DAILY_KEEP):
   never follows a link (`not path.is_symlink() and path.is_file()`; not
   `is_file(follow_symlinks=False)`, which needs Python 3.13, and `pyproject.toml` allows 3.12),
   and never leaves the folder it was given.
-- The 14 includes today's copy.
+- The 14 includes today's copy, and **today's copy is never pruned**, even when other daily
+  names sort after it (for example files with a future date, after the Mac's clock was wrong).
+  Without `protect`, 14 future-dated files would make the copy just made the oldest, and it
+  would be deleted at once.
 
 ### 3. The command: `backup_db --daily`
 
@@ -94,8 +103,14 @@ lines:
 - and, when something was pruned: `Removed 2 old daily copies.`
 
 A failed copy is a `CommandError` with the same plain message as today ("Could not copy the
-database: ..."), exit code 1. A failed delete during pruning is a `CommandError` too ("Could not
-remove an old daily copy: ..."), after the new copy is safely saved.
+database: ..."), exit code 1, and `make run` prints its warning.
+
+A failed delete during pruning comes **after** today's copy is safely saved, so it is not a
+failed backup: the command prints the "Saved" line, then `Warning: could not remove an old daily
+copy: <name>: <error>.` on stderr, and exits 0. `prune_daily` stops at the first failed delete
+and returns what it removed so far; the error goes up to the command as an `OSError` it catches.
+The person sees a different warning from "the daily backup did not work", which would be wrong
+here.
 
 ### 4. `make run`: copy, then start, also when the copy failed
 
@@ -204,6 +219,9 @@ folder and its own small SQLite file (as `BackupTests` does). Every call passes 
 | `test_failed_copy_prunes_nothing` | Twenty daily files; `copy_sqlite` patched to raise: the error goes up, all twenty are still there, no new file. | Pruning before the copy, or on a failed day. |
 | `test_no_database_makes_and_prunes_nothing` | No source: `(None, [])`, the twenty files stay. | Pruning with no new copy and no today's copy. |
 | `test_same_second_counts_as_done` | A daily file with exactly `now`'s name exists: no error, nothing new. | `FileExistsError` stopping `make run` with a warning. |
+| `test_todays_copy_is_never_pruned` | Twenty daily files dated in 2027 (the future); a run today: today's new copy is still there, with the 13 newest 2027 files; 7 are deleted. | Pruning by name only, without `protect`. |
+| `test_prune_failure_after_a_good_copy_is_a_warning` | Twenty daily files; `Path.unlink` patched to raise `PermissionError` for one old file: the command exits normally (no `CommandError`), today's copy is there, stderr has "Warning: could not remove an old daily copy", stdout has "Saved today's copy". | Treating a prune failure as a failed backup, or hiding it. |
+| `test_daily_name_must_match_whole` | `daily_copies` ignores `db-20200101-000000-daily.sqlite3x` and `xdb-20200101-000000-daily.sqlite3`. | `DAILY_NAME.match` or `.search` instead of `fullmatch`. |
 | `test_daily_command_prints_one_line` | The command with `--daily` prints "Saved today's copy in"; the second time "Today's copy is already in"; with 14 old ones (15 after the new one) also "Removed 1 old daily copy." (or "copies" with `pluralize`). | Wrong output. |
 | `test_plain_command_never_prunes` | Twenty daily files; `call_command("backup_db", ...)` without `--daily`: a normal copy is made and all twenty stay. | `make backup` pruning. |
 
@@ -215,8 +233,8 @@ into a temporary folder. No server starts, no port is used.
 
 | Test | What it checks | The break that fails it |
 |---|---|---|
-| `test_run_backs_up_then_starts` | The log has `run python manage.py backup_db --daily`, then `run python manage.py runserver`, in that order; exit code 0. | No backup, or the backup after the server. |
-| `test_failed_backup_still_starts_with_a_warning` | With `FAKE_BACKUP_EXIT=1`: `runserver` is still in the log, the output has "Warning: the daily backup did not work", exit code 0. | Stopping the app on a failed backup, or no warning. |
+| `test_run_backs_up_then_starts` | The log has a line with `backup_db --daily` and a later line with `runserver` (the test compares the two lines' positions, not the exact list of lines); exit code 0. | No backup, or the backup after the server. |
+| `test_failed_backup_still_starts_with_a_warning` | With `FAKE_BACKUP_EXIT=1`: a `runserver` line comes after the `backup_db` line in the log, the output has "Warning: the daily backup did not work", exit code 0. | Stopping the app on a failed backup, or no warning. |
 | `test_backup_target_has_no_daily_flag` | `make backup` logs `backup_db` **without** `--daily`. | `make backup` limited or pruned. |
 
 ## Decided by the person (2026-10-11)
@@ -228,7 +246,7 @@ into a temporary folder. No server starts, no port is used.
 - Never touch files that are not backups. `make backup` stays unlimited.
 - Tests only in temporary folders (a fake `uv` on `PATH` for the `Makefile`).
 
-## Open engineering choices
+## Open choices
 
 1. **Which copies the 14 counts and prunes.** Only the daily copies (their own `-daily` name),
    **recommended**: the copy before a `make reset` and the person's own `make backup` copies are
@@ -254,3 +272,12 @@ Verification by the planner (2026-10-11), against `main` (`d66b978`):
   first on `PATH`; its `case` matches `*backup_db*`, so the same fake works for `backup_db
   --daily` and logs `runserver` without running it.
 - Confirmed: `/backups/` is in `.gitignore`.
+
+The plan review (2026-10-11, an independent reviewer who also ran small prototypes) said APPROVE
+WITH CHANGES. What changed:
+
+- `DAILY_NAME.fullmatch` everywhere (a test with a longer name).
+- A prune failure after a good copy is a warning on stderr with exit code 0, with its own text,
+  not "the daily backup did not work". `MakeRunTests` compares the order of lines, not exact
+  lists.
+- Today's copy is never pruned (`protect`), even when future-dated names sort after it.

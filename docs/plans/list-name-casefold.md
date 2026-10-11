@@ -100,9 +100,18 @@ if clash:
 
 - New list and rename: `form.save()`.
 - Sign-up: `TodoList.objects.create(owner=user, name="Inbox")` calls `save()`.
-- The admin: `TodoListAdmin` saves with `save()`. (A duplicate in the admin gives a 500 page,
-  because the admin's form does not know `name_key`. The database still refuses it. See "Not part
-  of this task".)
+- The admin: `TodoListAdmin` saves with `save()`. **Today the admin shows a friendly error** for
+  "Work" next to "work": its form has both `owner` and `name`, so Django checks the old
+  constraint before saving. With the new constraint on `name_key` (not a form field), Django
+  would skip the check and the database would answer with a 500 page. To keep the friendly
+  error:
+  - `TodoList.clean()` sets `self.name_key = casefold(self.name)` (a model form runs `clean()`
+    before it checks constraints);
+  - `TodoList.validate_constraints(exclude=None)` removes `"name_key"` from `exclude` when
+    `"name"` is not in `exclude`, then calls `super()`. So when a form has the name (and the
+    owner), the unique rule on `owner` and `name_key` is checked, and a clash is a form error.
+  For `TodoListForm` nothing changes: `owner` is not in that form, so Django still skips the
+  constraint there, and `clean_name` gives the message.
 - `QuerySet.update(name=...)` and `bulk_create` skip `save()`. No code does that today. The
   `AGENTS.md` row says: never change a list's name without `save()`.
 - A data migration that makes lists (like `0006_default_lists.py`) uses historical models without
@@ -131,8 +140,15 @@ after A merges.
    `str.casefold()`, three lines), so the migration does not change when app code changes later.
    **Duplicates**: per owner, lists with the same key are sorted by `created_at`, then `pk`. The
    first keeps its name. Each other one is renamed to "<name> (2)", "<name> (3)", ...: the
-   smallest number whose new key is free for that owner, with the name cut so the whole fits in
-   100 characters. Their to-dos, members and ids do not change. The migration prints one line per
+   smallest number whose new key is free for that owner. "Free" is checked against **all** of
+   that owner's keys from the start (also lists that are not duplicates, like an existing
+   "ærend (2)") **plus** every key the migration has already given out, so two renamed lists
+   can never get the same name. When the name must be cut so the whole fits in 100 characters,
+   trailing spaces are removed after the cut (no "ærend  (2)"). The key of a new name uses the
+   same frozen function as every other row, which is exactly what `TodoList.save()` uses (NFC,
+   then casefold). The review suggested an optional second NFC after casefold; it is **not**
+   added, because the migration and `save()` must give the same key for the same name, and
+   `sqlite_functions.casefold` (also used by search) has no second NFC. Their to-dos, members and ids do not change. The migration prints one line per
    renamed list ("Renamed list 7 to “ærend (2)”."), and nothing when there is none. Backwards:
    does nothing (the old names cannot be known; the renamed lists keep their new names, which are
    still valid).
@@ -162,8 +178,6 @@ Wave: A, B, C and D are built at the same time; **merge order A → B → C (thi
 
 ## Not part of this task
 
-- A friendly message for a duplicate typed in the **admin** (the database refuses it with a 500
-  page; the admin is only for the person).
 - Turning a duplicate that two requests make at the same moment into a form error (the database
   refuses the second with a 500 page, as today).
 - Unique names for tags (they are already lower case) or to-do titles.
@@ -174,7 +188,7 @@ Wave: A, B, C and D are built at the same time; **merge order A → B → C (thi
 
 | File | Change |
 |---|---|
-| `todos/models.py` | `name_key`; `TodoList.save()`; the new constraint instead of the old one; comments. |
+| `todos/models.py` | `name_key`; `TodoList.save()`, `clean()` and `validate_constraints()`; the new constraint instead of the old one; comments. |
 | `todos/forms.py` | `TodoListForm.clean_name` uses `name_key` and names the clashing list. |
 | `todos/migrations/0020_todolist_name_key.py` (new, made by Django) | The field. |
 | `todos/migrations/0021_fill_list_name_key.py` (new, written) | The fill and the duplicate rule. |
@@ -182,6 +196,7 @@ Wave: A, B, C and D are built at the same time; **merge order A → B → C (thi
 | `todos/tests/integration/test_lists.py` | New tests in `NewListTests` and `RenameListTests`. |
 | `todos/tests/integration/test_sharing.py` | One test. |
 | `todos/tests/integration/test_migrations.py` | `FillListNameKeyMigrationTests`. |
+| `todos/tests/integration/test_access.py` | `AdminTests.test_admin_duplicate_is_a_form_error`. |
 | `AGENTS.md` | `todos/models.py` row (`name_key`, the constraint, "never change a name without `save()`"; a data migration that makes lists sets `name_key`); `todos/forms.py` row; `sqlite_functions.py` row. |
 
 ## Steps
@@ -212,6 +227,7 @@ Wave: A, B, C and D are built at the same time; **merge order A → B → C (thi
 | `RenameListTests.test_rename_to_other_case_of_own_name_works` | "ærend" renamed to "Ærend" (the same list): saved, the new name shows. | `exclude(pk=...)` lost. |
 | `RenameListTests.test_rename_to_another_lists_nordic_name_is_refused` | alice has "Ærend" and "Hjem"; rename "Hjem" to "ærend": refused with the message, "Hjem" unchanged. | Rename skipping the rule. |
 | `NewListTests.test_same_nordic_name_as_another_person_is_allowed` | bob has "Ærend"; alice makes "ærend": saved. | A rule across owners. |
+| `AdminTests.test_admin_duplicate_is_a_form_error` (in `test_access.py`, next to the other admin tests) | A superuser posts the admin "add list" form for alice with "ærend" while she has "Ærend": 200 with an error on the form, no 500, still one list. The same with "Hjem" (no clash): saved. | The new constraint skipped by the admin form (a 500 page). |
 | `NewListTests.test_message_escapes_the_name` | alice has a list `<b>Æ</b>`; typing `<b>æ</b>` shows the escaped name in the error. | `|safe` on the error. |
 
 ### Integration: `todos/tests/integration/test_sharing.py`
@@ -227,8 +243,8 @@ Wave: A, B, C and D are built at the same time; **merge order A → B → C (thi
 | Test | What it checks | The break that fails it |
 |---|---|---|
 | `test_fill_sets_every_key` | Migrate to `0020`; make lists with the historical model; migrate to the newest: every `name_key` is `casefold(name)`. | An empty key left (then the constraint fails on a second empty key). |
-| `test_duplicates_are_renamed` | At `0020`, one owner has, made in this order, "Ærø", "ærø (2)", "ærø" and "ÆrØ" (the old A-to-Z constraint allows all four); another owner has "ærø". After: the oldest keeps "Ærø"; the others become "ærø (3)" and "ÆrØ (4)" (the free numbers); "ærø (2)" and the other owner's list are unchanged; the to-dos stay in their lists. | Renaming the wrong one, a clash with an existing "(2)", or renaming across owners. |
-| `test_long_duplicate_name_is_cut` | A 100-letter duplicate gets a name of at most 100 characters that ends in " (2)". | A name too long for the column. |
+| `test_duplicates_are_renamed` | At `0020`, one owner has, made in this order, "Ærø", "ærø (2)", "ærø" and "ÆrØ" (the old A-to-Z constraint allows all four); another owner has "ærø". After: the oldest keeps "Ærø"; the others become "ærø (3)" and "ÆrØ (4)" (the free numbers); "ærø (2)" and the other owner's list are unchanged; the to-dos stay in their lists. | Renaming the wrong one, a clash with an existing "(2)" (a list outside the duplicate group), two renamed lists given the same number, or renaming across owners. |
+| `test_long_duplicate_name_is_cut` | A 100-letter duplicate gets a name of at most 100 characters that ends in " (2)"; a duplicate whose cut falls after a space has no double space before "(2)". | A name too long for the column, or trailing spaces kept. |
 | `test_migration_goes_back` | Migrate back to `0019`: the old constraint is back, no error. | A broken backwards path. |
 
 ## Decided by the person (2026-10-11)
@@ -240,7 +256,7 @@ Wave: A, B, C and D are built at the same time; **merge order A → B → C (thi
   rule is still written).
 - Names of lists shared **with** you do not count.
 
-## Open engineering choices
+## Open choices
 
 1. **Stored key or form check only.** Stored `name_key` with a unique constraint,
    **recommended** (decision 1): the database itself refuses a duplicate, with every tool. Form
@@ -248,7 +264,10 @@ Wave: A, B, C and D are built at the same time; **merge order A → B → C (thi
    and "ærend".
 2. **The message.** Name the list the person already has ("You already have a list called
    “Ærend”."), **recommended**, or the name they typed (today's code). Same sentence either way.
-3. **What the migration does with duplicates.** Rename the newer ones to "<name> (2)" and on,
+3. **A duplicate typed in the admin** (PERSON). Default written into the plan: keep today's
+   friendly form error (`clean()` and `validate_constraints()`, decision 3), **recommended**.
+   Other option: let the database refuse it with a 500 page (the admin is only for the person).
+4. **What the migration does with duplicates.** Rename the newer ones to "<name> (2)" and on,
    **recommended**: nothing is lost and the person sees both lists. (Other options: stop the
    migration with an error and ask the person to rename by hand; or merge the lists, which mixes
    members and to-dos and cannot be undone.)
@@ -267,3 +286,14 @@ Verification by the planner (2026-10-11), against `main` (`d66b978`):
 - Confirmed: no code calls `TodoList.objects.update(name=...)` or `bulk_create` on lists.
 - Confirmed: `test_migrations.py` already tests data migrations with `MigrationExecutor`
   (`DefaultListsTests`, `FillPositionMigrationTests`); the new class follows them.
+
+The plan review (2026-10-11, an independent reviewer who also ran small prototypes) said APPROVE
+WITH CHANGES. What changed:
+
+- Admin regression found: today the admin form checks the old constraint and shows a friendly
+  error; a constraint on `name_key` would be skipped and give a 500 page. Now `TodoList.clean()`
+  sets `name_key`, and `validate_constraints()` keeps `name_key` in the check when `name` is
+  checked. New admin test. Keeping the friendly error is the PERSON default.
+- Migration `0021`: a new name is checked against all of the owner's keys from the start plus
+  every key given out so far; trailing spaces are removed after a cut. The optional second NFC
+  after casefold was not taken, so the migration and `save()` always make the same key.

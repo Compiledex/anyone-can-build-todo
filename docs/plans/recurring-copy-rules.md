@@ -51,22 +51,49 @@ New field on `Todo`:
 copy_fingerprint = models.CharField(max_length=64, blank=True, default="", editable=False)
 ```
 
-New method:
+One list of the copied fields, used by both `make_next_copy` and the fingerprint, at module
+level in `todos/models.py`:
 
 ```python
-def content_fingerprint(self):
-    """A SHA-256 hash of what a person can change on a to-do.
-
-    Title, notes, priority, due date, repeat, tag names (sorted) and step titles
-    (in their order). Not done, not the steps' done state, not position.
-    Two queries: the tags and the steps.
-    """
+# The fields make_next_copy copies as they are. due_date (a new date), the tags
+# and the steps are copied too, and are always in the fingerprint.
+COPIED_FIELDS = ("title", "description", "priority", "repeat")
 ```
 
-It hashes `json.dumps([...], ensure_ascii=False)` of those values (the due date as
-`YYYY-MM-DD` or `None`). `make_next_copy` sets `copy.copy_fingerprint = copy.content_fingerprint()`
-after it has set the tags and made the steps, and saves only that field
-(`save(update_fields=["copy_fingerprint"])`).
+`make_next_copy` builds its `Todo.objects.create(...)` arguments from this tuple
+(`{name: getattr(self, name) for name in COPIED_FIELDS}`), so a field added to the copy is
+added here, and then it is in the fingerprint too. This is the one guard; a test (below) checks
+that a copy has every field in `COPIED_FIELDS` equal to the original, and that changing each one
+changes the fingerprint.
+
+A plain function and a method:
+
+```python
+FINGERPRINT_VERSION = "v1"
+
+def fingerprint(values, due_date, tag_names, step_titles):
+    """A SHA-256 hash (64 hex characters) of what a person can change on a to-do.
+
+    `values`: a dict with the COPIED_FIELDS. The notes have "\r\n" made "\n"
+    (as NoteField does), so the same text always gives the same hash. Tag names
+    sorted, step titles in their order. Not done, not the steps' done state,
+    not position, not reminded_on. Starts with FINGERPRINT_VERSION.
+    """
+
+def content_fingerprint(self):
+    """fingerprint() of this to-do as it is in the database now (two queries:
+    the tags and the steps)."""
+```
+
+It hashes `json.dumps([FINGERPRINT_VERSION, *values in COPIED_FIELDS order, due date as
+YYYY-MM-DD or None, sorted tag names, step titles], ensure_ascii=False)`.
+
+**At creation the fingerprint is computed from values in memory**, not read back:
+`make_next_copy` already knows the copied values, the new due date, the original's tag names and
+its step titles. It computes `fingerprint(...)` from them **before** `Todo.objects.create(...)`
+and passes `copy_fingerprint=...` to `create()`. No second save. A test pins that a fresh copy's
+stored fingerprint equals `copy.content_fingerprint()` read from the database (so the in-memory
+values and the saved rows agree).
 
 New method used by Undo:
 
@@ -91,11 +118,11 @@ Why a fingerprint, and not a flag such as `edited_since_copy` that the edit and 
   text as typed ("a,b" and "a, b").
 - **The cost**: two small queries (tags and steps of the one copy) inside the Undo transaction.
   The list page does not change.
-- **The risk**: the fingerprint must cover every field `make_next_copy` copies. A test (below)
-  changes each copied field once and checks that the fingerprint changes, so a new copied field
-  without a fingerprint part fails a test. If the fingerprint ever changes shape, every stored
-  fingerprint differs, so every old copy counts as changed and is kept: the safe direction (no
-  data is lost).
+- **The risk**: the fingerprint must cover every field `make_next_copy` copies. Both read
+  `COPIED_FIELDS`, so they cannot drift apart; a test changes each copied field once and checks
+  that the fingerprint changes. If the fingerprint ever changes shape, `FINGERPRINT_VERSION`
+  changes too; every stored fingerprint then differs, so every old copy counts as changed and is
+  kept: the safe direction (no data is lost).
 
 ### 2. The Undo rule (in `todo_toggle`, inside the same transaction)
 
@@ -115,19 +142,29 @@ another list is left alone with no message, as today. The date uses the same `fo
 
 ### 3. Turning on Repeat on a done to-do makes the copy at once (in `todo_edit`)
 
-On a valid `POST`:
+On `POST`, the to-do is read again **inside** the transaction, so `done` and `repeat` are the
+values in the database at that moment (SQLite `IMMEDIATE`: another request that marks it done or
+changes Repeat waits, or has already finished):
 
 ```python
-was_repeating = bool(todo.repeat)  # read before the form, like saved_title
-...
 copy = None
 with transaction.atomic():
-    form.save()
-    if todo.done and todo.repeat and not was_repeating:
-        copy = todo.make_next_copy(timezone.localdate())
-if copy:
-    messages.info(request, f"Made the next copy, due {format_date(copy.due_date, 'j M Y')}.")
+    todo = get_visible_todo(request.user, pk)  # fresh row; 404 for a stranger
+    saved_title = todo.title
+    was_repeating = bool(todo.repeat)
+    form = TodoForm(request.POST, instance=todo)
+    valid = form.is_valid()
+    if valid:
+        form.save()
+        if todo.done and todo.repeat and not was_repeating:
+            copy = todo.make_next_copy(timezone.localdate())
+if valid:
+    if copy:
+        messages.info(request, f"Made the next copy, due {format_date(copy.due_date, 'j M Y')}.")
+    return redirect(todo.todo_list)
 ```
+
+`GET` stays as today (no transaction). `form.save()` keeps its own inner `atomic()` (a savepoint).
 
 - **Only "turned on"**: Repeat was Never and now is Daily, Weekly or Monthly. Changing Weekly to
   Monthly on a done to-do does nothing new. Saving a done repeating to-do whose copy someone
@@ -165,7 +202,7 @@ if copy:
   `0019_todo_copy_fingerprint` (an `AddField` with `default=""`).
 - **Existing rows**: every to-do gets `""`. An old copy (made before this plan) has no fingerprint,
   so `changed_since_copy()` is `False` and Undo treats it as today (removed unless a step is done).
-  No data migration (see "Open engineering choices", 1).
+  No data migration (see "Open choices", 1).
 - **Going back**: `migrate todos 0018` drops the column; revert the commit. No other data changes.
 
 ## Working next to
@@ -197,9 +234,9 @@ Wave: A, B, C and D are built at the same time; **merge order A (this) → B →
 
 | File | Change |
 |---|---|
-| `todos/models.py` | `copy_fingerprint` field; `content_fingerprint()`; `changed_since_copy()`; `make_next_copy` stores the fingerprint; docstrings. |
+| `todos/models.py` | `COPIED_FIELDS`, `FINGERPRINT_VERSION`, `fingerprint()`; `copy_fingerprint` field; `content_fingerprint()`; `changed_since_copy()`; `make_next_copy` built from `COPIED_FIELDS` and passing the fingerprint to `create()`; docstrings. |
 | `todos/migrations/0019_todo_copy_fingerprint.py` (new, made by Django) | The field. |
-| `todos/views.py` | `todo_toggle`: the "changed" row of the Undo rule (decision 2). `todo_edit`: `was_repeating`, the transaction, the copy and the message (decision 3). Docstrings. |
+| `todos/views.py` | `todo_toggle`: the "changed" row of the Undo rule (decision 2). `todo_edit`: on `POST`, the transaction with the fresh read, `was_repeating`, the copy and the message (decision 3). Docstrings. |
 | `todos/tests/integration/test_recurring.py` | New tests (below). |
 | `todos/tests/integration/test_sharing.py` | Two member tests. |
 | `todos/tests/cuj/test_journeys.py` | One journey. |
@@ -225,7 +262,9 @@ Each "kept" test also has its "removed" partner, so a rule that always keeps fai
 
 | Test | What it checks | The break that fails it |
 |---|---|---|
-| `test_new_copy_has_its_fingerprint` | After Done, the copy's `copy_fingerprint` is 64 characters and equals `copy.content_fingerprint()`; `changed_since_copy()` is `False`. The original's `copy_fingerprint` stays `""`. | Not storing it, or storing it before the tags or steps are set (then a fresh copy looks changed). |
+| `test_new_copy_has_its_fingerprint` | The original has notes with a line break, two tags and two steps. After Done, the copy's `copy_fingerprint` is 64 characters and equals `copy.content_fingerprint()` read from the database; `changed_since_copy()` is `False`. The original's `copy_fingerprint` stays `""`. | In-memory values that differ from the saved rows (tags left out, steps in another order, "\r\n" in the notes). |
+| `test_copy_has_every_copied_field` | Subtests over `COPIED_FIELDS`: each field of the copy equals the original's. | `make_next_copy` not built from `COPIED_FIELDS`. |
+| `test_fingerprint_starts_with_the_version` | `fingerprint()` of the same values with `FINGERPRINT_VERSION` patched to `"v2"` gives a different hash. | No version in the hash. |
 | `test_fingerprint_changes_for_each_field` | Subtests: change the copy's title, notes, priority, due date, repeat, tags (add one, remove one), steps (add one, delete one, change a step's title in the database). Each time `changed_since_copy()` is `True`. | A field left out of the fingerprint. |
 | `test_fingerprint_ignores_done_and_order` | Marking a step done (then undone), moving the copy in the manual order (`save_order`), and `reminded_on`: `changed_since_copy()` stays `False`. | Hashing `done`, `position` or `reminded_on`. |
 | `test_undo_keeps_an_edited_copy` | Done, then edit the copy's title through the edit page (`POST`), then Undo: the copy is still there with the new title; the message is "The next copy, due ..., was kept, because it was changed after it was made." | Today's code (the copy is deleted). |
@@ -239,6 +278,7 @@ Each "kept" test also has its "removed" partner, so a rule that always keeps fai
 | `test_edit_turn_on_repeat_on_done_todo_makes_copy` | A done to-do with a due date and Repeat Never; Edit sets Weekly: one copy, due the next date after today (fixed with `patch("todos.views.timezone.localdate")`), message "Made the next copy, due ...". | Today's code (no copy). |
 | `test_edit_turn_on_repeat_on_open_todo_makes_no_copy` | The same on a to-do that is not done: no copy, no message. | Making a copy for every repeat. |
 | `test_edit_change_repeat_kind_makes_no_copy` | A done weekly to-do whose copy was deleted; Edit sets Monthly: no copy. | Treating any repeat value as "turned on". |
+| `test_edit_rereads_the_todo_inside_the_transaction` | The edit page was opened while the to-do was open; then it is marked done (another request); then the Edit with Weekly is posted: one copy is made (the fresh `done` counts). | Reading `done` before the transaction. |
 | `test_edit_turn_on_repeat_when_copy_exists_makes_no_second` | Done weekly with a copy; Edit sets Never, then Weekly again: still one copy, no "Made" message. | A second copy, or an `IntegrityError` (500). |
 | `test_invalid_edit_makes_no_copy` | Done to-do; Edit sets Weekly and an empty title: 200 with the error, no copy. | Making the copy before `is_valid()`. |
 
@@ -269,7 +309,7 @@ The 404 rules for `todo_toggle` and `todo_edit` already have tests (`test_other_
   members.
 - A migration is OK (with a fixed `--name`).
 
-## Open engineering choices
+## Open choices
 
 1. **Copies made before this plan.** They have no fingerprint. (a) Treat them as "not changed",
    so Undo removes them as today, **recommended**: we cannot know if they were changed, and that
@@ -299,3 +339,15 @@ Verification by the planner (2026-10-11), against `main` (`d66b978`):
 - Confirmed: `Subtask.Meta.ordering = ["created_at", "id"]`, so step titles come back in a fixed
   order for the fingerprint.
 - Confirmed: the latest migration is `0018_todo_ordering_tiebreak`; this plan's is `0019`.
+
+The plan review (2026-10-11, an independent reviewer who also ran small prototypes) said APPROVE
+WITH CHANGES. What changed:
+
+- One `COPIED_FIELDS` tuple, used by `make_next_copy` and by the fingerprint, so they cannot
+  drift; a test checks the copy against it.
+- The fingerprint makes "\r\n" in the notes "\n" and starts with a version (`"v1"`).
+- The fingerprint of a new copy is computed from the values in memory and passed to `create()`
+  (no second save); a test pins that it equals the one read back from the database.
+- `todo_edit` reads the to-do again with `get_visible_todo` inside `transaction.atomic()`, and
+  checks `done` and `repeat` on that fresh row; a test covers a to-do marked done after the edit
+  page was opened.

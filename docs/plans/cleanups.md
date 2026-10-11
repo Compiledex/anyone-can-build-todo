@@ -37,8 +37,12 @@ D):
    `todos/templates/todos/site_base.html`, `todos/templates/todos/list_form.html` (`{% url
    'todo_list' %}`), the tests (`reverse("todo_list")` in `accounts/tests/integration/
    test_accounts.py`, `todos/tests/integration/test_lists.py`, `test_sharing.py`; the set of open
-   views in `test_access.py`), and `AGENTS.md` (the landing row and the Rules). B (delete-undo)
-   may add more uses (a redirect to `/`); the implementer greps again.
+   views in `test_access.py`, and the comment above it, `# "todo_list" is `/`...`), and
+   `AGENTS.md` (the landing row, line ~56, "view `todo_list`"; and the Rules, line ~136, "Today
+   the open views are ... `todo_list`"). B (delete-undo) adds a redirect to `/` after a failed
+   Undo ("go to `/`"); if B wrote it as `redirect("todo_list")`, it becomes `redirect("home")`.
+   The implementer runs `git grep -n "todo_list['\"]"` and `git grep -n "views.todo_list"` again
+   on the new `main` and changes every hit that means the `/` view.
 2. The list page is heavy. Measured on 2026-10-11 in a scratch database (never the person's file),
    one list with **300 plain to-dos** (no notes, tags or steps), logged in:
 
@@ -101,13 +105,18 @@ checks every place where an inline element follows another with only whitespace 
 <form method="post">
   {% csrf_token %}
   <input type="hidden" name="done" value="{% if todo.done %}0{% else %}1{% endif %}">
-  <button ... formaction="{% url 'todo_toggle' todo.pk %}" name="next" value="{{ back_url }}#...">Done</button>
+  <button ... formaction="{% url 'todo_toggle' todo.pk %}" name="next" value="{{ back_url }}#{% if status %}{{ todo.anchor_after_removal }}{% else %}todo-{{ todo.pk }}{% endif %}">Done</button>
   <button ... formaction="{% url 'todo_delete' todo.pk %}" name="next" value="{{ back_url }}#{{ todo.anchor_after_removal }}">Delete</button>
 </form>
 ```
 
 - The browser sends the clicked button's `name=value`, so each button still sends its own `next`
-  (the same values as today, from safe-toggles). `todo_delete` ignores `done`, as it ignores
+  (the same values as today, from safe-toggles). The Done/Undo button keeps safe-toggles' exact
+  rule, `{% if status %}{{ todo.anchor_after_removal }}{% else %}todo-{{ todo.pk }}{% endif %}`
+  (with a filter, the row leaves the page, so the next row); Delete keeps
+  `{{ todo.anchor_after_removal }}`. The existing tests for both rules
+  (`test_done_in_not_done_filter_goes_to_the_next_row`, `test_done_goes_back_to_its_row`,
+  `test_delete_goes_to_the_next_row`) must pass, reading `next` from the button. `todo_delete` ignores `done`, as it ignores
   every other field today. The views do not change.
 - Both buttons have a `formaction`, so the form never posts to the list page itself. The form
   has no text field, so pressing Enter cannot submit it without a button.
@@ -144,9 +153,12 @@ ignore whitespace between tags. A check with a raw string that holds whitespace 
 would fail; the implementer runs `make test` after step a and lists any such test in the PR, with
 the change.
 
-A **new test** keeps the page light: `ListPageSizeTests.test_300_todos_stay_light` builds 300
-plain to-dos and checks that the default page is at most the measured "after" size plus 5 %
-(written into the test as a number, with a comment that says how it was measured).
+A **new test** keeps the rows light: `ListPageSizeTests.test_bytes_per_row_stay_light` measures
+the default list page with 0 plain to-dos and with 300, and checks `(size with 300 - size with 0)
+/ 300` against a budget per row: the measured "after" number plus 5 %, written into the test with
+a comment that says how it was measured. Per row, not a fixed total, so a change to the page
+frame (the header, the menu, a new message) does not break it; only heavier rows do. (Today one
+row is about 1,943 bytes.)
 
 ### 3. A shorter AGENTS.md
 
@@ -159,6 +171,20 @@ plain to-dos and checks that the default page is at most the measured "after" si
   only; no behaviour change). The PR lists every moved fact and where it went.
 - **The Rules section stays complete**: every rule, word for word unless a name changed (`home`).
   The Commands section stays complete.
+- **Rules that live in file rows stay as invariants of those rows** (shortened, never dropped).
+  At least:
+  - `todos/queries.py`: every function starts from the `todos` it is given; never `Todo.objects`
+    there; `SORT_OPTIONS` is the one allow-list of orders.
+  - `deploy/macos/...reminders.plist`: the AI never installs it, never runs `launchctl`, and
+    never writes to `~/Library`.
+  - `todos/migrations/`: never edit these by hand, except a data migration, which is meant to
+    be written.
+  - `todos/reminders.py`: the fixed AppleScript, `--` before the arguments, never `stderr` in
+    the error text.
+  - `todos/static/todos/tokens.css`: the one place that sets the tokens.
+  - `base.html`: never loads `site.css`.
+  The implementer greps the current rows for "never", "only", "the one place" and "must" and
+  lists each such sentence in the PR with where it stays.
 - The intro ("What this is") stays, shortened only where it repeats a row.
 - Target: about 22,000 bytes or less (today 42,624). The PR gives the before and after size.
 - The `docs/plans/` row and the rule "AGENTS.md describes the code on `main`" stay.
@@ -209,7 +235,7 @@ Wave: **E runs last**, after A → B → C → D have merged. It starts a new br
 | `todos/static/todos/app.css` | `ul.steps li form { display: contents; }` (step b). |
 | `accounts/tests/integration/test_accounts.py`, `todos/tests/integration/test_lists.py`, `test_sharing.py`, `test_access.py` | `reverse("home")`; the open-views set. |
 | `todos/tests/integration/test_views.py`, `test_subtasks.py`, `test_filter.py` | The form checks in the table above. |
-| `todos/tests/integration/test_list_page_size.py` (new) | `ListPageSizeTests`. |
+| `todos/tests/integration/test_list_page_size.py` (new) | `ListPageSizeTests.test_bytes_per_row_stay_light`. |
 | `todos/tests/integration/test_landing.py` | `test_old_name_is_gone` (or in `test_access.py`). |
 | Docstrings in `todos/*.py`, `accounts/*.py` | Facts moved from `AGENTS.md` that were not in the code yet. |
 | `AGENTS.md` | Shorter (decision 3); `home`. |
@@ -222,7 +248,7 @@ Wave: **E runs last**, after A → B → C → D have merged. It starts a new br
 3. Rename (decision 1). `make test`.
 4. Step a (`spaceless`). Measure. `make test` (all CUJ tests too).
 5. Change the form tests in the table, then step b. Measure. `make test`.
-6. Write `ListPageSizeTests` with the measured number.
+6. Write `ListPageSizeTests` with the measured bytes per row.
 7. `AGENTS.md` and the docstrings (decision 3).
 8. `make check`. Commit. Last commit: Status `**done** (<date in Tokyo>)`.
 
@@ -235,7 +261,7 @@ Wave: **E runs last**, after A → B → C → D have merged. It starts a new br
 | `test_access.py` `test_only_landing_login_and_signup_are_open` (changed) | The open views are `login`, `logout`, `signup`, `home`. | A rename that drops `@login_not_required`, or opens another view. |
 | `test_landing.py` `test_old_name_is_gone` (new) | `reverse("home") == "/"`; `reverse("todo_list")` raises `NoReverseMatch`. | A forgotten alias, or the address changed. |
 | `test_lists.py` `HomeTests`, `test_sharing.py` `HomeTests`, `test_accounts.py` (changed) | The same checks as today, with `reverse("home")`: `/` sends a logged-in person to the oldest list, sign-up and login go there. | Any change in where `/` goes. |
-| `test_list_page_size.py` `test_300_todos_stay_light` (new) | The default page with 300 plain to-dos is at most the measured size plus 5 %. | Undoing step a or b later. |
+| `test_list_page_size.py` `test_bytes_per_row_stay_light` (new) | (page with 300 plain to-dos - page with 0) / 300 is at most the measured bytes per row plus 5 %. | Undoing step a or b later. |
 | `test_views.py`, `test_subtasks.py`, `test_filter.py` (changed) | Each button posts to the same view with the same `done` and `next` as before. | Step b sending the wrong `next` or no `done`. |
 | Every other test | Unchanged, all pass. | Any behaviour change. |
 
@@ -256,13 +282,14 @@ so the form change is invisible to them. In particular `test_done_keeps_the_plac
   move to (or point at) docstrings; the Rules section stays complete.
 - It must not change behaviour.
 
-## Open engineering choices
+## Open choices
 
 1. **Merge the Done/Undo and Delete forms (step b).** Yes, **recommended**: about 45 KB less for
    300 to-dos (more with steps), no behaviour change, and four test helpers change for a clear
    reason. (No: only step a; no test changes.)
-2. **A page-size test.** Yes, **recommended**: a fixed budget (the measured size plus 5 %) stops
-   the page from growing back unnoticed. It must be raised on purpose when a feature adds to a row.
+2. **A page-size test.** Yes, **recommended**: a budget in bytes per row (the measured number
+   plus 5 %) stops rows from growing back unnoticed, and a change to the page frame does not
+   touch it. It must be raised on purpose when a feature adds to a row.
 3. **How short AGENTS.md gets.** About half (about 22 KB), **recommended**: the Rules and Commands
    stay whole, each row keeps its job and invariants. (Shorter means more trips into the code for
    every task.)
@@ -283,3 +310,15 @@ Verification by the planner (2026-10-11), against `main` (`d66b978`):
 - Confirmed the exact-HTML checks of the row forms: `test_views.py` (~24, ~422),
   `test_subtasks.py` (~152), `test_filter.py` (~143, ~229-231).
 - Confirmed `AGENTS.md` is 42,624 bytes, and the longest rows (sizes in "What is wrong today", 3).
+
+The plan review (2026-10-11, an independent reviewer who also ran small prototypes) said APPROVE
+WITH CHANGES. What changed:
+
+- The Done/Undo button keeps safe-toggles' exact `next` rule (`{% if status %}` the anchor after
+  removal, else `todo-<pk>`); the plan writes it out.
+- The rename list adds B's redirect to `/`, the comment in `test_access.py`, and the two
+  `AGENTS.md` lines (~56 and ~136).
+- The page-size test is a budget in bytes per row ((300 rows - 0 rows) / 300), not a fixed total.
+- AGENTS.md trimming lists the rules that live in file rows and must stay as invariants (never
+  `Todo.objects` in `queries.py`; never install launchd or write to `~/Library`; never edit
+  migrations except data migrations; and more).
