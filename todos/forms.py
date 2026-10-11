@@ -56,8 +56,8 @@ class TodoForm(NoColon, forms.ModelForm):
 
     class Meta:
         model = Todo
-        # "repeat" and "due_date" must both be here: Todo.clean() puts its
-        # error on "repeat", and checks "due_date".
+        # "repeat" and "due_date" must both be here: Todo.clean() checks
+        # "repeat", and puts its error on "due_date".
         fields = ["title", "due_date", "repeat", "description", "priority"]
         field_classes = {"description": NoteField}
         labels = {"description": "Notes"}
@@ -83,12 +83,13 @@ class TodoForm(NoColon, forms.ModelForm):
     def full_clean(self):
         super().full_clean()
         # A typed date that is not valid already has its own error. Then
-        # "A repeating to-do needs a due date" (from Todo.clean) only confuses.
-        if self.has_error("due_date") and self.has_error("repeat", "needs_due_date"):
-            errors = self.errors["repeat"]
-            errors.data = [e for e in errors.as_data() if e.code != "needs_due_date"]
-            if not errors:
-                del self.errors["repeat"]
+        # "A repeating to-do needs a due date" (from Todo.clean, also on
+        # due_date) only confuses, so only the date's own error stays.
+        if self.has_error("due_date", "needs_due_date"):
+            errors = self.errors["due_date"]
+            others = [e for e in errors.as_data() if e.code != "needs_due_date"]
+            if others:
+                errors.data = others
 
     def clean_tag_names(self):
         return parse_tags(self.cleaned_data["tag_names"])

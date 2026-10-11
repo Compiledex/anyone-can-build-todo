@@ -1,6 +1,15 @@
 # Plan: backups before a reset, "#work" finds the tag, and the repeat error on the date
 
-Status: **approved** (2026-10-11, by the orchestrator for the person), not started.
+Status: **done** (2026-10-11). Approved 2026-10-11 by the orchestrator for the person.
+
+Built as planned, with these small differences: the SQLite copy step is its own function,
+`copy_sqlite(source, target)` in `todos/backup.py` (the failed-copy test patches it); the source
+URI is quoted, so a `?` or `#` in the folder name cannot break it. The `#` search tests also check
+`# work` and `###`. The repeat-error tests share one helper, `assertErrorOnDueDate`. Manual check
+(step 3): `make backup` was run in the worktree only (no database: "No database yet"; then a copy
+that passes `PRAGMA integrity_check`); `make reset` was **not** run at all, only read with
+`make -n reset`, on the orchestrator's instruction; the test `test_make_reset_copies_before_deleting`
+pins its order.
 
 Builds on: **foundation** (the `Makefile`, `make reset`), **tags** (`parse_tags`), **search**
 and **nordic-letters** (merged first: `search()` uses `casefold` and `Contains(CaseFold(...))`),
