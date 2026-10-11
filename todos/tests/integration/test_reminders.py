@@ -9,7 +9,7 @@ from django.test import TestCase
 from accounts.tests.helpers import make_user
 from todos.models import Todo, TodoList
 from todos.reminders import NotificationError, send_reminders
-from todos.tests.helpers import FakeOsascriptMixin
+from todos.tests.helpers import FakeOsascriptMixin, add_todo
 
 # A fixed "today", so the tests give the same answer on any day.
 TODAY = date(2026, 10, 10)
@@ -28,11 +28,8 @@ class RemindersTestCase(FakeOsascriptMixin, TestCase):
         cls.bob_list = TodoList.objects.create(owner=cls.bob, name="Bob's list")
 
     def add(self, title, due_date=TODAY, todo_list=None, **fields):
-        return Todo.objects.create(
-            todo_list=todo_list or self.alice_list,
-            title=title,
-            due_date=due_date,
-            **fields,
+        return add_todo(
+            todo_list or self.alice_list, title, due_date=due_date, **fields
         )
 
     def reminded_on(self, todo):

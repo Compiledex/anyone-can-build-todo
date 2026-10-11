@@ -133,7 +133,7 @@ class Todo(models.Model):
     reminded_on = models.DateField(null=True, blank=True, editable=False)
 
     class Meta:
-        ordering = ["created_at"]
+        ordering = ["created_at", "pk"]  # pk: a fixed order for equal times.
 
     def __str__(self):
         return self.title

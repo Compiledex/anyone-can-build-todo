@@ -1,6 +1,6 @@
 # Plan: a maintenance pass (tidy code and tests, no new behaviour)
 
-Status: **approved** (2026-10-11, by the orchestrator for the person), not started.
+Status: **done** (2026-10-11). Approved 2026-10-11 by the orchestrator for the person.
 
 Builds on: everything on `main`, plus the plans that merge before this one:
 **nordic-letters**, **recurring-undo-steps**, **safe-toggles**, **accessibility-pass** and
@@ -188,7 +188,7 @@ earlier plan added one). It only fixes the order of to-dos made in the same micr
 
 - Nothing changes in who may see or change what. The tests in `test_access.py` and every
   `assertOtherUserGets404` move unchanged.
-- `signup` gets stricter (only `GET` and `POST`).
+- `signup` gets stricter (only `GET`, `HEAD` and `POST`).
 - The hidden inputs still come from `cleaned_data` (only valid values), as today.
 - `order_by` is not touched (the `Meta.ordering` change is a fixed list in the model).
 
@@ -226,7 +226,7 @@ split from the real file (class names may have grown).
 | `todos/templates/todos/todo_list.html`, `_todo_item.html` | `maxlength` from the context; hidden inputs in a loop. |
 | `todos/static/todos/app.css` | Decision 4. |
 | `accounts/forms.py` | `NoColon`. |
-| `accounts/views.py` | `@require_http_methods(["GET", "POST"])` on `signup`. |
+| `accounts/views.py` | `@require_http_methods(["GET", "HEAD", "POST"])` on `signup`. |
 | `todos/models.py`, `todos/migrations/00NN_todo_ordering_tiebreak.py` | Decision 6. |
 | `todos/templates/todos/site_base.html` | The comment. |
 | `README.md`, `AGENTS.md` | Decision 7; the test file rows; `todos/tests/helpers.py` and `accounts/tests/helpers.py` rows list the new helpers; `models.py` row (`Meta.ordering`). |
@@ -259,7 +259,7 @@ Each step is its own commit, and `make check` passes after each one.
 |---|---|---|
 | Integration, `test_reorder.py` `test_move_up_on_first_changes_nothing` | "Move up" on the first row: redirect to `?sort=manual#todo-<pk>`, positions and shown order unchanged. | `todo_move` wrapping around (moving the first row to the end) or crashing at index `-1`. |
 | Integration, `accounts/tests/integration/test_accounts.py` `test_signup_methods` | `PUT` and `DELETE` to `/accounts/signup/` give 405; `GET` and `HEAD` give 200. | No method rule on `signup`, or a rule that drops `HEAD`. |
-| Integration, `todos/tests/integration/test_views.py` `ListTests.test_todos_with_the_same_time_come_back_by_pk` | Three to-dos in one list, then one `update(created_at=<one fixed time>)` on all of them: `[t.pk for t in the_list.todos.all()]` equals the sorted pks. | Removing `"pk"` from `Todo.Meta.ordering` (then SQLite may return equal times in any order). |
+| Integration, `todos/tests/integration/test_views.py` `ListTests.test_todos_with_the_same_time_come_back_by_pk` | Three to-dos in one list, then one `update(created_at=<one fixed time>)` on all of them: `[t.pk for t in the_list.todos.all()]` equals the sorted pks, and the SQL of `the_list.todos.all()` ends with `"todos_todo"."id" ASC` (SQLite often returns rowid order anyway, which would hide a missing `pk`). | Removing `"pk"` from `Todo.Meta.ordering`. |
 | CUJ, `test_escape_cancels_a_drag` (changed) | No reorder `fetch` after Escape, checked after `dragend`, with no timed wait. | `reorder.js` sending on a cancelled drag. |
 
 Everything else is a move or a rewrite of how a test is written; what each test checks does not
@@ -316,3 +316,57 @@ The plan review (2026-10-11) said APPROVE WITH CHANGES. What changed:
   change keeps its own parser. `test_search.py` line ~141 keeps exactly 3 matches.
 - The CUJ fix is simpler: the existing wait for `li.dragging` count 0, then read
   `window.__fetchCalls`; no extra `dragend` listener.
+
+## Built (2026-10-11, on `main` `3dab572`)
+
+Test counts from `make test`. Before: CUJ 28, Integration 476, Unit 123 (627). After: CUJ 28,
+Integration 479, Unit 123 (630): the same tests plus the three new integration tests
+(`test_move_up_on_first_changes_nothing`, `test_signup_methods`,
+`test_todos_with_the_same_time_come_back_by_pk`). Tests per class in `test_views.py` before the
+split, after safe-toggles, accessibility-pass and local-safety: List 15, Add 15, Toggle 13,
+Delete 5, LoginRequired 4, OnlyMyData 7, Admin 1, Edit 25, Priority 10, Tag 14, Recurring 34
+(143). Every class has the same count after the move.
+
+What differs from the plan above:
+
+- `test_views.py` had a fourth parser, `TagsByName` (inputs by name, `<ul>` text by id), used
+  only by `RecurringTests.assertErrorOnDueDate`. It moved with `RecurringTests` to
+  `test_recurring.py`, unchanged: it keeps the first input of each name, which the shared
+  `PageParts` does not do, so merging it would change what the test checks.
+- `hidden_next` and `OVERDUE_LABEL` stay in `test_views.py`: only its classes use them.
+- `count_queries(func)`: the old inner functions also checked that the page answered 200. That
+  check stays, in a small `load()` function each test passes to `count_queries`.
+  `test_subtasks.py` keeps one `CaptureQueriesContext`: it reads the SQL of the `UPDATE`, not a
+  count.
+- Files with no own defaults (`test_filter.py`, `test_search.py`, `test_sort.py`,
+  `test_access.py`) call `shown_titles` directly; `test_reorder.py` keeps its `shown(client)`
+  wrapper (manual order). `add` wrappers stay where a file has its own list or `due_date`.
+- `parse_page(response, parser_class=PageParts)`: the landing page passes `LandingParts`.
+- `test_migrations.py`'s docstring now says `FillPositionMigrationTests` does not migrate the
+  database.
+- `views.py` has a module constant `STEP_MAX_LENGTH` (from `Subtask`), used by `subtask_add`'s
+  message and the `step_max_length` context value.
+- The hidden-input loop kept every exact-HTML test passing, so it is in.
+- `test_escape_cancels_a_drag` was a false pass all along: the last row's drag handle was at
+  y=719 in the 720px-high window, so the mouse press was off the page and no drag started (no
+  `dragstart` at all). The test now scrolls the list into view first and checks that a row is
+  `dragging` before it presses Escape. Checked: with `reorder.js` changed to send on a cancelled
+  drag, the new test fails (`['/lists/1/reorder/'] != []`) and the old test passed.
+- `test_signup_methods` is in `SignupTests` in `accounts/tests/integration/test_accounts.py`.
+  Before the fix: `PUT` and `DELETE` gave `200 != 405`.
+- Migration `0018_todo_ordering_tiebreak` (depends on `0017_todo_reminded_on`; one
+  `AlterModelOptions`).
+- After review (PASS WITH FIXES), more checks, each shown failing with its break first:
+  `SubtaskTests.test_step_input_keeps_its_browser_checks` (the "New step" input has
+  `maxlength="200"` and `required`; fails with `step_max_length` left out of the context, or
+  set to 199); the ordering test also checks the SQL ends with `"todos_todo"."id" ASC` (fails
+  with `ordering = ["created_at"]`, where the pk list alone passed); the CUJ test checks that
+  its fetch recorder records a `fetch('/')` (fails when the init script records nothing);
+  `count_queries` raises when `func()` made no queries, and the new
+  `todos/tests/integration/test_test_helpers.py` (2 tests) checks it counts 1 and 2 queries
+  (fails when it does not call `func`, or returns a constant; the per-test count comparisons
+  alone did not catch a constant); `SortTests.test_search_form_has_no_hidden_sort_for_the_default`
+  (fails when the search form always sends `sort`). Final counts: CUJ 28, Integration 483,
+  Unit 123 (634).
+- Running `ruff format` on the whole repo also rewrites code blocks in some `docs/plans/*.md`
+  files; those changes were not kept. The commit hook only formats Python files.

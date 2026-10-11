@@ -11,6 +11,7 @@ from django.utils import timezone
 
 from accounts.tests.helpers import LoggedInTestCase
 from todos.models import Todo
+from todos.tests.helpers import add_todo, shown_titles
 
 
 class SortTests(LoggedInTestCase):
@@ -19,10 +20,7 @@ class SortTests(LoggedInTestCase):
         self.url = self.todo_list.get_absolute_url()
 
     def add(self, title, **fields):
-        return Todo.objects.create(todo_list=self.todo_list, title=title, **fields)
-
-    def shown(self, response):
-        return [todo.title for todo in response.context["todos"]]
+        return add_todo(self.todo_list, title, **fields)
 
     def in_days(self, days):
         return timezone.localdate() + datetime.timedelta(days=days)
@@ -33,7 +31,7 @@ class SortTests(LoggedInTestCase):
         self.add("In two days", due_date=self.in_days(2))
         response = self.client.get(f"{self.url}?sort=due")
         self.assertEqual(
-            self.shown(response), ["In two days", "In ten days", "No date"]
+            shown_titles(response), ["In two days", "In ten days", "No date"]
         )
 
     def test_sort_by_due_date_ties_use_created_at(self):
@@ -45,48 +43,48 @@ class SortTests(LoggedInTestCase):
             created_at=first.created_at - datetime.timedelta(hours=1)
         )
         response = self.client.get(f"{self.url}?sort=due")
-        self.assertEqual(self.shown(response), ["Made second", "Made first"])
+        self.assertEqual(shown_titles(response), ["Made second", "Made first"])
 
     def test_sort_by_priority_most_important_first(self):
         self.add("Low one", priority=Todo.Priority.LOW)
         self.add("High one", priority=Todo.Priority.HIGH)
         self.add("Medium one", priority=Todo.Priority.MEDIUM)
         response = self.client.get(f"{self.url}?sort=priority")
-        self.assertEqual(self.shown(response), ["High one", "Medium one", "Low one"])
+        self.assertEqual(shown_titles(response), ["High one", "Medium one", "Low one"])
 
     def test_sort_by_title_ignores_case(self):
         self.add("cherry")
         self.add("Banana")
         self.add("apple")
         response = self.client.get(f"{self.url}?sort=title")
-        self.assertEqual(self.shown(response), ["apple", "Banana", "cherry"])
+        self.assertEqual(shown_titles(response), ["apple", "Banana", "cherry"])
 
     def test_sort_by_title_uses_norwegian_order(self):
         for title in ["Ål", "Zebra", "øl", "Ærend", "apple", "Banana"]:
             self.add(title)
         response = self.client.get(f"{self.url}?sort=title")
         self.assertEqual(
-            self.shown(response), ["apple", "Banana", "Zebra", "Ærend", "øl", "Ål"]
+            shown_titles(response), ["apple", "Banana", "Zebra", "Ærend", "øl", "Ål"]
         )
 
     def test_sort_by_title_nordic_case_ties_keep_created_order(self):
         lower = self.add("ål")
         upper = self.add("Ål")
         response = self.client.get(f"{self.url}?sort=title")
-        self.assertEqual(self.shown(response), ["ål", "Ål"])
+        self.assertEqual(shown_titles(response), ["ål", "Ål"])
         # The one made second gets the older created_at, so it comes first.
         Todo.objects.filter(pk=upper.pk).update(
             created_at=lower.created_at - datetime.timedelta(hours=1)
         )
         response = self.client.get(f"{self.url}?sort=title")
-        self.assertEqual(self.shown(response), ["Ål", "ål"])
+        self.assertEqual(shown_titles(response), ["Ål", "ål"])
 
     def test_bad_sort_shows_default_order(self):
         self.add("Old")
         self.add("New")
         response = self.client.get(f"{self.url}?sort=-created_at")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.shown(response), ["Old", "New"])
+        self.assertEqual(shown_titles(response), ["Old", "New"])
         # The default order is set by apply_list_query, not by Meta.ordering.
         self.assertEqual(response.context["todos"].query.order_by, ("created_at", "pk"))
 
@@ -102,7 +100,7 @@ class SortTests(LoggedInTestCase):
         self.add("milk done", done=True)
         self.add("Milk a")
         response = self.client.get(f"{self.url}?q=milk&status=open&sort=title")
-        self.assertEqual(self.shown(response), ["Milk a", "milk z"])
+        self.assertEqual(shown_titles(response), ["Milk a", "milk z"])
 
     def test_filter_links_and_show_all_keep_sort(self):
         response = self.client.get(f"{self.url}?q=xyz&sort=title")
@@ -138,6 +136,15 @@ class SortTests(LoggedInTestCase):
             '<input type="hidden" name="sort" value="title">', search_form
         )
 
+    def test_search_form_has_no_hidden_sort_for_the_default(self):
+        for query in ["", "?sort=created", "?sort=bogus"]:
+            with self.subTest(query=query):
+                html = self.client.get(f"{self.url}{query}").content.decode()
+                search_form = html[html.index('<form class="search"') :]
+                search_form = search_form[: search_form.index("</form>")]
+                self.assertIn('<input type="search" name="q"', search_form)
+                self.assertNotIn('name="sort"', search_form)
+
     def test_other_users_list_with_sort_is_404(self):
         self.add("Buy milk")
         self.assertOtherUserGets404(f"{self.url}?sort=due", method="get")
@@ -148,4 +155,4 @@ class SortTests(LoggedInTestCase):
         self.add("apple")
         bob = self.client_for(self.other_user)
         response = bob.get(f"{self.url}?sort=title")
-        self.assertEqual(self.shown(response), ["apple", "cherry"])
+        self.assertEqual(shown_titles(response), ["apple", "cherry"])

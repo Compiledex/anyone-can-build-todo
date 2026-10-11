@@ -8,7 +8,7 @@ from .tags import parse_tags
 
 
 class NoColon:
-    """Labels like "Notes", not "Notes:", as on the login and sign-up pages.
+    """Labels like "Notes", not "Notes:". Every form with a visible label uses it.
 
     Put it first: class TodoForm(NoColon, forms.ModelForm).
     """

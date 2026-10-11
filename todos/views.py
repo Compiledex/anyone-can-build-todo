@@ -27,6 +27,8 @@ from .queries import (
     list_query,
 )
 
+STEP_MAX_LENGTH = Subtask._meta.get_field("title").max_length
+
 # A view that reads or changes a list or its to-dos finds the list with
 #   get_object_or_404(TodoList.objects.visible_to(request.user), pk=pk)
 # or the to-do with get_visible_todo(request.user, pk), or a step with
@@ -35,6 +37,9 @@ from .queries import (
 # Only rename, delete, share and remove-member are for the owner alone. They use
 #   get_object_or_404(TodoList, pk=pk, owner=request.user)
 # so a member gets the same 404 as a stranger.
+# list_leave is for members alone: it uses
+#   get_object_or_404(TodoList, pk=pk, members=request.user)
+# so the owner and strangers get 404.
 
 
 def get_visible_todo(user, pk):
@@ -152,7 +157,16 @@ def render_list_page(request, the_list, form):
             "query": list_query(data, status=value),
             "current": status == value,
         }
-        for value, label in [("", "All"), ("open", "Not done"), ("done", "Done")]
+        for value, label in [("", "All"), *TodoQueryForm.STATUS_CHOICES]
+    ]
+    # The hidden inputs that keep the other choices when a form is sent. Only
+    # cleaned values: status is "open" or "done", the sort a key of SORT_OPTIONS.
+    current_sort = chosen_sort(query_form)
+    search_hidden = [("status", status)] if status else []
+    if current_sort != DEFAULT_SORT:
+        search_hidden.append(("sort", current_sort))  # A new search keeps the order.
+    sort_hidden = [
+        (name, value) for name, value in [("q", q), ("status", status)] if value
     ]
     return render(
         request,
@@ -167,8 +181,12 @@ def render_list_page(request, the_list, form):
             "back_url": back_url,
             "filter_links": filter_links,
             # The order shown, always a key of SORT_OPTIONS (#15 uses "manual").
-            "current_sort": chosen_sort(query_form),
-            "default_sort": DEFAULT_SORT,
+            "current_sort": current_sort,
+            "search_hidden": search_hidden,
+            "sort_hidden": sort_hidden,
+            # The longest title of a to-do and of a step, for maxlength.
+            "title_max_length": Todo._meta.get_field("title").max_length,
+            "step_max_length": STEP_MAX_LENGTH,
             # Drag handles and Move buttons: manual order, no search, no filter.
             "can_reorder": can_reorder(query_form),
             # "Show all" clears the search and the filter, but keeps the order.
@@ -440,7 +458,9 @@ def subtask_add(request, todo_pk):
         subtask.todo = todo  # Only from the address, never from the form.
         subtask.save()
     else:
-        messages.error(request, "A step needs a title of 1 to 200 characters.")
+        messages.error(
+            request, f"A step needs a title of 1 to {STEP_MAX_LENGTH} characters."
+        )
     return back_to_steps(todo, to_new_step=True)
 
 

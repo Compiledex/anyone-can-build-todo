@@ -3,15 +3,13 @@
 A logged-in person still goes straight to a list (see HomeTests in test_lists.py).
 """
 
-from html.parser import HTMLParser
-
 from django.conf import settings
 from django.contrib.staticfiles import finders
 from django.templatetags.static import static
 from django.test import Client, TestCase
 from django.urls import reverse
 
-from accounts.tests.helpers import make_user
+from accounts.tests.helpers import PageParts, make_user, parse_page
 from todos.models import Subtask, Todo, TodoList
 from todos.tests.helpers import webp_size
 
@@ -33,12 +31,11 @@ def static_text(path):
         return file.read()
 
 
-class PageParts(HTMLParser):
-    """Collects the links (address and text) and the image files of a page."""
+class LandingParts(PageParts):
+    """The shared PageParts, plus the landing page's images and what it loads."""
 
     def __init__(self):
         super().__init__()
-        self.links = []  # (href, text)
         self.images = []  # the attributes of each <img>
         self.image_files = []  # every address in src and srcset
         self.tags = set()
@@ -46,15 +43,11 @@ class PageParts(HTMLParser):
         self.pictures = []  # each <picture>: {"sources": [attrs], "img": attrs}
         self.sized = []  # (address, width, height) of each <img> and <source> file
         self._picture = None
-        self._href = None
-        self._text = []
 
     def handle_starttag(self, tag, attrs):
+        super().handle_starttag(tag, attrs)
         attrs = dict(attrs)
         self.tags.add(tag)
-        if tag == "a":
-            self._href = attrs.get("href")
-            self._text = []
         if tag == "img":
             self.images.append(attrs)
         if tag in LOADING_TAGS:
@@ -81,22 +74,14 @@ class PageParts(HTMLParser):
                 if part.strip():
                     self.image_files.append(part.split()[0])
 
-    def handle_data(self, data):
-        if self._href is not None:
-            self._text.append(data)
-
     def handle_endtag(self, tag):
+        super().handle_endtag(tag)
         if tag == "picture":
             self._picture = None
-        if tag == "a" and self._href is not None:
-            self.links.append((self._href, " ".join("".join(self._text).split())))
-            self._href = None
 
 
 def parts_of(response):
-    parser = PageParts()
-    parser.feed(response.content.decode())
-    return parser
+    return parse_page(response, LandingParts)
 
 
 class LandingPageTests(TestCase):

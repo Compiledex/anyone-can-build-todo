@@ -85,6 +85,20 @@ class SignupTests(TestCase):
         self.assertContains(response, "A user with that username already exists.")
         self.assertEqual(get_user_model().objects.count(), 1)
 
+    def test_signup_methods(self):
+        # A browser only sends GET, HEAD and POST; any other method is refused.
+        url = reverse("signup")
+        for method, status in [
+            ("get", 200),
+            ("head", 200),
+            ("put", 405),
+            ("delete", 405),
+        ]:
+            with self.subTest(method=method):
+                response = getattr(self.client, method)(url)
+                self.assertEqual(response.status_code, status)
+        self.assertFalse(get_user_model().objects.exists())
+
     def test_signup_ignores_next(self):
         response = self.client.post(
             SIGNUP_URL + "?next=https://evil.example/",

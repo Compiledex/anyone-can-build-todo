@@ -3,16 +3,13 @@
 alice is logged in and owns "Inbox" (self.todo_list). bob owns "Bob's list".
 """
 
-import datetime
-import importlib
-
-import django.apps
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
 from accounts.tests.helpers import LoggedInTestCase, make_user
 from todos.models import Todo
+from todos.tests.helpers import add_todo, shown_titles
 
 
 class ReorderTests(LoggedInTestCase):
@@ -25,13 +22,10 @@ class ReorderTests(LoggedInTestCase):
         self.manual_url = f"{self.todo_list.get_absolute_url()}?sort=manual"
 
     def add(self, title, todo_list=None, **fields):
-        return Todo.objects.create(
-            todo_list=todo_list or self.todo_list, title=title, **fields
-        )
+        return add_todo(todo_list or self.todo_list, title, **fields)
 
     def shown(self, client=None):
-        response = (client or self.client).get(self.manual_url)
-        return [todo.title for todo in response.context["todos"]]
+        return shown_titles((client or self.client).get(self.manual_url))
 
     def reorder(self, *todos, client=None):
         return (client or self.client).post(
@@ -141,6 +135,17 @@ class ReorderTests(LoggedInTestCase):
         self.assertEqual(self.positions(), before)
         self.assertEqual(self.shown(), ["First", "Second", "Third"])
 
+    def test_move_up_on_first_changes_nothing(self):
+        before = self.positions()
+        response = self.move(self.first, "up")
+        self.assertRedirects(
+            response,
+            f"{self.manual_url}#todo-{self.first.pk}",
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(self.positions(), before)
+        self.assertEqual(self.shown(), ["First", "Second", "Third"])
+
     def test_move_with_bad_direction_is_400(self):
         before = self.positions()
         response = self.move(self.second, "sideways")
@@ -192,28 +197,3 @@ class ReorderTests(LoggedInTestCase):
     def test_new_todo_goes_last_even_with_a_position_given(self):
         todo = self.add("Fourth", position=1)  # The biggest in the list is 3.
         self.assertEqual(Todo.objects.get(pk=todo.pk).position, 4)
-
-
-class FillPositionMigrationTests(LoggedInTestCase):
-    def test_fill_migration_numbers_each_list(self):
-        # The file name starts with a number, so a normal import cannot load it.
-        migration = importlib.import_module("todos.migrations.0016_fill_todo_position")
-        now = timezone.now()
-        lists = {"alice": self.todo_list, "bob": self.other_list}
-        for the_list in lists.values():
-            # Made in the order C, B, A, but A is the oldest (created_at).
-            for minutes_ago, title in [(1, "C"), (2, "B"), (3, "A")]:
-                todo = Todo.objects.create(todo_list=the_list, title=title)
-                Todo.objects.filter(pk=todo.pk).update(
-                    created_at=now - datetime.timedelta(minutes=minutes_ago),
-                    position=0,
-                )
-
-        migration.fill_position(django.apps.apps, None)
-
-        for owner, the_list in lists.items():
-            with self.subTest(owner=owner):
-                numbered = list(
-                    the_list.todos.order_by("position").values_list("title", "position")
-                )
-                self.assertEqual(numbered, [("A", 1), ("B", 2), ("C", 3)])

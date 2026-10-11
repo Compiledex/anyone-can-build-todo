@@ -54,9 +54,8 @@ a:hover {
   color: var(--accent-hover);
 }
 
-/* Dates and counts: every digit equally wide, so they line up. */
-time,
-.count {
+/* Dates: every digit equally wide, so they line up. */
+time {
   font-variant-numeric: tabular-nums;
 }
 
@@ -221,6 +220,8 @@ header.site {
   color: var(--danger);
 }
 
+/* Not used by an app page today; kept so the app and the visitor pages share
+   one button vocabulary. */
 .button-small {
   min-height: var(--control-height-small);
 }
@@ -639,12 +640,12 @@ ul.todos > li .meta {
 }
 
 /* Overdue: the date and the label in red. No dot, no icon. */
-.overdue time,
-.overdue-label {
+.overdue time {
   color: var(--danger);
 }
 
 .overdue-label {
+  color: var(--danger);
   font-weight: 650;
 }
 

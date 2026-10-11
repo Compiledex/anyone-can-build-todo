@@ -10,6 +10,7 @@ from django.urls import reverse
 
 from accounts.tests.helpers import LoggedInTestCase
 from todos.models import Todo
+from todos.tests.helpers import add_todo, shown_titles
 
 NO_MATCH = "No to-dos match"
 EMPTY_LIST = "Nothing to do yet"
@@ -21,10 +22,7 @@ class FilterTests(LoggedInTestCase):
         self.url = self.todo_list.get_absolute_url()
 
     def add(self, title, **fields):
-        return Todo.objects.create(todo_list=self.todo_list, title=title, **fields)
-
-    def shown(self, response):
-        return [todo.title for todo in response.context["todos"]]
+        return add_todo(self.todo_list, title, **fields)
 
     def add_two(self):
         self.add("Buy milk")
@@ -33,30 +31,30 @@ class FilterTests(LoggedInTestCase):
     def test_open_shows_only_not_done(self):
         self.add_two()
         response = self.client.get(f"{self.url}?status=open")
-        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
 
     def test_done_shows_only_done(self):
         self.add_two()
         response = self.client.get(f"{self.url}?status=done")
-        self.assertEqual(self.shown(response), ["Call home"])
+        self.assertEqual(shown_titles(response), ["Call home"])
 
     def test_no_status_shows_all(self):
         self.add_two()
         response = self.client.get(self.url)
-        self.assertEqual(self.shown(response), ["Buy milk", "Call home"])
+        self.assertEqual(shown_titles(response), ["Buy milk", "Call home"])
 
     def test_bad_status_shows_all(self):
         self.add_two()
         response = self.client.get(f"{self.url}?status=banana")
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(self.shown(response), ["Buy milk", "Call home"])
+        self.assertEqual(shown_titles(response), ["Buy milk", "Call home"])
 
     def test_filter_combines_with_search(self):
         self.add("Buy milk")
         self.add("Milk done", done=True)
         self.add("Call home")
         response = self.client.get(f"{self.url}?q=milk&status=open")
-        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
 
     def test_filter_links_keep_search(self):
         self.add_two()
@@ -103,7 +101,7 @@ class FilterTests(LoggedInTestCase):
     def test_no_match_message(self):
         self.add("Buy milk")
         response = self.client.get(f"{self.url}?status=done")
-        self.assertEqual(self.shown(response), [])
+        self.assertEqual(shown_titles(response), [])
         self.assertContains(response, f"{NO_MATCH}.")
         self.assertContains(response, f'<a href="{self.url}">Show all</a>', html=True)
         self.assertNotContains(response, EMPTY_LIST)
@@ -112,7 +110,7 @@ class FilterTests(LoggedInTestCase):
         # The button deletes every done to-do of the list, whatever is shown.
         self.add_two()
         response = self.client.get(f"{self.url}?status=open")
-        self.assertEqual(self.shown(response), ["Buy milk"])
+        self.assertEqual(shown_titles(response), ["Buy milk"])
         self.assertContains(response, "Clear completed (1)")
 
     def test_other_users_list_with_filter_is_404(self):
@@ -124,7 +122,7 @@ class FilterTests(LoggedInTestCase):
         self.add_two()
         bob = self.client_for(self.other_user)
         response = bob.get(f"{self.url}?status=done")
-        self.assertEqual(self.shown(response), ["Call home"])
+        self.assertEqual(shown_titles(response), ["Call home"])
 
 
 class RedirectBackTests(LoggedInTestCase):
