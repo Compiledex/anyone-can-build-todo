@@ -1,6 +1,9 @@
 # Plan: cleanups: the "/" view is `home`, lighter list HTML, a shorter AGENTS.md
 
-Status: approved by the person (2026-10-11, plan card answered), not started
+Status: **done** (2026-10-11). Measured when built: the list page with 300 plain to-dos went
+from 594,081 to 500,181 bytes (step a) and 445,581 bytes (step b); `?sort=manual` from 804,136
+to 641,836. The page-size budget is 1,501 bytes per row (measured 1,429 plus 5 %). `AGENTS.md`
+was 50,093 bytes on the `main` after A to D (not 42,624) and is now 23,163.
 
 Builds on: everything on `main` after **A** (recurring-copy-rules), **B** (delete-undo), **C**
 (list-name-casefold) and **D** (backup-on-run) have merged. This plan starts from that `main`, not
