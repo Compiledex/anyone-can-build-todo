@@ -473,6 +473,21 @@ class RecurringUndoTests(DeleteUndoTestCase):
         self.assertEqual(Todo.objects.get(pk=copy.pk).repeated_from_id, original.pk)
         self.assertEqual(Todo.objects.get(pk=original.pk).get_next_copy().pk, copy.pk)
 
+    def test_restored_copy_still_counts_as_unchanged(self):
+        original = self.weekly()
+        self.done(original)
+        copy = Todo.objects.get(repeated_from=original)
+        made = copy.copy_fingerprint
+        self.assertTrue(made)
+        self.delete(copy)
+        self.undo(copy.pk)
+        restored = Todo.objects.get(pk=copy.pk)
+        self.assertEqual(restored.copy_fingerprint, made)
+        self.assertFalse(restored.changed_since_copy())
+        # So Undo on the original still removes the unchanged copy.
+        self.done(original, False)
+        self.assertFalse(Todo.objects.filter(pk=copy.pk).exists())
+
     def test_recurring_link_not_stolen(self):
         original = self.weekly()
         self.done(original)
