@@ -27,7 +27,8 @@ which is not in git.
 
 | File | Its one job |
 |---|---|
-| `config/settings.py` | Settings for the whole project. The secret key, debug and allowed hosts come from environment variables on a live server, with defaults for a laptop. SQLite uses `transaction_mode: "IMMEDIATE"`, so two requests that write at the same time wait for each other instead of failing. `TIME_ZONE` is `"Asia/Tokyo"` (the person's choice): "today" in the app is the date in Tokyo. |
+| `config/settings.py` | Settings for the whole project. The secret key, debug and allowed hosts come from environment variables on a live server, with defaults for a laptop. `DEBUG` and `SECRET_KEY` come from `config/env.py`. SQLite uses `transaction_mode: "IMMEDIATE"`, so two requests that write at the same time wait for each other instead of failing. `TIME_ZONE` is `"Asia/Tokyo"` (the person's choice): "today" in the app is the date in Tokyo. |
+| `config/env.py` | Pure functions that read the environment (given as a dict). `read_debug(env)`: `DJANGO_DEBUG` not set gives `True`; `True` or `False` in any case, spaces at the ends removed, give `True` or `False`; any other value, also `""`, raises `ImproperlyConfigured` (Django's "the settings are wrong" error, which stops the app). `read_secret_key(env, debug)`: with debug on, `DJANGO_SECRET_KEY` or the laptop key; with debug off, a missing key or a weak one (Django's deploy-check limits: under 50 characters, under 5 different characters, or starting with `django-insecure-`) raises `ImproperlyConfigured`; `is_strong(key)` checks those three limits. No message ever shows the key or the value of `DJANGO_DEBUG` (only its length). |
 | `config/urls.py` | Sends `/admin/` to Django's admin, `/accounts/` to `accounts/urls.py`, and everything else to `todos/urls.py`. |
 | `accounts/` | The accounts app: sign up, log in, log out. It uses Django's own `User`, `LoginView`, `LogoutView` and `UserCreationForm`. It has no models. |
 | `accounts/forms.py` | `LoginForm` (used by `LoginView`, through `authentication_form` in `accounts/urls.py`) and `SignupForm` (used by the `signup` view): Django's `AuthenticationForm` and `UserCreationForm`, only with `label_suffix = ""`, so a label says "Username", not "Username:". They check and save exactly like Django's own forms. |
@@ -68,7 +69,8 @@ which is not in git.
 | `todos/tests/integration/` | Integration tests: Django's test client, from the address to the database. |
 | `todos/tests/cuj/` | CUJ tests (critical user journeys): a real Chromium browser, driven by Playwright. |
 | `config/test_runner.py` | Finds each test's layer from its folder, checks the layer rules, and prints one line per layer after a run. |
-| `config/tests/unit/` | The tests for the test runner. |
+| `config/tests/unit/` | The tests for the test runner and for `config/env.py`. |
+| `config/tests/integration/` | Starts `manage.py check` in a new process (a subprocess, not Django's test client), with only the chosen `DJANGO_*` variables, to test the start-up rules. |
 | `todos/migrations/` | Made by Django from `models.py`. Never edit these by hand. One exception: a data migration (one that changes rows, like `0003_give_old_todos_an_owner.py` and `0006_default_lists.py`) is meant to be written. |
 | `pyproject.toml`, `uv.lock` | The packages this project uses, and their exact versions. |
 | `.pre-commit-config.yaml` | The checks that run on every `git commit`. |

@@ -175,8 +175,8 @@ You should see `OK`, and then one line for each layer of tests:
 ```
 Test layers
   CUJ          24 passed
-  Integration  400 passed
-  Unit         93 passed
+  Integration  406 passed
+  Unit         107 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
@@ -296,6 +296,7 @@ runs the same checks and the tests on every push.
 | File | What it does |
 |---|---|
 | `config/settings.py` | Settings for the whole project |
+| `config/env.py` | Reads `DJANGO_DEBUG` and `DJANGO_SECRET_KEY`, and stops the app when debug is off and the secret key is missing or weak |
 | `config/urls.py` | Sends each address to the right app |
 | `accounts/` | Sign up, log in and log out, with Django's own accounts |
 | `accounts/templates/registration/` | The login and sign-up pages, in the same style as the landing page |
@@ -341,16 +342,23 @@ A live server needs three environment variables. Never put their real values in 
 | Variable | Value |
 |---|---|
 | `DJANGO_SECRET_KEY` | A long random string. Make one with `uv run python -c "import secrets; print(secrets.token_urlsafe(50))"` |
-| `DJANGO_DEBUG` | `False` |
+| `DJANGO_DEBUG` | `False`. Only `True` or `False` are allowed (upper or lower case); any other value, also an empty one, stops the app |
 | `DJANGO_ALLOWED_HOSTS` | The site's address without `https://`, for example `my-todo.onrender.com` |
 
-With `DJANGO_DEBUG` set to `False`, the site only works over HTTPS.
+With `DJANGO_DEBUG` set to `False`, the site only works over HTTPS, and the app stops at once if
+`DJANGO_SECRET_KEY` is missing or weak (fewer than 50 characters, fewer than 5 different
+characters, or starting with `django-insecure-`).
+
+The build uses the settings too, so set the three variables for the build as well as for the start.
+(On most hosts, for example Render, the variables on the settings page are used for both.)
 
 Build command:
 
 ```bash
-pip install uv && uv sync --locked --no-dev && uv run --no-dev python manage.py collectstatic --no-input && uv run --no-dev python manage.py migrate
+pip install uv && uv sync --locked --no-dev && uv run --no-dev python manage.py check --deploy --fail-level WARNING && uv run --no-dev python manage.py collectstatic --no-input && uv run --no-dev python manage.py migrate
 ```
+
+If the build stops, read the last line of the error: it says which variable to set.
 
 Start command:
 

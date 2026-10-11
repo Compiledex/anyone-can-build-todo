@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from pathlib import Path
 
+from config.env import read_debug, read_secret_key
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -23,11 +25,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # On your laptop these defaults are fine. On a live server, set each of these
 # as an environment variable, so the real values never go into the code.
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY", "django-insecure-only-for-your-laptop")
-
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get("DJANGO_DEBUG", "True") == "True"
+# DJANGO_DEBUG must be True or False (any case); not set means True.
+DEBUG = read_debug(os.environ)
+
+# SECURITY WARNING: keep the secret key used in production secret!
+# With DJANGO_DEBUG=False, a missing or weak DJANGO_SECRET_KEY stops the app
+# (see config/env.py).
+SECRET_KEY = read_secret_key(os.environ, DEBUG)
 
 # The addresses this site answers to, separated by commas.
 ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
