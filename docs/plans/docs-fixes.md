@@ -1,6 +1,6 @@
 # Plan: make the docs match the code
 
-Status: **approved** (2026-10-11), not started.
+Status: **done** (2026-10-11).
 
 Builds on: every merged feature (PRs #1 to #33). Changes only Markdown files: no code, no
 migration.
