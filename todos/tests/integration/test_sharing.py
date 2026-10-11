@@ -607,6 +607,12 @@ class ShareTests(SharingTestCase):
         self.assertTrue(self.groceries.members.filter(pk=self.carol.pk).exists())
         self.assertEqual(messages_of(response), ["Shared with carol."])
 
+    def test_shared_list_name_does_not_count(self):
+        errand = TodoList.objects.create(owner=self.alice, name="Ærend")
+        errand.members.add(self.bob)
+        self.client_for(self.bob).post(self.url("list_create"), {"name": "ærend"})
+        self.assertTrue(self.bob.todo_lists.filter(name="ærend").exists())
+
     def test_unknown_username_is_refused(self):
         response = self.share("nobody")
         self.assertRedirects(response, self.groceries.get_absolute_url())
