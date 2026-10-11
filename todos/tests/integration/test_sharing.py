@@ -17,11 +17,11 @@ from datetime import timedelta
 from django.contrib.messages import get_messages
 from django.test import Client, TestCase
 from django.urls import reverse
-from django.utils import timezone
+from django.utils import dateformat, timezone
 from django.utils.html import escape
 
 from accounts.tests.helpers import make_user
-from todos.models import Tag, Todo, TodoList
+from todos.models import Subtask, Tag, Todo, TodoList
 
 # The two parts of the menu on the list page.
 MY_LISTS = re.compile(r'<p class="menu" id="my-lists">(.*?)</p>', re.S)
@@ -267,6 +267,29 @@ class MemberCanTests(SharingTestCase):
         self.assertRedirects(response, self.groceries.get_absolute_url())
         self.assertEqual(list(self.groceries.todos.all()), [self.milk])
         self.assertEqual(len(self.messages_of(response)), 1)
+
+    def test_member_undo_keeps_copy_with_a_done_step(self):
+        self.make_weekly_milk()
+        Subtask.objects.create(todo=self.milk, title="Check the date")
+        self.client.post(self.url("todo_toggle", self.milk.pk))
+        copy = Todo.objects.get(repeated_from=self.milk)
+        step = copy.subtasks.get()
+        self.client.post(self.url("subtask_toggle", step.pk))
+        response = self.client.post(self.url("todo_toggle", self.milk.pk))
+        self.assertRedirects(response, self.groceries.get_absolute_url())
+        self.milk.refresh_from_db()
+        self.assertFalse(self.milk.done)
+        self.assertTrue(Todo.objects.filter(pk=copy.pk).exists())
+        step.refresh_from_db()
+        self.assertTrue(step.done)
+        due = dateformat.format(copy.due_date, "j M Y")
+        self.assertEqual(
+            self.messages_of(response),
+            [
+                f"The next copy, due {due}, was kept, "
+                "because a step in it is already done."
+            ],
+        )
 
     def test_former_member_undo_does_not_touch_list(self):
         self.make_weekly_milk()

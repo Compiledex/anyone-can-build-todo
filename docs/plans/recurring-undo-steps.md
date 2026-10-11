@@ -1,6 +1,6 @@
 # Plan: Undo keeps the next copy when some of its steps are done
 
-Status: **approved** (2026-10-11, by the orchestrator for the person), not started.
+Status: **done** (2026-10-11). Approved 2026-10-11 by the orchestrator for the person.
 
 Builds on: **recurring** (`Todo.make_next_copy`, `Todo.get_next_copy`, the Undo rule in
 `todo_toggle`), **subtasks** (#16, `Subtask`, the step views `subtask_toggle` and friends),
