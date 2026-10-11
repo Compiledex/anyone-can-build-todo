@@ -1,6 +1,6 @@
 # To-do list: short commands for this project. Type `make help` to see them.
 
-.PHONY: help setup run test unit integration cuj lint format check reset worktree landing-shots
+.PHONY: help setup run test unit integration cuj lint format check backup reset worktree landing-shots
 
 # How many processes run the tests. 1 is fastest while there are few tests:
 # each extra process has to start Python and Django again. Try PARALLEL=auto
@@ -23,7 +23,8 @@ help:
 	@echo "make lint             look for mistakes and style problems (ruff check)"
 	@echo "make format           rewrite the code in the standard style (ruff format)"
 	@echo "make check            the commit checks on every file, the migration check, the tests"
-	@echo "make reset            delete db.sqlite3 and create it again, empty"
+	@echo "make backup           copy db.sqlite3 to backups/ (safe while the server runs)"
+	@echo "make reset            ask, copy db.sqlite3 to backups/, then start again with an empty database"
 	@echo "make landing-shots    take the landing page's screenshots of the app again (scratch data)"
 	@echo "make worktree BRANCH=name"
 	@echo "                      give a branch its own folder, .claude/worktrees/name"
@@ -60,7 +61,21 @@ check:
 	uv run python manage.py makemigrations --check --dry-run
 	$(TEST)
 
+# A safe copy of db.sqlite3 in backups/db-YYYYMMDD-HHMMSS.sqlite3 (see todos/backup.py).
+backup:
+	uv run python manage.py backup_db
+
+# Asks first (only "yes" goes on), then copies, then deletes. CONFIRM=yes skips
+# the question, never the copy. If the copy fails, nothing is deleted.
 reset:
+	@if [ -f db.sqlite3 ]; then \
+		if [ "$(CONFIRM)" != "yes" ]; then \
+			printf 'This deletes every account, list and to-do in db.sqlite3.\nA copy goes to backups/ first. Type yes to go on: '; \
+			read answer; \
+			if [ "$$answer" != "yes" ]; then echo "Nothing was deleted."; exit 1; fi; \
+		fi; \
+		uv run python manage.py backup_db || exit 1; \
+	fi
 	rm -f db.sqlite3
 	uv run python manage.py migrate
 

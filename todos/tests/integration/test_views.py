@@ -1,4 +1,5 @@
 from datetime import UTC, date, datetime, timedelta
+from html.parser import HTMLParser
 from unittest import mock
 
 from django.contrib.auth import get_user_model
@@ -874,6 +875,36 @@ class TagTests(LoggedInTestCase):
         self.assertEqual(self.tag_names(todo), [])
 
 
+class TagsByName(HTMLParser):
+    """The attributes of each <input>, <select> and <ul> on a page, by name or id."""
+
+    def __init__(self, html):
+        super().__init__()
+        self.by_name = {}
+        self.by_id = {}
+        self.texts = {}
+        self._open_id = None
+        self.feed(html)
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag in ("input", "select") and "name" in attrs:
+            self.by_name.setdefault(attrs["name"], attrs)
+        if "id" in attrs:
+            self.by_id[attrs["id"]] = attrs
+            if tag == "ul":
+                self._open_id = attrs["id"]
+                self.texts[self._open_id] = ""
+
+    def handle_endtag(self, tag):
+        if tag == "ul":
+            self._open_id = None
+
+    def handle_data(self, data):
+        if self._open_id:
+            self.texts[self._open_id] += data
+
+
 class RecurringTests(LoggedInTestCase):
     """Repeating to-dos. The view uses the real today, so every due date here is
     counted from timezone.localdate(), and is in the future."""
@@ -931,6 +962,36 @@ class RecurringTests(LoggedInTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "A repeating to-do needs a due date.")
         self.assertFalse(Todo.objects.filter(title="Pay rent").exists())
+
+    def assertErrorOnDueDate(self, response):
+        """The repeat error is under Due date, the field to fix; Repeat is not marked."""
+        self.assertEqual(response.status_code, 200)
+        page = TagsByName(response.content.decode())
+        due_date = page.by_name["due_date"]
+        self.assertEqual(due_date.get("aria-invalid"), "true")
+        self.assertIn("id_due_date_error", due_date.get("aria-describedby", "").split())
+        self.assertIn(
+            "A repeating to-do needs a due date.", page.texts["id_due_date_error"]
+        )
+        self.assertNotIn("aria-invalid", page.by_name["repeat"])
+        self.assertNotIn("id_repeat_error", page.by_id)
+
+    def test_add_repeat_without_due_date_marks_the_date(self):
+        response = self.client.post(
+            reverse("todo_add", args=[self.todo_list.pk]),
+            {"title": "Pay rent", "repeat": "monthly"},
+        )
+        self.assertErrorOnDueDate(response)
+        self.assertFalse(Todo.objects.filter(title="Pay rent").exists())
+
+    def test_edit_repeat_without_due_date_marks_the_date(self):
+        response = self.client.post(
+            reverse("todo_edit", args=[self.weekly.pk]),
+            {"title": "Water the plants", "repeat": "weekly", "due_date": ""},
+        )
+        self.assertErrorOnDueDate(response)
+        self.weekly.refresh_from_db()
+        self.assertEqual(self.weekly.due_date, self.due)
 
     def test_edit_cannot_remove_due_date_of_repeating_todo(self):
         response = self.client.post(

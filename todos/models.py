@@ -183,10 +183,11 @@ class Todo(models.Model):
 
     def clean(self):
         # Runs in a ModelForm's is_valid(), never in save() or create().
+        # The error is on due_date: that is the field the person must fill in.
         if self.repeat and self.due_date is None:
             raise ValidationError(
                 {
-                    "repeat": ValidationError(
+                    "due_date": ValidationError(
                         "A repeating to-do needs a due date.", code="needs_due_date"
                     )
                 }

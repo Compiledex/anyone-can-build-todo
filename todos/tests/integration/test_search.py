@@ -253,3 +253,43 @@ class SearchTests(LoggedInTestCase):
         for n in range(1, 5):
             add_match(n)
         self.assertEqual(count_queries(), with_one)
+
+    def test_hash_finds_the_tag(self):
+        # The page shows the tag as "#work"; it is stored as "work".
+        self.add("Write report").set_tags(["work"])
+        self.add("Call home")
+        for q in ["#work", "#WORK", "# work", "##work"]:
+            with self.subTest(q=q):
+                response = self.search(q)
+                self.assertEqual(self.shown(response), ["Write report"])
+
+    def test_hash_still_searches_titles(self):
+        self.add("Fix #work bug")
+        self.add("Call home")
+        response = self.search("#work")
+        self.assertEqual(self.shown(response), ["Fix #work bug"])
+
+    def test_hash_alone_does_not_match_every_tag(self):
+        self.add("Clean the kitchen").set_tags(["home"])
+        self.add("Call home")
+        for q in ["#", "# ", "###"]:
+            with self.subTest(q=q):
+                response = self.search(q)
+                self.assertEqual(self.shown(response), [])
+                self.assertContains(response, NO_MATCH)
+
+    def test_hash_search_shows_a_todo_once(self):
+        self.add("Write report").set_tags(["work", "workshop"])
+        self.add("Call home")
+        response = self.search("#work")
+        self.assertEqual(self.shown(response), ["Write report"])
+
+    def test_hash_search_stays_in_the_list(self):
+        self.add("Write report").set_tags(["work"])
+        Todo.objects.create(todo_list=self.other_list, title="Bob's report").set_tags(
+            ["work"]
+        )
+        response = self.search("#work")
+        self.assertEqual(self.shown(response), ["Write report"])
+        self.assertNotContains(response, "Bob&#x27;s report")
+        self.assertNotContains(response, "Bob's report")

@@ -50,7 +50,7 @@ class RepeatTests(SimpleTestCase):
             todo.clean()
         self.assertEqual(
             caught.exception.message_dict,
-            {"repeat": ["A repeating to-do needs a due date."]},
+            {"due_date": ["A repeating to-do needs a due date."]},
         )
 
     def test_repeat_with_due_date_is_valid(self):
