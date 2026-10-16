@@ -178,7 +178,7 @@ numbers grow with the app):
 ```
 Test layers
   CUJ          31 passed
-  Integration  601 passed
+  Integration  602 passed
   Unit         129 passed
 ```
 

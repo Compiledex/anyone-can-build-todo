@@ -291,7 +291,7 @@ secure cookies and HSTS turn on. No message shows a secret value (PR #36).
 | Layer | Folder | Tool | Count |
 |---|---|---|---|
 | CUJ | `*/tests/cuj/` | Chromium driven by Playwright | 31 |
-| Integration | `*/tests/integration/` | Django's test client | 601 |
+| Integration | `*/tests/integration/` | Django's test client | 602 |
 | Unit | `*/tests/unit/` | One function, no database | 129 |
 
 Rule: test each rule once, in the lowest layer where a person would notice it (test-pyramid,
