@@ -1,6 +1,6 @@
 # Plan: split the browser tests into files by journey (no new behaviour)
 
-Status: draft (2026-10-16)
+Status: approved (2026-10-16) — not started
 
 Builds on: **test-pyramid** (the `cuj/` folder is the CUJ layer, `config/test_runner.py`),
 **maintenance-pass** (the same kind of split for `test_views.py`), and everything on `main`
@@ -344,3 +344,8 @@ The plan review (2026-10-16) said APPROVE WITH CHANGES. What changed:
 ## Decided by the person
 
 (Filled in after the person answers.)
+
+## Decided by the person (2026-10-16)
+
+- Approved: "Ja, bygg dem" (build all five plans, in the merge order of the build order).
+- The open questions follow the plan's recommendations (decided by the orchestrator): the six files as written; `UI_CONTRAST` stays in `test_auth_pages.py`; old records that name `test_journeys.py` stay.

@@ -1,6 +1,6 @@
 # Plan: Delete my account
 
-Status: draft (2026-10-16)
+Status: approved (2026-10-16) — not started
 
 Builds on: **accounts** (Django's `User`, login, sign-up, `LoggedInTestCase`), **lists** and
 **sharing** (`TodoList.owner`, `members`, `visible_to`, "Leave this list"), **tags** (`Tag.owner`),
@@ -518,3 +518,10 @@ Second plan review (2026-10-16): APPROVE WITH CHANGES. All findings applied:
 ## Decided by the person
 
 (Filled in after the plan card.)
+
+## Decided by the person (2026-10-16)
+
+- Approved: "Ja, bygg dem" (build all five plans, in the merge order of the build order).
+- The link: option A. "Logged in as <name>" in the header becomes the link to the page.
+- A staff user, also the last superuser, may delete themselves (the page says how to make a new admin with `createsuperuser`).
+- The page shows no member names, only the number of members per shared list.

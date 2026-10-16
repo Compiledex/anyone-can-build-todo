@@ -1,6 +1,6 @@
 # Plan: three small privacy fixes (old sessions, messages, search words in the log)
 
-Status: draft (2026-10-16)
+Status: approved (2026-10-16) — not started
 
 Builds on: **backup-on-run** (`make run` makes a daily copy first, and starts the app also when
 the copy fails), **delete-undo** (the undo snapshot in the session), **accounts** (login, logout,
@@ -465,3 +465,8 @@ The plan review (2026-10-16, an independent reviewer) said APPROVE WITH CHANGES.
 ## Decided by the person
 
 Not yet.
+
+## Decided by the person (2026-10-16)
+
+- Approved: "Ja, bygg dem" (build all five plans, in the merge order of the build order).
+- The open questions follow the plan's recommendations (decided by the orchestrator): `clearsessions` runs after the daily backup, also when the backup failed; the log line shows nothing in place of the query string; stopping only at whitespace is enough (a raw space from curl is a documented limit).

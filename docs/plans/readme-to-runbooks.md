@@ -1,6 +1,6 @@
 # Plan: move the reminders and server instructions from the README into runbooks
 
-Status: draft (2026-10-16)
+Status: approved (2026-10-16) — not started
 
 Builds on: **reminders** (PR #27: `send_reminders` and the launchd template), **safe-settings**
 (PR #36: the three `DJANGO_*` variables), the README host warning (PR #37), and the documentation
@@ -343,3 +343,8 @@ The plan review (2026-10-16) said APPROVE WITH CHANGES. What changed:
 ## Decided by the person
 
 (Filled in after the person answers.)
+
+## Decided by the person (2026-10-16)
+
+- Approved: "Ja, bygg dem" (build all five plans, in the merge order of the build order).
+- The open questions follow the plan's recommendations (decided by the orchestrator): a new `docs/runbooks/reminders.md`; the move is word for word (no wording fixes in this PR); ADRs are not edited; README keeps a one-sentence warning about the database on a host (the person asked for that warning in PR #37).

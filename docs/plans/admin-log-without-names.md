@@ -1,6 +1,6 @@
 # Plan: the admin log keeps no names
 
-Status: draft (2026-10-16)
+Status: approved (2026-10-16) — not started
 
 Builds on: **foundation** and **accounts** (`/admin/`, `todos/admin.py`, Django's own `User`
 admin), **subtasks** (the steps inline on a to-do's admin page), **list-name-casefold** (the
@@ -383,3 +383,9 @@ The plan review (2026-10-16, an independent reviewer) said APPROVE WITH CHANGES.
 
 - (2026-10-16, from the round's brief) Keep the admin log, but without names. New rows store no
   title; a data migration removes the names from existing rows.
+
+## Decided by the person (2026-10-16)
+
+- Approved: "Ja, bygg dem" (build all five plans, in the merge order of the build order).
+- Labels: "name not kept" for a hidden inline name, `todo 42` style object labels.
+- Erasing old bytes (`PRAGMA secure_delete` / `VACUUM`) is not part of this plan; at most a separate small plan later (the recommendation on the plan card; the person approved the plans).
