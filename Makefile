@@ -15,7 +15,7 @@ layer_dirs = $(or $(wildcard */tests/$(1)),$(error No */tests/$(1) folders))
 
 help:
 	@echo "make setup            install Python and the packages, create the database, turn on the commit checks"
-	@echo "make run              copy db.sqlite3 to backups/ (once a day, keeps 14), then start the server at http://127.0.0.1:8000"
+	@echo "make run              copy db.sqlite3 to backups/ (once a day, keeps 14), remove expired sessions, then start the server at http://127.0.0.1:8000"
 	@echo "make test             run every test, then show how many passed in each layer"
 	@echo "make unit             run only the unit tests (tests/unit/ folders)"
 	@echo "make integration      run only the integration tests (tests/integration/ folders)"
@@ -36,9 +36,11 @@ setup:
 	uv run pre-commit install
 
 # A daily copy of db.sqlite3 first (at most one a day, the newest 14 are kept;
-# see todos/backup.py). If it fails, say so and start the app anyway.
+# see todos/backup.py). Then expired sessions are deleted (Django's own
+# clearsessions). If either fails, say so and start the app anyway.
 run:
 	@uv run python manage.py backup_db --daily || echo "Warning: the daily backup did not work (see the message above). The app starts anyway. Run make backup to try again."
+	@uv run python manage.py clearsessions || echo "Warning: could not remove expired sessions (see the message above). The app starts anyway."
 	uv run python manage.py runserver
 
 test:

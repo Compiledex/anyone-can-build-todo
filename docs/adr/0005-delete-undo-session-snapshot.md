@@ -47,6 +47,7 @@ state, and the id of its next copy. The snapshot goes in `request.session["undo_
   dropped, or the person logs out. If the session just expires, its row (with the snapshot) stays
   in the database, because nothing runs `clearsessions` (a known gap). See
   [Data inventory](../design/data-inventory-and-privacy.md), section 7.
+  (2026-10-16: since privacy-small-fixes, `make run` runs `clearsessions`.)
 
 ## Alternatives considered
 

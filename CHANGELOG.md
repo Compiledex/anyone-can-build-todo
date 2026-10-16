@@ -26,6 +26,15 @@ Added, Changed, Fixed, Security, plus "Under the hood" for changes you cannot se
 - The steps to switch on the Mac reminders, and the notes for a server, moved from the README to
   the runbooks; the README links to them (PR #56).
 
+### Security
+
+- `make run` now deletes expired sessions (and any old undo snapshot in them) after the daily
+  backup, before the server starts (PR #58).
+- Messages like "Deleted “Buy milk”." are kept in the session on the server, never in a browser
+  cookie (PR #58).
+- The development server's terminal no longer shows search words: request lines are printed
+  without the part after `?` (PR #58).
+
 ### Under the hood
 
 - The browser tests are split into one file per journey; the same 30 tests (PR #57).

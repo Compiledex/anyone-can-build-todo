@@ -203,7 +203,10 @@ not a plain file copy. Without `make`: `uv run python manage.py backup_db`.
 *daily copy*, for example `backups/db-20261011-081500-daily.sqlite3`, at most one a day. It keeps the
 newest 14 daily copies and deletes older **daily** copies. It never deletes the copies from
 `make backup` or `make reset`, or any other file. If the copy does not work (for example the disk is
-full), it prints a warning, and the app starts anyway; run `make backup` to try again.
+full), it prints a warning, and the app starts anyway; run `make backup` to try again. After the
+copy, `make run` also removes expired sessions (Django's `clearsessions`): old logins nobody can
+use any more, and any old undo data in them. If that fails, it prints a warning too, and the app
+starts anyway.
 
 **`make reset` asks first.** It deletes `db.sqlite3` and starts again with an empty database. So it
 first asks you to type `yes` (anything else stops, and nothing is deleted), then it makes a copy in
