@@ -109,7 +109,7 @@ team would set, and how they could be checked **locally**, without tracking anyo
 1. Should a person be able to **delete their own account**? Today only the admin can
    ([data inventory](../design/data-inventory-and-privacy.md), gap 1).
 2. Should the daily **reminders** be switched on? It needs the owner's own launchd setup
-   (`README.md`, "Reminders on your Mac").
+   ([reminders runbook](../runbooks/reminders.md)).
 3. Should members of a shared list also get reminders? Needs a per-person "reminded" table
    (`docs/plans/reminders.md`).
 4. Will it ever run on a **server**? Then: a persistent database, a password-attempt limit, closed

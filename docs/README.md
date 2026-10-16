@@ -56,6 +56,7 @@ Templates GitHub uses for new PRs and issues:
 | [QA run and bug bash](process/qa-run-and-bug-bash.md) | Did we check everything before a release? What did a group find? | Mixed |
 | [Bug reports and triage](bug-reports/README.md) | How is a bug filed and sorted? Plus three real bug reports | Real (triage cadence simulated) |
 | [Deployment runbook](runbooks/deployment.md) | How to install, start, update and roll back | Real |
+| [Reminders runbook](runbooks/reminders.md) | How to switch on the morning Mac notification, and stop it | Real |
 | [On-call and incident runbook](runbooks/on-call-and-incidents.md) | What to do when something goes wrong | Mixed |
 | [Postmortem: merged with red CI](postmortems/2026-10-09-merged-with-red-ci.md) | What went wrong, why, and what changed so it does not happen again | Real |
 | [Changelog (release notes)](../CHANGELOG.md) | What is new for the person using the app? | Real |
@@ -78,7 +79,7 @@ docs/
   adr/             architecture decision records, 0001-..., never renumbered
   process/         ticket, task plan, PR description, review by risk, test plan, QA
   bug-reports/     triage process (README) and BUG-001-...
-  runbooks/        deployment, on-call and incidents
+  runbooks/        deployment, reminders, on-call and incidents
   postmortems/     YYYY-MM-DD-....md
   retrospectives/  YYYY-MM-DD-....md
   plans/           the feature plans (history), with their own index

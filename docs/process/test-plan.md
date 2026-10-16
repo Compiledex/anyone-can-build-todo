@@ -66,7 +66,7 @@ runs the commit checks, the migration check and all tests. CI runs the same on e
 
 Files: `todos/tests/unit/test_undo.py` (1 test), `todos/tests/integration/test_delete_undo.py`
 (30 tests in the classes `DeleteTests`, `UndoTests`, `SharedUndoTests`, `RecurringUndoTests`),
-and `DeleteAndUndoTests.test_delete_and_undo` in `todos/tests/cuj/test_journeys.py`.
+and `DeleteAndUndoTests.test_delete_and_undo` in `todos/tests/cuj/test_todo_basics.py`.
 
 ### Delete
 

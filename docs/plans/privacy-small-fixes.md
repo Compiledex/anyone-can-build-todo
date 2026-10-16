@@ -1,6 +1,6 @@
 # Plan: three small privacy fixes (old sessions, messages, search words in the log)
 
-Status: approved (2026-10-16) — not started
+Status: **done** (2026-10-16)
 
 Builds on: **backup-on-run** (`make run` makes a daily copy first, and starts the app also when
 the copy fails), **delete-undo** (the undo snapshot in the session), **accounts** (login, logout,

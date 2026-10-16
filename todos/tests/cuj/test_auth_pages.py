@@ -6,7 +6,7 @@ from playwright.sync_api import expect
 
 from accounts.tests.helpers import TEST_PASSWORD
 from todos.tests.cuj.browser import BrowserTestCase
-from todos.tests.cuj.test_journeys import (
+from todos.tests.cuj.helpers import (
     AA_CONTRAST,
     DESKTOP,
     LOGIN_PAGE,

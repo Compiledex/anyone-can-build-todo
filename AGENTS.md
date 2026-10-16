@@ -31,7 +31,8 @@ file's docstrings and comments: read them before you change the file.
 
 | File | Its one job |
 |---|---|
-| `config/settings.py` | Settings for the whole project. Secret key, debug and allowed hosts come from environment variables on a live server (`DEBUG` and `SECRET_KEY` through `config/env.py`), with laptop defaults. SQLite uses `transaction_mode: "IMMEDIATE"`, so two writing requests wait for each other instead of failing. `TIME_ZONE` is `"Asia/Tokyo"` (the person's choice): "today" is the date in Tokyo. |
+| `config/settings.py` | Settings for the whole project. Secret key, debug and allowed hosts come from environment variables on a live server (`DEBUG` and `SECRET_KEY` through `config/env.py`), with laptop defaults. SQLite uses `transaction_mode: "IMMEDIATE"`, so two writing requests wait for each other instead of failing. `TIME_ZONE` is `"Asia/Tokyo"` (the person's choice): "today" is the date in Tokyo. `MESSAGE_STORAGE` is the session storage: message text is never in a cookie. `LOGGING` repeats Django's own `django.server` logger and adds `DropQueryString`; the rest is Django's default logging. |
+| `config/logging_filters.py` | `DropQueryString`: removes the query string (`?` up to a space) from every text argument of a `django.server` log line, so search words are never printed in the terminal. It changes `record.args`, never `record.msg`, and never drops a line. |
 | `config/env.py` | Pure functions that read the environment (a dict): `read_debug`, `read_secret_key`, `is_strong`. A bad `DJANGO_DEBUG`, or (with debug off) a missing or weak secret key, raises `ImproperlyConfigured` (Django's "the settings are wrong" error, which stops the app). No message ever shows the key or the value of `DJANGO_DEBUG`. |
 | `config/urls.py` | `/admin/` to Django's admin, `/accounts/` to `accounts/urls.py`, everything else to `todos/urls.py`. |
 | `accounts/` | Sign up, log in, log out, with Django's own `User`, `LoginView`, `LogoutView` and `UserCreationForm`. No models. `accounts/admin.py` registers Django's own `User` and `Group` admins again, with `NoNamesInLog` first (the pages are unchanged). |
@@ -72,13 +73,13 @@ file's docstrings and comments: read them before you change the file.
 | `todos/management/commands/send_reminders.py` | `python manage.py send_reminders --user <username>`. It prints one line, never a to-do title. |
 | `todos/backup.py` | `backup_database`: a whole copy of the SQLite file with SQLite's online backup, also while the app runs; it never changes or makes `source`, never overwrites a file, leaves no file when it fails, and the copy is mode 600. `daily_backup` (for `make run`): at most one `...-daily.sqlite3` a day, then `prune_daily` keeps the newest `DAILY_KEEP` (14), today's always included. `daily_copies` is the only list it deletes from (a regular file whose whole name matches `DAILY_NAME`), so copies from `make backup` and `make reset` are never deleted. Standard library only. |
 | `todos/management/commands/backup_db.py` | `python manage.py backup_db` (and `--daily`, only for `make run`) into `BASE_DIR / "backups"`. `--source` and `--folder` are for the tests only; the `Makefile` never uses them. `backups/` is in `.gitignore`. |
-| `deploy/macos/com.anyone-can-build-todo.reminders.plist` | The launchd template that runs `send_reminders` at 08:00. The person fills it in and installs it (see `README.md`); the AI never installs it, never runs `launchctl`, and never writes to `~/Library`. |
+| `deploy/macos/com.anyone-can-build-todo.reminders.plist` | The launchd template that runs `send_reminders` at 08:00. The person fills it in and installs it (see `docs/runbooks/reminders.md`); the AI never installs it, never runs `launchctl`, and never writes to `~/Library`. |
 | `todos/tests/helpers.py` | `FakeOsascriptMixin` (every reminders test uses it, so a test never shows a real notification), `add_todo`, `shown_titles`, `messages_of`, `button_form` (a button with a `formaction` and its form's hidden fields), `count_queries` (raises when there were no queries) and `webp_size`. A test file may keep a one-line wrapper with its own defaults that calls them. |
 | `todos/tests/unit/` | Unit tests: one method on its own, no requests, no database. |
 | `todos/tests/integration/` | Integration tests: Django's test client, from the address to the database. One file per feature (`test_views.py`, `test_access.py`, `test_sharing.py`, `test_list_page_size.py`, and so on). |
-| `todos/tests/cuj/` | CUJ tests (critical user journeys): a real Chromium browser, driven by Playwright. |
+| `todos/tests/cuj/` | CUJ tests (critical user journeys): a real Chromium browser, driven by Playwright. One file per journey (`test_todo_basics.py`, `test_steps_and_repeat.py`, `test_lists_and_people.py`, `test_find_and_order.py`, `test_landing_page.py`, `test_look_and_feel.py`, `test_auth_pages.py`); `browser.py` holds `BrowserTestCase`, `helpers.py` what several files share (`make_user_with_inbox`, `contrast`, `DONE`, the page addresses). A helper module's name never starts with `test`. |
 | `config/test_runner.py` | Finds each test's layer from its folder, checks the layer rules, and prints one line per layer. |
-| `config/tests/unit/`, `config/tests/integration/` | Tests for the test runner and `config/env.py`, and `manage.py check` in a new process with chosen `DJANGO_*` variables. |
+| `config/tests/unit/`, `config/tests/integration/` | Tests for the test runner, `config/env.py`, the logging filter and the server's request lines, and `manage.py check` in a new process with chosen `DJANGO_*` variables. |
 | `todos/migrations/` | Made by Django from `models.py`. Never edit these by hand. One exception: a data migration (one that changes rows, like `0006_default_lists.py`) is meant to be written. `0023_blank_admin_log_names.py` is one: it replaced the names in the admin log with labels (it keeps frozen copies of `todos/admin_log.py`'s rules). |
 | `pyproject.toml`, `uv.lock` | The packages and their exact versions. |
 | `.pre-commit-config.yaml` | The checks that run on every `git commit`. |
@@ -96,8 +97,9 @@ This project uses **uv** to install Python and the packages. Run every Python co
 
 - `make setup` — install everything, create the database, turn on the commit checks
 - `make run` — first a daily copy of `db.sqlite3` in `backups/` (at most one a day, the newest 14
-  daily copies stay; if it fails, a warning, and the server starts anyway), then start the server at
-  <http://127.0.0.1:8000>
+  daily copies stay; if it fails, a warning, and the server starts anyway), then Django's
+  `clearsessions` (deletes expired sessions; if it fails, a warning, and the server starts anyway),
+  then start the server at <http://127.0.0.1:8000>
 - `make test` — run every test, then show how many passed in each layer
 - `make unit` / `make integration` / `make cuj` — run only one layer
 - `make lint` / `make format` — Ruff: find mistakes, and rewrite code in the standard style
