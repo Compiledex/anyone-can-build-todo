@@ -45,6 +45,7 @@ In the order they were built:
 | [recurring-copy-rules](recurring-copy-rules.md) | Undo keeps a changed copy; Repeat on a done to-do makes the copy | [#50](https://github.com/Compiledex/anyone-can-build-todo/pull/50) | 2026-10-11 |
 | [delete-undo](delete-undo.md) | Undo after deleting a to-do | [#51](https://github.com/Compiledex/anyone-can-build-todo/pull/51) | 2026-10-11 |
 | [cleanups](cleanups.md) | Rename / to home, lighter list HTML, shorter AGENTS.md | [#52](https://github.com/Compiledex/anyone-can-build-todo/pull/52) | 2026-10-11 |
-| [split-browser-tests](split-browser-tests.md) | Split the browser tests into one file per journey | — | 2026-10-16 |
+| [readme-to-runbooks](readme-to-runbooks.md) | Reminders and server steps move from the README to the runbooks | [#56](https://github.com/Compiledex/anyone-can-build-todo/pull/56) | 2026-10-16 |
+| [split-browser-tests](split-browser-tests.md) | Split the browser tests into one file per journey | [#57](https://github.com/Compiledex/anyone-can-build-todo/pull/57) | 2026-10-16 |
 
-The plans themselves were merged in PRs #3, #4 (fixes), #26 (reminders), #30 (redesign), #34, #39, #42 and #47.
+The plans themselves were merged in PRs #3, #4 (fixes), #26 (reminders), #30 (redesign), #34, #39, #42, #47 and #55.
