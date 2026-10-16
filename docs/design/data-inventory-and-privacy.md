@@ -68,11 +68,12 @@ only.
 
 | Data | Retention |
 |---|---|
-| Accounts, lists, to-dos, tags, steps | Until the person (or the admin) deletes them. |
+| Accounts, lists, to-dos, tags, steps | Until the person (or the admin) deletes them. A person deletes their own account, and everything they own, on "Delete your account" (section 6). |
 | A deleted to-do | Gone from `db.sqlite3` at once (no soft delete, [ADR 0005](../adr/0005-delete-undo-session-snapshot.md)). It can still be in the session for a short time, and in backups. |
 | Daily backups (`make run`) | The newest 14 daily copies (`DAILY_KEEP = 14` in `todos/backup.py`). Older daily copies are deleted. |
 | Manual backups (`make backup`, `make reset`) | **Forever**, until the owner deletes them by hand. |
 | Expired session rows | Stay in `django_session` until `manage.py clearsessions` runs. Nothing runs it today (known gap). |
+| Sessions after an account delete | Every session row of the deleted user goes in the same transaction. With session message storage, one new session row then holds only the message "Your account was deleted." (no user id) until the landing page shows it; then it is saved as `{}` (no user id, no text) and the `sessionid` cookie is set again for two weeks. That `{}` row stays in `django_session` until `clearsessions` deletes it after it expires. |
 
 ## 5. What is never collected
 
@@ -95,14 +96,15 @@ only.
 | Delete the done to-dos of a list | "Clear completed". | Cannot be undone. |
 | Delete a list | "Delete list" (owner only). | Its to-dos and member rows go too. |
 | Stop seeing a shared list | "Leave this list" (member). | The to-dos the member added stay in the list. |
-| Delete an account | **No page for it** (known gap). The admin can delete the user at `/admin/`. | Cascade: the user's lists, their to-dos, tags and memberships go. To-dos they added to *other people's* lists stay, because they belong to those lists. |
+| Delete an account | "Delete your account" (`/accounts/delete/`; click "Logged in as <name>" at the top), with the password. The admin can also delete a user at `/admin/`. | Cascade: the user's own lists (with all their to-dos, also those members added, and their steps), their tags, their memberships, their admin log rows, and every session of the user go. Members of the user's shared lists lose those lists. Lists shared *with* the user stay with their owners, with the to-dos the user added there. Copies in `backups/` still hold the data (the page says so). |
 | Delete everything | `make reset` (asks `yes` first). | It makes a backup first. |
 | Remove data from backups | Delete the files in `backups/` by hand. | A daily copy leaves by itself after 14 newer ones. |
 
 ## 7. Known gaps and recommendations
 
-1. **No self-service account delete.** Add a "Delete my account" page (POST, password check)
-   before anyone besides the owner relies on the app.
+1. ~~**No self-service account delete.**~~ Closed: a person can delete their own account
+   (POST, password check, its sessions go too); see the plan
+   [delete-account](../plans/delete-account.md).
 2. **Expired sessions are not cleaned.** Run `clearsessions` now and then, or from `make run`.
 3. **Manual backups never expire** and hold every account and to-do. The README says: do not share
    them; copy them only to a safe place.

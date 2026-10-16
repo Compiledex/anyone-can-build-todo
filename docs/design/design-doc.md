@@ -239,6 +239,8 @@ with `/` and Django's `url_has_allowed_host_and_scheme` accepts it. This stops a
 - Sign-up makes the first list, "Inbox". Names are unique per owner, ignoring case for every
   letter; names of lists shared with you do not count.
 - Delete list and "Clear completed" ask first. Leave asks first. Share by exact username.
+- Deleting your account deletes the lists you own: their members lose them. Lists shared with you
+  stay with their owners (only your membership goes, the to-dos you added stay).
 - A step (`Subtask`) is one level only and has no owner: whoever can see the to-do may change its
   steps. A step's address holds only the step's number.
 
@@ -288,9 +290,9 @@ secure cookies and HSTS turn on. No message shows a secret value (PR #36).
 
 | Layer | Folder | Tool | Count |
 |---|---|---|---|
-| CUJ | `*/tests/cuj/` | Chromium driven by Playwright | 30 |
-| Integration | `*/tests/integration/` | Django's test client | 577 |
-| Unit | `*/tests/unit/` | One function, no database | 124 |
+| CUJ | `*/tests/cuj/` | Chromium driven by Playwright | 31 |
+| Integration | `*/tests/integration/` | Django's test client | 601 |
+| Unit | `*/tests/unit/` | One function, no database | 129 |
 
 Rule: test each rule once, in the lowest layer where a person would notice it (test-pyramid,
 PR #1). `config/test_runner.py` stops before running if a test is in the wrong folder or class.
@@ -311,7 +313,6 @@ on every push; a ruleset on `main` requires both green. Reviewers break the code
 | Custom SQL functions | Other SQLite tools cannot run search or title sort. |
 | No threaded test for two requests at once | `IMMEDIATE` and idempotent toggles cover the known cases. |
 | Open sign-up, no password-attempt limit | Must change before going public. |
-| No "delete my account" page | Only the admin can delete a user ([data inventory](data-inventory-and-privacy.md), gap 1). |
 | Expired sessions are never cleared | Their rows (with any undo snapshot) stay in `django_session`; nothing runs `clearsessions` (gap 2). |
 | Messages cookie is signed, not encrypted | A to-do title in "Deleted “…”." can be read in the browser's cookies (gap 4). |
 | Search words in the server log | A search is a `GET` address, so the development server prints `?q=...` in the terminal (gap 5). |

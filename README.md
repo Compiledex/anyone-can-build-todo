@@ -92,7 +92,8 @@ The app follows the light or dark setting of your computer or phone. It works on
 
 Every page needs a login. A person sees only their own lists and the lists shared with them;
 someone else's list gives "not found", as if it did not exist. A visitor who is not logged in only
-sees a front page that explains the app, with **Create an account** and **Log in**.
+sees a front page that explains the app, with **Create an account** and **Log in**. You can
+delete your account (click your name at the top); your lists and to-dos go with it.
 
 Optional: your Mac can show you **one notification each morning** with the to-dos due that day.
 It is off until you set it up; see [Reminders on your Mac](#reminders-on-your-mac).
@@ -176,9 +177,9 @@ numbers grow with the app):
 
 ```
 Test layers
-  CUJ          30 passed
-  Integration  577 passed
-  Unit         124 passed
+  CUJ          31 passed
+  Integration  601 passed
+  Unit         129 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
@@ -306,7 +307,8 @@ the Terminal. These steps change your Mac's settings, so you do them yourself (n
    could not go into the project folder (see step 1).
 8. **To change or stop it:** run the `bootout` line, change the file (or fill it in again with
    step 5), and run `bootstrap` again. To stop it for good, run `bootout` and delete the file from
-   `~/Library/LaunchAgents/`.
+   `~/Library/LaunchAgents/`. If you delete that account, remove the launchd job too, or a new
+   account with the same name gets its reminders.
 
 If the Mac is asleep at 08:00, the job runs when it wakes up. If the Mac is shut down, it does not
 run that day: run the command by hand. The job runs the code that is in the project folder now, so

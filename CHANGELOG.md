@@ -19,6 +19,18 @@ work, so the history is easy to read. Dates are Tokyo dates (the app's `TIME_ZON
 names its pull request (PR). The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/):
 Added, Changed, Fixed, Security, plus "Under the hood" for changes you cannot see.
 
+## [Unreleased]
+
+### Added
+
+- Delete your own account: click "Logged in as <name>" at the top. The page shows what will go,
+  asks for your password, and then deletes your lists, their to-dos and your tags; members of your
+  shared lists lose them, and lists shared with you stay with their owners (delete-account).
+
+### Security
+
+- Deleting an account also deletes every session of that account, on every browser (delete-account).
+
 ## [0.5.1] - 2026-10-16
 
 ### Fixed
