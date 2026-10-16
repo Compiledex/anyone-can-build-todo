@@ -83,6 +83,7 @@ file's docstrings and comments: read them before you change the file.
 | `.pre-commit-config.yaml` | The checks that run on every `git commit`. |
 | `Makefile` | Short commands. `make help` lists them. |
 | `.github/workflows/check.yml` | CI: on every push and pull request, the jobs `lint` (every commit check, the migration check) and `test` (all three layers), with no `DJANGO_*` variable. A ruleset on `main` requires both to be green, and blocks deleting or force-pushing `main`. |
+| `docs/design.md` | The design document: the big picture and **why** the app is built this way (architecture, data model, access control, key behaviours, testing, limits). For file rules, this file wins; when the code changes the design, update it in the same PR. |
 | `docs/plans/` | One plan per feature, written and approved before the code. **History**: they say what was decided and why, not how the code is now. Their Status line says when they were built. |
 
 ## Commands
