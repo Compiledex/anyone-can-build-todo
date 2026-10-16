@@ -37,8 +37,9 @@ Never paste real to-do text, passwords, or a copy of db.sqlite3. Use invented da
 
 ## Severity
 
-<!-- One of: S1 data lost or another user's data shown; S2 a feature does not work, no
-workaround; S3 works with a workaround; S4 looks wrong. -->
+<!-- One of (see docs/bug-reports/README.md): S1 data lost, or another user's data shown;
+S2 a main journey broken or data wrong, no easy workaround; S3 wrong, but with a workaround;
+S4 cosmetic. -->
 
 ## Notes
 

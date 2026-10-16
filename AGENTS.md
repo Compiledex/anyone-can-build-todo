@@ -83,7 +83,10 @@ file's docstrings and comments: read them before you change the file.
 | `.pre-commit-config.yaml` | The checks that run on every `git commit`. |
 | `Makefile` | Short commands. `make help` lists them. |
 | `.github/workflows/check.yml` | CI: on every push and pull request, the jobs `lint` (every commit check, the migration check) and `test` (all three layers), with no `DJANGO_*` variable. A ruleset on `main` requires both to be green, and blocks deleting or force-pushing `main`. |
-| `docs/plans/` | One plan per feature, written and approved before the code. **History**: they say what was decided and why, not how the code is now. Their Status line says when they were built. |
+| `docs/README.md` and the other `docs/` folders | The documentation set: one example of each document type a team writes (PRD, design doc, ADRs, runbooks, postmortem, retrospective, ...), listed by phase in `docs/README.md`. Like the plans, they describe the app when they were written; the code and this file win. Invented content is marked SIMULATED. |
+| `docs/plans/` | One plan per feature, written and approved before the code. **History**: they say what was decided and why, not how the code is now. Their Status line says when they were built. `docs/plans/README.md` lists them with their PRs. |
+| `CHANGELOG.md` | The release notes, newest first. Add a line for a change a person using the app would notice. |
+| `.github/pull_request_template.md`, `.github/ISSUE_TEMPLATE/` | The templates GitHub puts in a new PR or issue. |
 
 ## Commands
 
