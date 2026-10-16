@@ -355,11 +355,9 @@ runs the same checks and the tests on every push.
 | `todos/tests/` | The tests, one folder per layer (unit, integration, CUJ) |
 | `deploy/macos/` | The launchd template for the morning reminders on a Mac |
 | `scripts/` | The tool behind `make landing-shots` |
-| `docs/design.md` | The design: the big picture, and why the app is built this way |
 | `docs/plans/` | The plan for each feature, written before the code; history, not a description of the code today |
 
-Each file's job is in `AGENTS.md`. The big picture, and why the app is built this way, is in
-[`docs/design.md`](docs/design.md).
+Each file's job is in `AGENTS.md`.
 
 ## Put it on the internet
 
