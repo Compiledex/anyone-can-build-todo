@@ -80,8 +80,9 @@ run:
   touched. No new Python code.
 - **After the backup.** The same rule as `make reset`: first the copy, then a change. If a
   delete ever went wrong, the copy of the same minute still has the rows. The cost: the daily copy
-  of that day still holds the sessions that expired since the last `make run` (they leave the
-  copies after 14 days, like every daily copy). The next copy no longer has them. See open
+  of the day (made by the first `make run` of that day) still holds the sessions that expired
+  since the last run (they leave the copies after 14 days, like every daily copy). The next
+  day's copy no longer has them. See open
   question 1.
 - **It runs also when the backup failed.** The two steps are independent: an expired session has
   no use to anyone (it cannot log in, and its undo snapshot is older than 15 minutes, so it can
@@ -133,9 +134,11 @@ worktree (deleted again):
   no `messages.*` call; Django's `LoginView` and `LogoutView` add none). So no flow loses one.
   The login page can show a message (`site_base.html`), and its test changes (Tests).
 - **A message for a visitor who is not logged in** now makes a session row (today: a cookie).
-  No such message exists today; delete-account will add one ("Your account was deleted."). The
-  row is removed on logout or by `clearsessions` after it expires; once the message is shown, the
-  session is empty and Django deletes the session cookie.
+  No such message exists today; delete-account will add one ("Your account was deleted."). Once
+  the message is shown, `SessionStorage` removes `_messages`, so the session is changed: Django
+  saves the row as an empty session (`{}`) and sets the `sessionid` cookie again (two weeks). No
+  text stays in it; `clearsessions` removes the row after it expires. Accepted (decided by the
+  coordinator in the plan review).
 - **An old `messages` cookie** in a browser from before this change is ignored (no code reads it).
   `CookieStorage` set it without `max_age`, so the browser drops it when it closes, and it was
   already removed after its message was shown. No code to delete it.
@@ -149,9 +152,9 @@ worktree (deleted again):
 import logging
 import re
 
-# "?" and everything after it up to a space or a quote: the query string of an
-# address in a request line, for example "?q=milk&sort=title".
-QUERY_STRING = re.compile(r"\?[^\s'\"]*")
+# "?" and everything after it up to a space: the query string of an address in
+# a request line, for example "?q=milk&sort=title".
+QUERY_STRING = re.compile(r"\?\S*")
 
 
 class DropQueryString(logging.Filter):
@@ -177,9 +180,15 @@ class DropQueryString(logging.Filter):
 - **Every text argument**, not only the first: Django's other `django.server` line,
   `log_error("code %d, message %s", 400, "Bad request syntax ('GET /?q=... HTTP/1.1')")`, has the
   request line inside the second argument.
-- **It stops at a space or a quote**, so ` HTTP/1.1` and the `')` of that error stay. A browser
-  never sends a raw space in an address (it sends `+` or `%20`), so a real search is always
-  removed whole.
+- **It stops only at a space**, so ` HTTP/1.1` stays. It does **not** stop at a quote: a raw
+  `'` or `"` can be in a query (`/?q=don't+tell`), and stopping there would leak `'t+tell`. The
+  cost is cosmetic: in a "Bad request syntax ('GET /?q=x')" line with no ` HTTP/1.1`, the
+  closing `')` is removed too.
+- **Known limit**: a browser never sends a raw space in an address (it sends `+` or `%20`), so a
+  real search is always removed whole. A hand-made request with a raw space in the query (only
+  with tools like `curl` or `nc`) gives a "Bad request syntax" line in which the words after the
+  space are still printed. Accepted (decided by the coordinator in the plan review); the data
+  inventory names it.
 - **It never returns `False`**: no line is hidden, only shortened.
 - **Only `django.server`**: the filter sits on that logger, so it runs for every record logged
   there, whatever handler prints it (also a test's `assertLogs`). `django.request` needs none
@@ -298,11 +307,12 @@ admin-log-without-names → delete-account.**
 | `config/tests/integration/test_server_log.py` (new) | `ServerLogTests`. |
 | `todos/tests/integration/test_backup.py` | The fake `uv` knows `clearsessions` (`FAKE_CLEAR_EXIT`); `FakeUvTestCase.run_make(clear_fails=...)`; `MakeRunTests` checks the order and the new warning. |
 | `todos/tests/integration/test_privacy.py` (new) | `ExpiredSessionsTests`, `MessagesInSessionTests`. |
-| `accounts/tests/integration/test_auth_pages.py` | `MessagesTests.test_a_message_shows_on_the_login_page` puts its message in the session (not a cookie); a new test that a message survives login. |
+| `accounts/tests/integration/test_auth_pages.py` | `MessagesTests.test_a_message_shows_on_the_login_page` puts its message in the session (not a cookie); a new test that `cycle_key` keeps a message at login. |
+| `todos/tests/integration/test_delete_undo.py` | `UndoTests.test_no_undo_button_for_a_message_without_its_snapshot_after_login` puts its message (tagged `undo-delete-7`) in the session's `_messages`, with no `undo_delete` snapshot, instead of a `CookieStorage` cookie. |
 | `README.md` | "Back up your data" (the `make run` paragraph): it also removes expired sessions. |
-| `docs/runbooks/deployment.md` | Section 2 "Start": `make run` also runs `clearsessions`. |
+| `docs/runbooks/deployment.md` | Section "2. Start and stop": `make run` also runs `clearsessions`. |
 | `docs/runbooks/on-call-and-incidents.md` | One row in the error table: "Warning: could not remove expired sessions" (cause: database locked or missing tables; fix: `make setup` / look at the message above; the app still works). |
-| `docs/design/data-inventory-and-privacy.md` | Sections 1, 3, 4 and 5: the messages row (session, not cookie), the expired sessions row (`make run` removes them), the terminal row and the "small leak" (no query string). Section 7: gaps 2, 4 and 5 say **Closed** (keep the numbers, so "gap N" links stay right). |
+| `docs/design/data-inventory-and-privacy.md` | Sections 1, 3, 4 and 5: the messages row (session, not cookie; a shown visitor message leaves an empty session row), the expired sessions row (`make run` removes them), the terminal row and the "small leak" (no query string; the raw-space limit). Section 7: gaps 2, 4 and 5 say **Closed** (keep the numbers, so "gap N" links stay right). |
 | `docs/design/design-doc.md` | Section 12: remove the rows for gaps 2, 4 and 5; the `make run` row in the commands table. |
 | `docs/product/prd.md` | Open question 6 asks only about the admin log (gap 6). |
 | `CHANGELOG.md` | `## [Unreleased]`: under **Security**, the three fixes in plain words. |
@@ -341,6 +351,7 @@ format `'"%s" %s %s'`, runs `DropQueryString().filter(record)`, and checks
 | `test_line_without_query_is_unchanged` | `GET /lists/3/ HTTP/1.1` stays exactly the same (the "nothing happens" case), and so does a path with `%` like `/static/a%20b.css`. | A filter that cuts too much, or formats `msg` itself. |
 | `test_login_next_is_removed` | `GET /accounts/login/?next=/lists/3/%3Fq%3Dsecret HTTP/1.1` gives `GET /accounts/login/ HTTP/1.1`. | Removing only `q=`. |
 | `test_status_and_size_stay` | `args[1]` and `args[2]` (`"404"`, `"10"`) are unchanged, and `record.status_code` too. | Changing the wrong argument. |
+| `test_quotes_in_the_query_are_removed_too` | `GET /?q=don't+tell HTTP/1.1` gives `GET / HTTP/1.1`, and the same with `"` (`/?q=say+"hi"`): no `t+tell`, no `hi`. | A pattern that stops at a quote. |
 | `test_error_line_in_a_later_argument` | `"code %d, message %s"` with `(400, "Bad request syntax ('GET /?q=secret HTTP/1.1')")` gives `... Bad request syntax ('GET / HTTP/1.1')`; the int `400` is still an int. | Only `args[0]`, or `str()` on every argument. |
 | `test_never_drops_a_line` | `filter()` returns `True` for every case above, and for a record with no args and one with a dict as args (left as it is). | Returning the cleaned text, or `False`. |
 
@@ -379,7 +390,13 @@ socket, no server, no port), and calls Django's own `log_request(code, size)`.
 | Test | What it checks | The break that fails it |
 |---|---|---|
 | `MessagesTests.test_a_message_shows_on_the_login_page` (changed) | The message is put in the client's session (`request.session = self.client.session`, `request._messages = SessionStorage(request)`, `messages.info(...)`, `request._messages.update(HttpResponse())`, `request.session.save()`), not in a cookie; the login page shows it in the one message box, above the title (as today). | The old way (a `CookieStorage` cookie) would no longer show. |
-| `MessagesTests.test_a_message_survives_login` (new) | A message in a visitor's session; alice logs in (POST to the login page, follow): the first page after login shows it. | A flush instead of `cycle_key` (a message lost at login). |
+| `MessagesTests.test_a_message_survives_login` (new) | Not a user flow (the app has no message before login today); a guard that `login()` uses `cycle_key`, which keeps the session's data: a message in a visitor's session, alice logs in (POST to the login page, follow), the first page after login shows it. | A flush instead of `cycle_key` (a message lost at login). |
+
+### Integration: `todos/tests/integration/test_delete_undo.py`
+
+| Test | What it checks | The break that fails it |
+|---|---|---|
+| `UndoTests.test_no_undo_button_for_a_message_without_its_snapshot_after_login` (changed) | The message "Deleted “X”." tagged `undo-delete-7` is put in `self.client.session["_messages"]` (made with `SessionStorage`, as in `MessagesTests`), with no `undo_delete` key; the list page shows the message and no Undo form (as today). | The old cookie no longer reaches the page, so the test would pass for the wrong reason or fail on "Deleted “X”.". |
 
 ### Integration: `todos/tests/integration/test_backup.py` (`MakeRunTests`, the real `Makefile` with a fake `uv`)
 
@@ -392,6 +409,7 @@ no port is used.
 | `test_run_backs_up_then_starts` (changed) | The log has `backup_db --daily`, then `clearsessions`, then `runserver`, in this order; exit 0; no "Warning". | No `clearsessions`, or before the backup. |
 | `test_failed_backup_still_starts_with_a_warning` (changed) | With a failed backup: `clearsessions` and `runserver` still run, the backup warning is printed. | Stopping after a failed backup. |
 | `test_failed_clearsessions_still_starts_with_a_warning` (new) | With `clear_fails=True`: `runserver` runs, the output has "Warning: could not remove expired sessions", not the backup warning; exit 0. | Stopping the app, no warning, or the wrong warning. |
+| `test_both_fail_both_warn_and_start` (new) | With `backup_fails=True` and `clear_fails=True`: both warnings are printed, `runserver` runs; exit 0. | One failure hiding the other, or stopping the app. |
 | `test_backup_target_has_no_daily_flag` | Unchanged: `make backup` runs no `clearsessions`. | `clearsessions` added to the wrong target. |
 
 No CUJ test: a person sees no change, and each rule is tested in the lowest layer where it shows.
@@ -416,8 +434,11 @@ Verification by the planner (2026-10-16), against `main` (`2c75b89`) and Django 
 
 - Confirmed: `MESSAGE_STORAGE` is not set (so `FallbackStorage`, cookie first); `SessionMiddleware`
   comes before `MessageMiddleware`; no `SESSION_ENGINE` (database sessions).
-- Confirmed: the app adds no message in login, logout or sign-up; `MessagesTests` in
-  `accounts/tests/integration/test_auth_pages.py` plants a `CookieStorage` cookie and must change.
+- Confirmed: the app adds no message in login, logout or sign-up. Two tests plant a
+  `CookieStorage` cookie and must change: `MessagesTests` in
+  `accounts/tests/integration/test_auth_pages.py`, and
+  `UndoTests.test_no_undo_button_for_a_message_without_its_snapshot_after_login` in
+  `todos/tests/integration/test_delete_undo.py` (found by the plan review).
 - Confirmed with a throw-away prototype test (session storage switched on with
   `override_settings`, then deleted): a delete gives no `messages` cookie and puts `_messages` in
   the session; the next page removes it; a message survives `login()`; a message added before or
@@ -429,7 +450,17 @@ Verification by the planner (2026-10-16), against `main` (`2c75b89`) and Django 
   `QuietWSGIRequestHandler`; `scripts/landing_shots.py` sends the server's stderr to
   `/dev/null`.
 
-Not reviewed yet by an independent plan reviewer.
+The plan review (2026-10-16, an independent reviewer) said APPROVE WITH CHANGES. What changed:
+
+- HIGH: the undo test in `test_delete_undo.py` also plants a cookie message; it is now in Changes
+  and Tests (the message moves to the session, with no snapshot).
+- The pattern is `\?\S*` (it stops only at a space): `[^\s'"]*` leaked the words after a `'` or
+  `"` in a query. Unit test with both quotes. The raw-space case is a documented known limit.
+- Decision 2: after a visitor's message is shown, the session row stays as `{}` and the cookie is
+  set again; no text, accepted.
+- Decision 1: "the daily copy of the day, made by the first `make run`"; a `MakeRunTests` case
+  where both steps fail. The runbook section is "2. Start and stop".
+- `test_a_message_survives_login` is described as a `cycle_key` guard, not a user flow.
 
 ## Decided by the person
 

@@ -150,8 +150,9 @@ class NoNamesInLog:
 - `log_label(obj)` is `f"{obj._meta.model_name} {obj.pk}"`: `todo 42`, `todolist 3`,
   `user 2`, `group 1`. `model_name` is the same text as `content_type.model` (both from the
   model's class name), so the data migration can make **exactly the same label** from a row's
-  content type and `object_id`. With no content type: `object <id>`; with no id: only the model
-  name.
+  content type and `object_id`. With no id: only the model name. The `object <id>` branch (a row
+  whose content type was deleted, `content_type` is `NULL`) exists **only in the migration's
+  `frozen_label`**: a new row always has an object, so `log_label` never needs it.
 - **Why not empty**: "Recent actions" uses `object_repr` as the link text. An empty one is an
   invisible link, and a deletion shows nothing at all. With the label, the box shows
   "todo 42" (a link to the to-do's admin page while it exists) with "Todo" under it.
@@ -180,9 +181,11 @@ Written by hand (AGENTS.md allows data migrations).
   "0003_logentry_add_action_flag_choices")` (the newest admin migration in Django 5.2), and
   `("contenttypes", "0002_remove_content_type_name")` (the content type model as it is now).
 - Forward, `blank_names(apps, schema_editor)`: for every `LogEntry` row (historical model,
-  `select_related("content_type")`, `.iterator()`): `object_repr = frozen_label(row)[:200]`,
-  `change_message = frozen_hide_names(row.change_message)`; then `bulk_update(rows,
-  ["object_repr", "change_message"], batch_size=500)`. Nothing else in the row changes.
+  `select_related("content_type")`, in order of `pk`): `object_repr = frozen_label(row)[:200]`,
+  `change_message = frozen_hide_names(row.change_message)`. The rows are read and written in
+  chunks of 500 (`iterator(chunk_size=500)`, and `bulk_update(chunk, ["object_repr",
+  "change_message"])` after each chunk), so a big log never sits in memory at once. Nothing else
+  in the row changes.
 - `frozen_label` and `frozen_hide_names` are **copies** in the migration file (as
   `0020_fill_list_name_key.py` copies `casefold`), so the migration never changes when
   `todos/admin_log.py` changes later. `frozen_label` uses `row.content_type.model` and
@@ -261,7 +264,7 @@ admin-log-without-names (this) → delete-account.**
 | `todos/tests/unit/test_admin_log.py` (new) | `HideNamesTests`, `LogLabelTests`. |
 | `todos/tests/integration/test_admin_log.py` (new) | `AdminLogTests`. |
 | `todos/tests/integration/test_migrations.py` | `BlankAdminLogNamesMigrationTests`; names of the migrations at the top. |
-| `docs/design/data-inventory-and-privacy.md` | Section 2: the `django_admin_log` row (labels, no names). Section 7: gap 6 says **Closed** (keep the number), with the note about backups and free pages. |
+| `docs/design/data-inventory-and-privacy.md` | Section 2: the `django_admin_log` row (labels, no names). Section 3: a staff user's session holds the admin's success message (with a title, for example "The to-do “…” was deleted successfully.") until the next admin page shows it; accepted. Section 7: gap 6 says **Closed** (keep the number), with the note about backups and free pages. |
 | `docs/design/design-doc.md` | Section 12: remove the "Admin log keeps object names" row. |
 | `docs/product/prd.md` | Remove open question 6 (all its gaps are closed). |
 | `docs/product/tracking-plan.md` | The sentence "the only records of activity are Django's admin log and ..." gets "(without names)". |
@@ -315,7 +318,7 @@ admin pages are read from a `GET` of the page first (the steps inline uses the p
 | `test_list_change_keeps_no_name` | Rename "Secret errands" in `/admin/todos/todolist/<pk>/change/`: `todolist <pk>`, fields `["Name"]`. | `TodoListAdmin` without the mixin. |
 | `test_deleting_a_user_keeps_no_username` | Delete carol at `/admin/auth/user/<pk>/delete/`: the row is `user <pk>`, no "carol". | Django's own `UserAdmin` still registered. |
 | `test_recent_actions_show_the_label` | After an add, `GET /admin/` shows `todo <pk>` in the "Recent actions" box, as a link to the change page, and not the title. | An empty `object_repr` (invisible link). |
-| `test_every_admin_hides_names` | Every model admin in `admin.site._registry` is an instance of `NoNamesInLog` (today: `TodoList`, `Todo`, `User`, `Group`). | A new admin without the mixin. |
+| `test_every_admin_hides_names` | For every model admin in `admin.site._registry` (today: `TodoList`, `Todo`, `User`, `Group`): `type(ma).log_addition is NoNamesInLog.log_addition`, the same for `log_change` and `log_deletions` (so a parent later in the MRO cannot win), and `type(ma).log_deletion is ModelAdmin.log_deletion` (no class brings back Django's deprecated path, which stores `str(obj)`). | A new admin without the mixin, the mixin after `ModelAdmin` in the parents, or an override of `log_deletion`. |
 | `test_rows_match_djangos_own_except_names` | For one to-do, `LogEntry.objects.log_actions(..., single_object=True)` and the mixin's `log_change`: all fields equal except `id`, `action_time`, `object_repr`, `change_message`. | A Django upgrade that adds a log field the copy misses. |
 | `test_normal_user_cannot_open_the_admin` | alice (not staff) and a visitor get a redirect to the admin's login page for `/admin/`, and the page has no log rows. | An admin open to non-staff. |
 
@@ -338,12 +341,8 @@ No CUJ test: the owner sees the change only in `/admin/`, and the integration te
 
 ## Open questions
 
-1. **The text for a hidden inline name.** "name not kept", **recommended**: plain words that
-   say it was left out on purpose. Other choices: `""` (the history page then says Added subtask
-   “”.), or "…".
-2. **The label.** `todo 42` (model code name and id), **recommended**: the same rule for new rows
-   and the migration, no user text, and a visible link in "Recent actions". Empty
-   `object_repr`, as first said in the shared context, gives invisible links.
+1. **The text for a hidden inline name.** Decided in the plan review: "name not kept".
+2. **The label.** Decided in the plan review: `todo 42` style (model code name and id).
 3. **Erase old bytes from the file?** Not in this plan, **recommended**: overwritten names can
    stay in SQLite's free pages until they are reused, and in older backups. `PRAGMA
    secure_delete` (or a `VACUUM` after the migration) would also help for deleted to-dos, so it
@@ -368,7 +367,17 @@ Verification by the planner (2026-10-16), against `main` (`2c75b89`) and Django 
   `0003_logentry_add_action_flag_choices`; the newest `todos` migration is
   `0022_todo_copy_fingerprint`.
 
-Not reviewed yet by an independent plan reviewer.
+The plan review (2026-10-16, an independent reviewer) said APPROVE WITH CHANGES. What changed:
+
+- The registry test checks the methods themselves (`type(ma).log_addition is
+  NoNamesInLog.log_addition`, and so on, and `log_deletion is ModelAdmin.log_deletion`), not
+  only `isinstance`, so the order of the parents cannot hide a wrong method.
+- The `object <id>` branch (no content type) is only in the migration's `frozen_label`.
+- The migration reads and writes in chunks of 500 (no `.iterator()` feeding one big
+  `bulk_update`).
+- Data inventory: a staff user's session holds the admin's success message with a title until
+  the next page; accepted.
+- Decided by the coordinator: "name not kept" for hidden inline names; `todo 42` style labels.
 
 ## Decided by the person
 
