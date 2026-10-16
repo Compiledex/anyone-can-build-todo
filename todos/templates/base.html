@@ -1,7 +1,8 @@
 {% load static %}<!doctype html>
 {% comment %}
   The shared frame of the logged-in app pages (the list page, edit, new list, rename
-  and delete list). It has the <head>, the header bar and Django's messages. The look
+  and delete list, and "Delete your account"). "Logged in as <name>" in the header is
+  the link to "Delete your account" (accounts/templates/registration/account_delete.html). It has the <head>, the header bar and Django's messages. The look
   is in todos/static/todos/tokens.css (the colors, sizes and font, shared with the
   landing, login and sign-up pages), then todos/static/todos/app.css. Never site.css.
 {% endcomment %}
@@ -21,7 +22,7 @@
       <div class="container site-inner">
         <a class="wordmark" href="{% url 'home' %}">To-do list</a>
         <div class="user">
-          <span class="who">Logged in as {{ user.username }}</span>
+          <a class="who" href="{% url 'account_delete' %}" aria-label="Logged in as {{ user.username }}: your account"{% if request.resolver_match.url_name == "account_delete" %} aria-current="page"{% endif %}>Logged in as {{ user.username }}</a>
           <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}
             <button class="button button-secondary button-compact" type="submit">Log out</button>
