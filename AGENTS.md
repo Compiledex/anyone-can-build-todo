@@ -78,7 +78,7 @@ file's docstrings and comments: read them before you change the file.
 | `todos/tests/integration/` | Integration tests: Django's test client, from the address to the database. One file per feature (`test_views.py`, `test_access.py`, `test_sharing.py`, `test_list_page_size.py`, and so on). |
 | `todos/tests/cuj/` | CUJ tests (critical user journeys): a real Chromium browser, driven by Playwright. |
 | `config/test_runner.py` | Finds each test's layer from its folder, checks the layer rules, and prints one line per layer. |
-| `config/tests/unit/`, `config/tests/integration/` | Tests for the test runner and `config/env.py`, and `manage.py check` in a new process with chosen `DJANGO_*` variables. |
+| `config/tests/unit/`, `config/tests/integration/` | Tests for the test runner, `config/env.py`, the logging filter and the server's request lines, and `manage.py check` in a new process with chosen `DJANGO_*` variables. |
 | `todos/migrations/` | Made by Django from `models.py`. Never edit these by hand. One exception: a data migration (one that changes rows, like `0006_default_lists.py`) is meant to be written. |
 | `pyproject.toml`, `uv.lock` | The packages and their exact versions. |
 | `.pre-commit-config.yaml` | The checks that run on every `git commit`. |

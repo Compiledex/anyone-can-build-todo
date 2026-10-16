@@ -86,9 +86,11 @@ only.
   the username, never a title, and never `osascript`'s error output.
 - **No search words in the terminal**: a search is a `GET` address (`?q=...`), but the
   development server prints its request lines without the query string (`DropQueryString` in
-  `config/logging_filters.py`). Known limit: a hand-made request with a raw space in the query
-  (only with tools like `curl` or `nc`, never from a browser) gives a "Bad request syntax" line in
-  which the words after the space are still printed.
+  `config/logging_filters.py`). Known limits, both only with hand-made requests (tools like
+  `curl` or `nc`, never from the app's own pages): a raw space in the query gives a "Bad request
+  syntax" line in which the words after the space are still printed; and a `?` written as `%3F`
+  in the path (`/lists/3/%3Fq=secret`) is part of the path, not a query string, so it is printed
+  as it is.
 
 ## 6. How to delete data
 
@@ -106,7 +108,7 @@ only.
 
 1. **No self-service account delete.** Add a "Delete my account" page (POST, password check)
    before anyone besides the owner relies on the app.
-2. **Closed.** Expired sessions are not cleaned: now `make run` runs `clearsessions` after the
+2. **Closed.** Expired sessions were not cleaned: now `make run` runs `clearsessions` after the
    daily copy.
 3. **Manual backups never expire** and hold every account and to-do. The README says: do not share
    them; copy them only to a safe place.
