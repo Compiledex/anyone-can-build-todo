@@ -22,9 +22,9 @@ Builds on: **test-pyramid** (the `cuj/` folder is the CUJ layer, `config/test_ru
 Facts, checked on `main` (`2c75b89`):
 
 1. `todos/tests/cuj/test_journeys.py` is 1203 lines. It holds **21** test classes with **25**
-   tests, plus 21 module-level helpers and constants. (The CUJ folder has **22** classes and
+   tests, plus 27 module-level helpers and constants (functions and assignments). (The CUJ folder has **22** classes and
    **30** tests in all: the 22nd class is `AuthPagesTests` in `test_auth_pages.py`, 5 tests.)
-2. `todos/tests/cuj/test_auth_pages.py` imports seven helpers **from a test module**:
+2. `todos/tests/cuj/test_auth_pages.py` imports eight names **from a test module**:
    `from todos.tests.cuj.test_journeys import AA_CONTRAST, DESKTOP, LOGIN_PAGE, PASSWORD, PHONE,
    SIGNUP_PAGE, contrast, make_user_with_inbox`. A test file that other test files import from is
    easy to break by accident (rename a constant, and a different file fails).
@@ -54,9 +54,9 @@ byte-for-byte the same, and `make check` passes.
 Total: 5 + 3 + 3 + 4 + 3 + 7 + 5 = **30** tests in **22** classes. `test_journeys.py` is deleted.
 
 Why these names: each says the journey, so a person finds a test from what they did in the app.
-`test_landing_page.py`, not `test_landing.py`, because `todos/tests/integration/test_landing.py`
-already exists; two files with the same name in different folders work, but are confusing in
-search results and error messages.
+`test_landing_page.py` says what the journey is about, like the other names (an integration file
+`todos/tests/integration/test_landing.py` exists too; same names in different folders work, so
+this is only for easier search).
 
 Inside each new file the classes keep the order they had in `test_journeys.py`.
 
@@ -82,14 +82,19 @@ today, and where it goes:
 | `HEADLINE` (786) | Landing | `test_landing_page.py` |
 | `LONG_WORD` (356), `LINE_THROUGH_ON_SELF_OR_ANCESTOR` (360), with comments | FixATypo | `test_todo_basics.py` |
 | `overlaps` (669), `inside` (679), `LONG_TITLE` (687), `LONG_URL` (691) | RowLayout | `test_look_and_feel.py` |
-| `TOUCH_HEIGHT` (919) | RowLayout, Touch (same file) | `test_look_and_feel.py` |
+| `TOUCH_HEIGHT` (917) | RowLayout, Touch (same file) | `test_look_and_feel.py`, see below |
 | `TOUCH_GAP` (920), `DISPLAY` (922), `gaps` (925) | Touch | `test_look_and_feel.py` |
 | `BUTTON_LOOK` (873), `SECONDARY_LOOK` (882) | OneProduct | `test_look_and_feel.py` |
 | `hex_to_rgb` (1012) | QuietDelete | `test_look_and_feel.py` |
 | `MOVING` (1046) | ReducedMotion | `test_look_and_feel.py` |
 
 Every helper and constant moves with its code, its docstring and the comment above it unchanged.
-In a test file, a constant stays just above the first class that uses it, as today.
+In a test file, each constant or helper keeps the place it has today relative to the classes,
+that is just above the class it stood above in `test_journeys.py`. In particular lines 915-922
+(the WCAG comment, `TOUCH_HEIGHT`, `TOUCH_GAP`, the `DISPLAY` comment and `DISPLAY`) stay **one
+block** above `TouchTests`, as today, although `RowLayoutTests` (earlier in the file) also uses
+`TOUCH_HEIGHT`; that works because the name is read when the test runs, not when the class is
+defined.
 
 `helpers.py` gets a short module docstring: "Shared helpers for the CUJ tests. Not a test file:
 the name does not start with `test`, so the runner never runs it." Then the comment block of
@@ -160,9 +165,8 @@ Wave A, built in parallel with **readme-to-runbooks**, **privacy-small-fixes** a
 **admin-log-without-names**. Merge order: **split-browser-tests (this) → readme-to-runbooks →
 privacy-small-fixes → admin-log-without-names → delete-account**.
 
-- **delete-account** merges after this plan, so its new CUJ test goes into the new layout: into
-  `test_lists_and_people.py` (it is about accounts and the lists other people lose), or a new
-  `test_account.py`; the delete-account plan decides. It imports shared helpers from
+- **delete-account** merges after this plan, so its new CUJ test goes into the new layout, in a
+  new file `todos/tests/cuj/test_account.py` (decided by the orchestrator, 2026-10-16). It imports shared helpers from
   `todos.tests.cuj.helpers`, never from a test file. If delete-account is built before this merges,
   it rebases and moves its class; it must not add to `test_journeys.py` after this merges.
 - **privacy-small-fixes** changes how messages are stored (session instead of cookie). The CUJ
@@ -218,13 +222,18 @@ Each step is a commit; `make check` passes after each one.
    (`$SCRATCH` is the session's scratchpad folder; the files are not committed.) Also save the
    source of every class and module-level name, with the AST script of step 4, to
    `$SCRATCH/cuj-before.json`. Run `make cuj` once and note `CUJ 30 passed`.
-2. **Add `helpers.py`** with the shared names, and switch `test_auth_pages.py`'s import to it.
-   `test_journeys.py` still defines its own copies for now, so nothing else changes. `make check`.
+2. **Add `helpers.py`** with the shared names, and in the **same commit** delete those names from
+   `test_journeys.py` and import them there from `helpers.py` (two definitions of one name would
+   be Ruff's `F811`, and the AST check would see a duplicate). Switch `test_auth_pages.py`'s
+   import to `helpers.py`. `make check`.
 3. **Move the classes**, one new file at a time, in the order of decision 1. After each file,
    delete the moved classes and helpers from `test_journeys.py` and import from `helpers.py` in
    `test_journeys.py` what the remaining classes still need. When the last class is moved,
    `git rm todos/tests/cuj/test_journeys.py`. Move code by cut and paste only; no reformatting
    (`ruff format` must leave the moved lines as they were; if it changes one, look at why).
+   Before the PR, run `uv run ruff check todos/tests/cuj` **without** `--fix` (the commit hook
+   runs with fixes, and would quietly remove an unused import instead of showing it), and put
+   its output in the PR.
 4. **Prove nothing was lost** (after the last move):
 
    a. Same ids, ignoring the module:
@@ -240,11 +249,21 @@ Each step is a commit; `make check` passes after each one.
    b. Each class is in the file decision 1 says: `grep -c` the module names in `cuj-after.txt`
    gives 5, 3, 3, 4, 3, 7 and 5.
 
-   c. Same code: a short script (in the scratchpad, not committed) parses `test_journeys.py` from
-   `main` (`git show origin/main:todos/tests/cuj/test_journeys.py`) and every file in
-   `todos/tests/cuj/` now with `ast`, and builds a map from each top-level class, function and
-   constant name to `ast.get_source_segment(...)`. The two maps must be equal (same names, same
-   source text). It also checks that no name is defined in two files.
+   c. Same code: a short script (in the scratchpad, not committed) uses the **same file set**
+   before and after. Before: `test_journeys.py`, `test_auth_pages.py` and `browser.py` from
+   `main` (`git show origin/main:<path>`). After: every `.py` file in `todos/tests/cuj/`. For
+   each file it parses the module with `ast` and collects one `(name, source)` pair per
+   top-level class, function and assignment (`ast.get_source_segment(...)`), skipping imports
+   and the module docstring. The two collections are compared as **multisets** (a
+   `collections.Counter`), so a name defined twice counts twice. They must be equal. The one
+   duplicate name allowed is the known one: `UI_CONTRAST = 3.0` in both the shared module and
+   `test_auth_pages.py`, as on `main` (open question 2); any other name found in two files fails
+   the check.
+
+   e. Same comments: `ast` source segments miss comments that stand between top-level
+   definitions (for example the comment above `LONG_WORD`, or the block at lines 57-60). The
+   script also reads the same before and after file sets with the `tokenize` module and keeps
+   every `COMMENT` token's text. The two sorted lists must be equal.
 
    d. `git grep -n test_journeys -- ':!docs/plans' ':!docs/bug-reports' ':!docs/postmortems'
    ':!config/tests'` finds nothing.
@@ -263,7 +282,8 @@ No new test and no changed test: this plan only moves tests. What proves it:
 |---|---|---|
 | Step 4a, the id diff | The same 30 `<Class>.<method>` names exist after the split. | A class left out, a method lost in a paste, a class that is not a `BrowserTestCase` any more (the runner refuses it). |
 | Step 4b, per-file counts | Each class is in the file this plan names. | A class in the wrong file. |
-| Step 4c, the AST compare | Every class, helper and constant has the same source as before; none is defined twice. | An edited assertion, a changed constant, a helper copied into two files. |
+| Step 4c, the AST compare | Every class, helper and constant has the same source as before; none is defined twice (except the known `UI_CONTRAST`). | An edited assertion, a changed constant, a helper copied into two files. |
+| Step 4e, the comment compare | Every comment is still there, word for word. | A comment lost between two definitions while moving. |
 | Ruff in `make check` | No missing and no unused import. | A file that forgot `DONE`, or imports one it does not use. |
 | `make cuj`, and once with `--shuffle` | All 30 still pass, in any order. | A test that only passed because another test in the old file ran before it. |
 | `make check` | The other layers are untouched (`config/tests/unit/test_test_runner.py` still passes). | |
@@ -286,8 +306,7 @@ No new test and no changed test: this plan only moves tests. What proves it:
   `TransactionTestCase`, which empties the tables after each test), so order should not matter;
   step 5's `--shuffle` run checks it.
 - **`test_list_page_size.py`, `test_landing.py`, and the other integration tests** are in another
-  layer and are not touched. The new CUJ file is `test_landing_page.py`, so there is no second
-  `test_landing.py`.
+  layer and are not touched.
 - **Formatting.** If `ruff format` reflows a moved line (for example an import line that is now
   longer), only the import lines may change; class bodies must stay byte-identical (4c).
 
@@ -304,7 +323,23 @@ No new test and no changed test: this plan only moves tests. What proves it:
 
 ## Review
 
-(Filled in after the plan review.)
+The plan review (2026-10-16) said APPROVE WITH CHANGES. What changed:
+
+- Step 4c compares the **same file set** before and after (`test_journeys.py`,
+  `test_auth_pages.py` and `browser.py` on `main`; every `.py` in `cuj/` after), as multisets of
+  `(name, source)`, skipping imports and module docstrings, with exactly one allowed duplicate
+  (`UI_CONTRAST` in `test_auth_pages.py`). Before, the "after" side had more files than the
+  "before" side, so `test_auth_pages.py`'s own names would have looked new.
+- New step 4e: the comments are compared with `tokenize`, because `ast` source segments do not
+  hold comments between definitions.
+- `TOUCH_HEIGHT` stays in its block above `TouchTests` (lines 915-922), as today; the wording
+  "just above the first class that uses it" was wrong for it.
+- Counts corrected: 27 module-level helpers and constants; `test_auth_pages.py` imports eight
+  names.
+- Step 2 deletes the shared copies from `test_journeys.py` in the same commit (no `F811`); the PR
+  shows `uv run ruff check` without `--fix`.
+- delete-account's CUJ file is named: `todos/tests/cuj/test_account.py`.
+- The reason for `test_landing_page.py` is softer: same file names in different folders work.
 
 ## Decided by the person
 

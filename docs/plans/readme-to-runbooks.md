@@ -52,10 +52,16 @@ New body of **"Reminders on your Mac"** (replaces lines 235-313):
 
 New body of **"Put it on the internet"** (replaces lines 366-410):
 
-> The app runs on your own computer. Before you put it on a server, read
-> [If it ever runs on a server](docs/runbooks/deployment.md#if-it-ever-runs-on-a-server) in the
-> deployment runbook: on many hosts the database file is deleted at every deploy, and a live
-> server needs three environment variables.
+> [!WARNING]
+> On many hosts the SQLite database file, `db.sqlite3`, is deleted at every deploy or restart,
+> and all accounts and to-dos are gone; read the runbook before you put real data online.
+
+The app runs on your own computer. Before you put it on a server, read
+[If it ever runs on a server](docs/runbooks/deployment.md#if-it-ever-runs-on-a-server) in the
+deployment runbook: it says how to keep the database, and which three environment variables a
+live server needs.
+
+(The one-sentence warning stays in the README because the owner asked for it there, PR #37.)
 
 The README's "How it is put together" row for `deploy/macos/` becomes: "The launchd template for
 the morning reminders on a Mac (set up with the [reminders runbook](docs/runbooks/reminders.md))".
@@ -81,7 +87,7 @@ box), then README lines 235-313 **unchanged**, then "Related documents". Exact c
 > and to change or stop it. They change the Mac's settings, so the person does them, not the AI
 > (`AGENTS.md`: the AI never installs the job, never runs `launchctl`, never writes to
 > `~/Library`). Run every command in the project folder. Moved here from `README.md` on
-> <build date> (PR #N); the text is the same.
+> <build date> (this PR); the text is the same.
 
 ## Set it up
 
@@ -118,7 +124,7 @@ What each place has today, and where it ends up:
 | On your laptop this does not happen | 381 | - | Warning box |
 | "A live server needs three environment variables. Never put their real values in the code." | 383 | 119 ("never in the code") | Sentence above the table, from the README |
 | The three variables and their values, how to make a key | 385-389 | 121-125 | The deployment.md table (it has the extra "If wrong" column), with the README's example `my-todo.onrender.com` added to `DJANGO_ALLOWED_HOSTS` |
-| Debug off: HTTPS only; a missing or weak key stops the app, and what "weak" means | 391-393 | 123, 127-128 | One sentence, README wording, plus "(`SECURE_SSL_REDIRECT` in `config/settings.py`)" from deployment.md |
+| Debug off: HTTPS only; a missing or weak key stops the app, and what "weak" means | 391-393 | 123, 127-128 | HTTPS: one sentence with "(`SECURE_SSL_REDIRECT` in `config/settings.py`)" from deployment.md. The weak-key rule is written **once**, in the table's "If wrong" cell; the sentence points to it |
 | Set the variables for the build too; on Render the settings page is used for both | 395-396 | 129 ("must be set for the build too") | README sentences, word for word |
 | Build command | 400-402 (code block) | 130 (inline) | The README code block, byte for byte |
 | `check --deploy` is Django's production checks; `--fail-level WARNING` stops on any warning | - | 131-132 | Kept from deployment.md |
@@ -132,10 +138,10 @@ The new section, exactly (the implementer copies the README parts from the file,
 ## If it ever runs on a server
 
 This section is **not in use**: the app runs only locally. It holds what was the "Put it on the
-internet" part of `README.md` until <build date> (PR #N), with the facts of the safe-settings plan
+internet" part of `README.md` until <build date> (this PR), with the facts of the safe-settings plan
 (PR #36), so nobody starts from zero.
 
-### Your data can disappear on a host
+### Data loss on a host
 
 <README.md lines 366-381 (the `> [!WARNING]` box), word for word, except the link
 `(#back-up-your-data)` becomes `(../../README.md#back-up-your-data)`>
@@ -151,8 +157,8 @@ A live server needs three environment variables. Never put their real values in 
 | `DJANGO_ALLOWED_HOSTS` | The site's address without `https://`, for example `my-todo.onrender.com`; commas between several | Requests to other names get 400 |
 
 With `DJANGO_DEBUG` set to `False`, the site only works over HTTPS (`SECURE_SSL_REDIRECT` in
-`config/settings.py`), and the app stops at once if `DJANGO_SECRET_KEY` is missing or weak (fewer
-than 50 characters, fewer than 5 different characters, or starting with `django-insecure-`).
+`config/settings.py`), and a missing or weak `DJANGO_SECRET_KEY` stops the app at once (see the
+table).
 
 ### Build and start
 
@@ -171,10 +177,20 @@ Start command:
 
 <README.md lines 408-410, the code block, byte for byte>
 
+### Logs
+
+On a server, check what the web server (for example gunicorn and the host's proxy) and Django
+write to their logs. A request line holds the whole address, and a search address holds the
+search words (`?q=...`), so the log can hold what people searched for. Keep such logs short, or
+leave the query string out.
+
 ### Not on a server
 
 - The reminders (`send_reminders`) only work on a Mac and are not part of a server.
 ````
+
+The "Logs" note is new (not from the README); privacy-small-fixes relies on it for the server
+case, since its log filter covers only the development server.
 
 The intro of the runbook (line 19), "Every command below exists in the `Makefile` or
 `README.md`.", becomes "Every command below exists in the `Makefile` or `README.md`, except the
@@ -196,9 +212,8 @@ it on the internet\|README"` on `main`, outside `docs/plans/`:
 | `docs/README.md:58-59` (phase 4 table) | Two runbook rows | Add a row after the deployment runbook: "\| [Reminders runbook](runbooks/reminders.md) \| How to switch on the morning Mac notification, and stop it \| Real \|". |
 | `docs/README.md:81` (folder tree) | "runbooks/ deployment, on-call and incidents" | "deployment, reminders, on-call and incidents". |
 | `docs/product/prd.md:112` | "(`README.md`, "Reminders on your Mac")" | "([reminders runbook](../runbooks/reminders.md))". |
-| `docs/adr/0008-mac-notifications-via-osascript.md:68` ("Source") | "README, "Reminders on your Mac"." | "[Reminders runbook](../runbooks/reminders.md) (until <build date> the README section "Reminders on your Mac")." See open question 2. |
-| `docs/adr/0002-sqlite-immediate-transactions.md:43` | "(README, "Put it on the internet")" | "(deployment runbook, "If it ever runs on a server")". See open question 2. |
-| `CHANGELOG.md` | | Under `## [Unreleased]` (create it above `## [0.5.1]` if no PR of this round made it yet), `### Changed`: "The steps to switch on the Mac reminders, and the notes for a server, moved from the README to the runbooks; the README links to them (PR #N)." |
+| `docs/adr/0008-mac-notifications-via-osascript.md:68`, `docs/adr/0002-sqlite-immediate-transactions.md:43` and `:53` (PostgreSQL, "the README names it") | Name the README sections | **None** (decided by the orchestrator): an ADR is a record of that day. The README headings stay and link on, so the pointers still lead to the text. ADR 0002 line 53 says "the README names it" (PostgreSQL); after the move the README no longer names PostgreSQL, only the runbook does. Left so knowingly. |
+| `CHANGELOG.md` | | Under `## [Unreleased]` (create it above `## [0.5.1]` if no PR of this round made it yet), `### Changed`: "The steps to switch on the Mac reminders, and the notes for a server, moved from the README to the runbooks; the README links to them (this PR)." |
 | `docs/plans/README.md` | | One row for this plan when it is built. |
 | `docs/plans/reminders.md`, `safe-settings.md`, `docs-fixes.md` and other plans | Name the README sections | **None**: plans are history. |
 | `deploy/macos/*.plist`, `todos/reminders.py`, `send_reminders.py` | Name no README section (checked) | None. |
@@ -229,13 +244,16 @@ Wave A, built in parallel with **split-browser-tests**, **privacy-small-fixes** 
 **admin-log-without-names**. Merge order: **split-browser-tests → readme-to-runbooks (this) →
 privacy-small-fixes → admin-log-without-names → delete-account**.
 
-- **privacy-small-fixes** changes the `make run` line in `README.md` ("Run it on your laptop" and
-  the "Commands" lines, not the moved sections) and probably `docs/runbooks/deployment.md`
+- **privacy-small-fixes** changes the `make run` paragraph in `README.md`'s "Back up your data"
+  section (line 202, "`make run` also makes a copy, once a day"; not a moved section), relies on
+  the new "Logs" note in the server section (decision 3), and probably `docs/runbooks/deployment.md`
   section 2 "Start and stop" (`make run` also clears old sessions). This plan changes only the
   intro line 19 and the last section of that file, so the hunks do not touch; it merges first,
   and privacy-small-fixes rebases.
-- **delete-account** may add a sentence to `README.md` ("Private by default" or "What it does");
-  not in the moved sections.
+- **delete-account** adds "If you delete that account, remove the launchd job too." to the
+  reminders steps. After this plan merges, those steps are in `docs/runbooks/reminders.md`, so
+  delete-account puts the sentence there, in step 8 ("To change or stop it"), when it rebases.
+  It may also add a sentence elsewhere in `README.md`, not in the moved sections.
 - **split-browser-tests** changes the `todos/tests/cuj/` row of `AGENTS.md`; this plan the plist
   row. Both add a `CHANGELOG.md` line under `## [Unreleased]`: the second to merge keeps both.
 - The privacy plans close gaps in `docs/design/data-inventory-and-privacy.md`; this plan does not
@@ -258,7 +276,7 @@ privacy-small-fixes → admin-log-without-names → delete-account**.
 | `README.md` | The two short bodies (decision 1); the `deploy/macos/` row. |
 | `AGENTS.md` | The plist row. |
 | `docs/README.md` | The runbook row and the folder tree. |
-| `docs/product/prd.md`, `docs/adr/0002-...md`, `docs/adr/0008-...md` | The pointers (decision 4). |
+| `docs/product/prd.md` | The pointer (decision 4). |
 | `CHANGELOG.md` | One line. |
 | `docs/plans/README.md` | One row when built. |
 | `docs/plans/readme-to-runbooks.md` | Status line on the last commit. |
@@ -301,16 +319,26 @@ The PR shows the outputs of these checks.
 1. **A new file `docs/runbooks/reminders.md`, or a section in `deployment.md`?** Recommended: a new
    file. It is a different job (a Mac scheduler, not the app), and `deployment.md` is already 146
    lines.
-2. **The pointers in ADR 0002 and ADR 0008.** An ADR records a decision and is normally not
-   edited. Recommended: change only the pointer (where to read the steps), not the decision text,
-   and note the old place in brackets, as in decision 4. The alternative is leaving them pointing
-   at a README section that now only links on (which still works, one click longer).
-3. **Fix "after you pull this feature" in reminders step 2?** It reads oddly now. Recommended:
+2. **Fix "after you pull this feature" in reminders step 2?** It reads oddly now. Recommended:
    not in this PR (word for word makes the diff check simple); a one-line follow-up later.
 
 ## Review
 
-(Filled in after the plan review.)
+The plan review (2026-10-16) said APPROVE WITH CHANGES. What changed:
+
+- ADRs are not edited at all (orchestrator's decision): they are records of that day, and the
+  README headings still link on. ADR 0002 line 53 ("the README names it", PostgreSQL) is left
+  knowingly. The old open question about it is gone.
+- "Working next to": delete-account's sentence about the launchd job goes into
+  `docs/runbooks/reminders.md` step 8 when it rebases; privacy-small-fixes changes the `make run`
+  paragraph in "Back up your data" (there is no "Commands" section).
+- The server section gets a short "Logs" note (request lines can hold search words), which
+  privacy-small-fixes relies on.
+- The weak-key rule is written once, in the table; the heading is "Data loss on a host".
+- "(this PR)" instead of "(PR #N)".
+- The README keeps a one-sentence `> [!WARNING]` in "Put it on the internet" that the SQLite
+  database can be deleted on many hosts, with the link (orchestrator's decision; the owner asked
+  for this warning in PR #37).
 
 ## Decided by the person
 
