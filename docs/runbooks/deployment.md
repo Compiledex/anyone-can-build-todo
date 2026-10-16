@@ -35,6 +35,9 @@ below exists in the `Makefile` or `README.md`. Run them in the project folder.
   (`backups/db-YYYYMMDD-HHMMSS-daily.sqlite3`), the newest 14 daily copies stay. If the copy fails,
   it prints "Warning: the daily backup did not work ..." and starts the app anyway (see the
   [incident runbook](on-call-and-incidents.md#playbook-c-the-daily-backup-warning)).
+  Then it runs `clearsessions` (Django's own command): it deletes expired sessions and prints
+  nothing. If it fails, it prints "Warning: could not remove expired sessions ..." and starts the
+  app anyway.
 - **Stop:** press `Ctrl+C` in the terminal where the server runs.
 
 ## 3. Update to a new version

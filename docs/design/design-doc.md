@@ -267,7 +267,7 @@ done ([ADR 0004](../adr/0004-today-in-asia-tokyo.md)).
 
 | Command | What it does |
 |---|---|
-| `make run` | A daily backup (at most one a day, newest 14 kept), then the server at 127.0.0.1:8000. |
+| `make run` | A daily backup (at most one a day, newest 14 kept), then `clearsessions` (expired sessions), then the server at 127.0.0.1:8000. |
 | `make backup` | A copy of `db.sqlite3` in `backups/`, kept until deleted by hand. |
 | `make reset` | Asks (`yes` only), copies, then makes an empty database. |
 | `make check` | Every commit check, the migration check, all tests. |
@@ -312,9 +312,6 @@ on every push; a ruleset on `main` requires both green. Reviewers break the code
 | No threaded test for two requests at once | `IMMEDIATE` and idempotent toggles cover the known cases. |
 | Open sign-up, no password-attempt limit | Must change before going public. |
 | No "delete my account" page | Only the admin can delete a user ([data inventory](data-inventory-and-privacy.md), gap 1). |
-| Expired sessions are never cleared | Their rows (with any undo snapshot) stay in `django_session`; nothing runs `clearsessions` (gap 2). |
-| Messages cookie is signed, not encrypted | A to-do title in "Deleted “…”." can be read in the browser's cookies (gap 4). |
-| Search words in the server log | A search is a `GET` address, so the development server prints `?q=...` in the terminal (gap 5). |
 | Admin log keeps object names | `django_admin_log` keeps the name of each object changed in `/admin/` (for example a to-do's title), also after the object is deleted (gap 6). |
 | Hosting | Many hosts lose the SQLite file on deploy; not built for it. |
 
