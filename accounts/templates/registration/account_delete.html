@@ -12,7 +12,7 @@
   <h1>Delete your account</h1>
   {% with summary as s %}
     {% if s.list_count %}
-      <p class="lead">{{ s.list_count }} list{{ s.list_count|pluralize }} and their {{ s.todo_count }} to-do{{ s.todo_count|pluralize }} (with their steps){% if s.tag_count %}, and your {{ s.tag_count }} tag{{ s.tag_count|pluralize }}{% endif %} will be deleted.</p>
+      <p class="lead">{{ s.list_count }} list{{ s.list_count|pluralize }} and {{ s.list_count|pluralize:"its,their" }} {{ s.todo_count }} to-do{{ s.todo_count|pluralize }} (with {{ s.todo_count|pluralize:"its,their" }} steps){% if s.tag_count %}, and your {{ s.tag_count }} tag{{ s.tag_count|pluralize }}{% endif %} will be deleted.</p>
     {% else %}
       <p class="lead">You have no lists.{% if s.tag_count %} Your {{ s.tag_count }} tag{{ s.tag_count|pluralize }} will be deleted.{% endif %}</p>
     {% endif %}

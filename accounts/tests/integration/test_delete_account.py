@@ -61,15 +61,22 @@ class PageText(PageParts):
         super().__init__()
         self.texts = []
         self.status_texts = []
+        self.list_items = []  # the text of each <li>
+        self._li = None
         self._roles = []  # (tag, is a role="status" element), of the open elements
 
     def handle_starttag(self, tag, attrs):
         super().handle_starttag(tag, attrs)
+        if tag == "li":
+            self._li = []
         if tag not in {"input", "img", "source", "link", "meta", "br"}:
             self._roles.append((tag, dict(attrs).get("role") == "status"))
 
     def handle_endtag(self, tag):
         super().handle_endtag(tag)
+        if tag == "li" and self._li is not None:
+            self.list_items.append(" ".join("".join(self._li).split()))
+            self._li = None
         for index in range(len(self._roles) - 1, -1, -1):
             if self._roles[index][0] == tag:
                 self._roles.pop(index)
@@ -78,6 +85,8 @@ class PageText(PageParts):
     def handle_data(self, data):
         super().handle_data(data)
         self.texts.append(data)
+        if self._li is not None:
+            self._li.append(data)
         if any(is_status for _tag, is_status in self._roles):
             self.status_texts.append(data)
 
@@ -147,13 +156,36 @@ class DeleteAccountPageTests(DeleteAccountWorld):
             text,
         )
         self.assertIn("“Family” (2 members) — they will lose this list.", text)
+        # Only her lists with members: "Inbox" is not shared, so it is not named.
+        self.assertEqual(
+            page_text(response).list_items,
+            ["“Family” (2 members) — they will lose this list."],
+        )
         # The to-dos of "Bob's list" and "Carol's list" ("Alice's idea" too) are not counted.
         self.assertIn("You will leave 2 lists that someone else shared with you.", text)
         self.assertIn("This cannot be undone.", text)
         self.assertIn("Copies in the backups/ folder still hold your data.", text)
         self.assertIn("make backup", text)
         self.assertContains(response, 'autocomplete="current-password"')
-        self.assertContains(response, "csrfmiddlewaretoken")
+        # The token of the delete form itself, not the one of the header's Log out form.
+        self.assertRegex(
+            response.content.decode(),
+            r'(?s)<form class="page-form" method="post" action="/accounts/delete/">'
+            r'(?:(?!</form>).)*name="csrfmiddlewaretoken"',
+        )
+
+    def test_page_for_one_list_and_one_shared_with_her(self):
+        erin = make_user("erin")
+        solo = TodoList.objects.create(owner=erin, name="Solo")
+        add_todo(solo, "Only one")
+        self.other_list.members.add(erin)
+        text = page_text(self.client_for(erin).get(URL)).text
+        self.assertIn("1 list and its 1 to-do (with its steps) will be deleted.", text)
+        self.assertIn(
+            "You will leave 1 list that someone else shared with you. It stays with"
+            " its owner, and the to-dos you added there stay in it.",
+            text,
+        )
 
     def test_page_names_no_member_and_no_other_list(self):
         member = make_user("Zoë-member")
@@ -286,8 +318,10 @@ class NothingIsDeletedTests(DeleteAccountWorld):
 class WhatGoesAndWhatStaysTests(DeleteAccountWorld):
     def test_right_password_deletes_exactly_alices_rows(self):
         before = row_counts()
-        response = self.delete_account()
-        self.assertRedirects(response, "/", fetch_redirect_response=False)
+        # A posted `next` is never followed: always `/`.
+        response = self.delete_account(next="https://evil.example/")
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "/")
 
         self.assertFalse(User.objects.filter(pk=self.user.pk).exists())
         self.assertFalse(
