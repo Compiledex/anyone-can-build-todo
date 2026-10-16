@@ -24,7 +24,7 @@ file in the code. Nothing is estimated.
 | Test pyramid (unit, integration, CUJ layers) | #1, #2 | 2026-10-09 |
 | Plans for the 17 features and the foundation | #3, #4 | 2026-10-09 |
 | The 17 features, in waves: foundation, dark mode, accounts, lists, edit, due date, sharing, clear completed, notes, priority, tags, steps, recurring, search, filter, sort, drag and drop, Mac reminders | #5 to #27 | 2026-10-09 to 2026-10-10 |
-| Design: row layout fix, landing page, login and sign-up, app redesign, README screenshots | #28 to #33 | 2026-10-10 to 2026-10-11 |
+| Design: row layout fix, landing page, login and sign-up, app redesign, README screenshots | #28 to #33 | 2026-10-11 |
 | Audit improvements: safe settings, docs fixes, Norwegian letters, Undo keeps a copy with a done step, local safety, safe toggles, accessibility, maintenance | #34 to #46 | 2026-10-11 |
 | The owner's product choices A to E: recurring copy rules, Undo after Delete, list names ignore case, daily backup on `make run`, cleanups | #47 to #52 | 2026-10-11 |
 | Docs fixes | #53 | 2026-10-16 |
@@ -51,8 +51,9 @@ Numbers (from `gh pr list --state all`):
 4. **Tests first**: each new test was shown failing before the code.
 5. **Code review with mutation testing**: a reviewer agent broke the code on purpose (a
    "mutation") and checked that some test failed. Example: PR #46 ran 38 mutations.
-6. **A merge queue**: the orchestrator merged one PR at a time, rebased the next, and remade
-   migrations when two branches clashed (for example `0012_tags` in PR #15).
+6. **A merge queue**: the *orchestrator* (the main Claude session that hands out the work and
+   merges) merged one PR at a time, *rebased* the next (moved its commits on top of the new
+   `main`), and remade migrations when two branches clashed (for example `0012_tags` in PR #15).
 7. **Strict green CI**: GitHub runs `lint` and `test` (`.github/workflows/check.yml`); a ruleset
    on `main` requires both.
 
@@ -68,14 +69,14 @@ Numbers (from `gh pr list --state all`):
 | Mutation testing made tests stronger | Most PRs report how many mutations were caught. PR #48: 33 run, 28 caught; PR #51: 28 run, 24 caught; PR #52: 20 run, 19 caught. Each missed one got a guard test. |
 | The owner made the product choices; agents did the rest | Every plan has "Decided by the person". The owner let the orchestrator merge after review and green CI. |
 | A refactor changed nothing visible | PR #52: 16 screenshot pairs pixel-identical to `main`, same accessibility tree. |
-| Fast | 17 features in about two days (PR #5 to #27), everything in three working days. |
+| Fast | 17 features in about two days (PR #5 to #27), everything in three working days (2026-10-09 to 2026-10-11; only the docs fix PR #53 came later). |
 
 ## 4. To improve
 
 | What happened | Effect | What we changed |
 |---|---|---|
-| PR #12 (Clear completed) was merged while one CI run was red, from a flaky browser test. The rerun was green. | The rule "only merge on green" was broken once. | PR #19 and PR #22 fixed the two flaky CUJ tests (Playwright's `click()` does not wait for the new page; now `expect()` waits). The merge command refuses unless every check is SUCCESS; later the ruleset on `main` enforces it. |
-| Deleting the base branch of a stacked PR made GitHub close the child PR (tags, stacked on priority, PR #15). | The branch had to be restored, the PR reopened and retargeted to `main`. | Rule: retarget children before deleting a base branch. |
+| PR #12 (Clear completed) was merged while one CI run was red, from a *flaky* browser test (one that sometimes fails with no change in the code). The rerun was green. | The rule "only merge on green" was broken once. | PR #19 and PR #22 fixed the two flaky CUJ tests (Playwright's `click()` does not wait for the new page; now `expect()` waits). The merge command refuses unless every check is SUCCESS; later the ruleset on `main` enforces it. |
+| Deleting the base branch of a *stacked* PR (a PR that builds on another PR's branch instead of `main`) made GitHub close the child PR (priority, PR #14, stacked on notes, PR #13). | The branch had to be restored, the PR reopened and retargeted to `main`; it merged minutes later. The tags PR #15 was retargeted in time and never closed. | Rule: retarget children before deleting a base branch. |
 | A safety hook refused force-pushes. | Work moved to new `-v2` branches (PR #41, PR #44); old branches stayed on GitHub for a while. | Never retry a refused command; use a new branch. The old branches were later deleted. |
 | A wrong assumption: "SQLite never reuses row ids". | Undo after Delete could have restored over another to-do. | Found in plan review; `docs/plans/delete-undo.md` says "Could not undo." and touches nothing. |
 | Two sessions "resumed" the rollout at once (2026-10-10) and both rebased the same PRs. | Duplicate work. | The owner decided one orchestrator session finishes the rollout; check `gh pr list` and `git worktree list` first. |

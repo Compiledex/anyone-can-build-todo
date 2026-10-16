@@ -31,7 +31,7 @@ notes, steps and a repeat rule. The owner of a list can share it with other user
 | Where does it run? | Only on the owner's Mac, at <http://127.0.0.1:8000>. Not deployed. |
 | Where is the data? | One SQLite file, `db.sqlite3`, next to the code. Not in git. |
 | How big is it? | 16 Python files in `todos/`, 22 migrations, 731 tests. |
-| Status | All planned features merged (33 plans, PR #1 to #53). |
+| Status | All planned features merged (33 plans; PR #1 to #53, of which 51 merged and 2 replaced). |
 
 ## 2. Goals and non-goals
 
@@ -300,6 +300,8 @@ on every push; a ruleset on `main` requires both green. Reviewers break the code
 
 ## 12. Known limits
 
+"Gap N" is item N in section 7 of the [data inventory](data-inventory-and-privacy.md).
+
 | Limit | Notes |
 |---|---|
 | Backups only on the same Mac | The owner copies `backups/` elsewhere by hand. |
@@ -309,7 +311,11 @@ on every push; a ruleset on `main` requires both green. Reviewers break the code
 | Custom SQL functions | Other SQLite tools cannot run search or title sort. |
 | No threaded test for two requests at once | `IMMEDIATE` and idempotent toggles cover the known cases. |
 | Open sign-up, no password-attempt limit | Must change before going public. |
-| No "delete my account" page | Only the admin can delete a user ([data inventory](data-inventory-and-privacy.md)). |
+| No "delete my account" page | Only the admin can delete a user ([data inventory](data-inventory-and-privacy.md), gap 1). |
+| Expired sessions are never cleared | Their rows (with any undo snapshot) stay in `django_session`; nothing runs `clearsessions` (gap 2). |
+| Messages cookie is signed, not encrypted | A to-do title in "Deleted “…”." can be read in the browser's cookies (gap 4). |
+| Search words in the server log | A search is a `GET` address, so the development server prints `?q=...` in the terminal (gap 5). |
+| Admin log keeps object names | `django_admin_log` keeps the name of each object changed in `/admin/` (for example a to-do's title), also after the object is deleted (gap 6). |
 | Hosting | Many hosts lose the SQLite file on deploy; not built for it. |
 
 ## 13. Glossary

@@ -86,10 +86,10 @@ Use this when the new code has a bad migration, and you have no good backup afte
 
 1. Stop the server, then `make backup`.
 2. **While you still have the new code**, migrate back to the last migration you noted in step 5 of
-   the update, for example:
+   the update (here `0022`, the last one today), for example:
 
    ```bash
-   uv run python manage.py migrate todos 0021
+   uv run python manage.py migrate todos 0022
    ```
 
    The old code does not have the new migration files, so Django could not undo them after a

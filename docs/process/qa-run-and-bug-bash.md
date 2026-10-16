@@ -1,4 +1,4 @@
-# QA run and bug bash: release v0.5
+# QA run and bug bash: release v0.5.0
 
 | | |
 |---|---|
@@ -9,13 +9,13 @@
 | Date | 2026-10-16 |
 | Data | MIXED (see below) |
 
+> **SIMULATED.** The people, quotes, numbers and sessions in this document are invented for
+> practice. The app has no real users besides its owner. Real facts are marked with their source.
+
 > **What this document is.** Before a release, a QA (quality assurance) lead walks through the
 > app's most important journeys by hand, with a checklist, so nothing big is broken on the day
 > people get it. A *bug bash* is a short meeting where several people try to break the app at the
 > same time. Without this step, a team learns about broken journeys from its users.
-
-> **SIMULATED.** The people, quotes, numbers and sessions in this document are invented for
-> practice. The app has no real users besides its owner. Real facts are marked with their source.
 
 The **checklist** (part 1) is real: every step uses a real feature and real words from the app.
 The **bug bash** (part 2) is simulated, except the rows marked **REAL**.
@@ -95,34 +95,41 @@ Stop here and fix first if any line in "Accounts", "Sharing" or "Delete" fails: 
 
 ## Part 2. Bug bash (simulated)
 
-**When:** 45 minutes, on the build of v0.5 (main after PR #52). **Who:** five invented testers.
+**When:** 45 minutes, on the build of v0.5.0 (`main` after PR #52, see the
+[changelog](../../CHANGELOG.md)). **Who:** five invented team members. (They are not the invented
+users of the [user research](../product/user-research-notes.md) and the
+[UX test](../design/ux-test-plan-and-findings.md).)
 
 | Person | Role in the bash | Focus |
 |---|---|---|
-| Ingrid | Facilitator, keeps time | Sharing between two accounts |
-| Tomas | Developer | Delete, Undo, repeat |
-| Amara | Designer | Dark mode, phone width |
-| Kenji | Support | First-time sign-up, wrong input |
-| Sofie | Accessibility tester | Keyboard and screen reader only |
+| Hanna | Facilitator, keeps time | Sharing between two accounts |
+| Jonas | Developer | Delete, Undo, repeat |
+| Leila | Designer | Dark mode, phone width |
+| Mateo | Support | First-time sign-up, wrong input |
+| Priya | Accessibility tester | Keyboard and screen reader only |
 
 **Plan of the 45 minutes:** 5 min intro and test accounts, 30 min free testing (each person their
 focus, then swap), 10 min to read out the findings and give each a severity.
 
 ### Results (simulated, except rows marked REAL)
 
+Rows 1 to 3 are **real** bugs from this project, found before the bash. They are listed so the
+team can check them again by hand. Rows 4 to 8 are the (simulated) bash itself.
+
 | # | Found by | What happened | Severity | Outcome |
 |---|---|---|---|---|
-| 1 | Tomas | **REAL.** Two fast clicks on Delete, then Undo: the to-do came back **without its steps and tags**. Found in code review, not by a person. | S2 | Fixed before merge in PR #51. See [BUG-001](../bug-reports/BUG-001-double-delete-loses-steps-and-tags.md). |
-| 2 | Kenji | **REAL.** A failed daily backup said "Today's copy is already there", and `make run` showed no warning. Found in code review. | S2 | Fixed before merge in PR #48. See [BUG-002](../bug-reports/BUG-002-failed-backup-reported-as-success.md). |
-| 3 | Amara | **REAL.** A two-line title ran under the priority label, and Delete jumped to a new line (1280px wide). | S4 | Fixed in PR #28. |
-| 4 | Amara | (simulated) In dark mode, the tag chips felt "too bright" next to the title. | S4 | Contrast measured: passes 4.5 : 1. Kept as a design note, no change. |
-| 5 | Sofie | (simulated) With a screen reader, "Undo" in a row and "Undo" in the delete message sounded the same. | S3 | Real in history: PR #51 named the message button "Undo delete: <title>". Re-checked: passes. |
-| 6 | Ingrid | (simulated) `qa-ben` could not see who else is a member of the shared list. | none | Works as designed: members do not see each other (AGENTS.md). Closed as "not a bug". |
-| 7 | Kenji | (simulated) The Undo button was gone after a coffee break. | none | Works as designed: Undo lasts 15 minutes (`UNDO_SECONDS` in `todos/undo.py`). Closed. |
-| 8 | Tomas | (simulated) Searching only `#` showed the whole list. | S4 | Invented for practice. Not checked against the code; would need a ticket and a test first. |
+| 1 | **REAL:** code review of PR #51 | Two fast clicks on Delete, then Undo: the to-do came back **without its steps and tags**. In the bash (simulated), Jonas re-checked it by hand (checklist step 19): fixed. | S2 | Fixed before merge in PR #51. See [BUG-001](../bug-reports/BUG-001-double-delete-loses-steps-and-tags.md). |
+| 2 | **REAL:** code review of PR #48 | A failed daily backup said "Today's copy is already there", and `make run` showed no warning. | S2 | Fixed before merge in PR #48. See [BUG-002](../bug-reports/BUG-002-failed-backup-reported-as-success.md). |
+| 3 | **REAL:** seen on the list page (PR #28) | A two-line title ran under the priority label, and Delete jumped to a new line (1280px wide). | S4 | Fixed in PR #28. |
+| 4 | Leila | (simulated) In dark mode, the tag chips felt "too bright" next to the title. | S4 | Contrast measured: passes 4.5 : 1. Kept as a design note, no change. |
+| 5 | Priya | (simulated) With a screen reader, "Undo" in a row and "Undo" in the delete message sounded the same. | S3 | Real in history: PR #51 named the message button "Undo delete: <title>". Re-checked: passes. |
+| 6 | Hanna | (simulated) `qa-ben` could not see who else is a member of the shared list. | none | Works as designed: members do not see each other (AGENTS.md). Closed as "not a bug". |
+| 7 | Mateo | (simulated) The Undo button was gone after a coffee break. | none | Works as designed: Undo lasts 15 minutes (`UNDO_SECONDS` in `todos/undo.py`). Closed. |
+| 8 | Jonas | (simulated) Searching only `#` showed the whole list. | S4 | Invented for practice. Not checked against the code; would need a ticket and a test first. |
 
-**Summary (simulated):** 8 findings in 45 minutes. 3 real ones, all already fixed before release.
-2 were "works as designed", which tells us the README could explain sharing and Undo better.
+**Summary (simulated):** 5 new findings in 45 minutes, plus the 3 real bugs re-checked (all
+already fixed before release). 2 findings were "works as designed", which tells us the README
+could explain sharing and Undo better.
 No S1. Release decision: **go**.
 
 ## Related documents

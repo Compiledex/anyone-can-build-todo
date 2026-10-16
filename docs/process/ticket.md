@@ -9,13 +9,13 @@
 | Date | 2026-10-16 |
 | Data | MIXED (see below) |
 
+> **SIMULATED.** The people, quotes, numbers and sessions in this document are invented for
+> practice. The app has no real users besides its owner. Real facts are marked with their source.
+
 > **What this document is.** A ticket is one small piece of work in an issue tracker (a tool such
 > as a shared board where each piece of work is a card). A product manager or tech lead files it
 > before the work starts, so everyone agrees on *what* "done" means. Without tickets, work is
 > lost, done twice, or finished without anyone knowing what was promised.
-
-> **SIMULATED.** The people, quotes, numbers and sessions in this document are invented for
-> practice. The app has no real users besides its owner. Real facts are marked with their source.
 
 This project never used an issue tracker: the owner made product decisions in chat, and each
 feature got a plan in `docs/plans/`. This page shows how the same work would look as a ticket.
@@ -91,27 +91,27 @@ keeping Undo after logout (real: the plan's "Not part of this task").
 
 ### Comments (simulated)
 
-> **Sofie (QA):** Does Undo work when the to-do was a repeating copy? Please add a test.
+> **Priya (QA):** Does Undo work when the to-do was a repeating copy? Please add a test.
 >
-> **Tomas (tech lead):** Yes, `test_recurring_links_come_back` covers both directions. Marking as
+> **Jonas (tech lead):** Yes, `test_recurring_links_come_back` covers both directions. Marking as
 > risk:high, because it writes data back and touches access control.
 
 ## Other tickets in this project (simulated IDs, real PRs)
 
 Each ID is invented, but the feature and the PR are real (`gh pr list --state merged`).
 
-| Ticket | Title | PR | Merged |
+| Ticket | Title | PR | Merged (Tokyo date) |
 |---|---|---|---|
 | TODO-7 | Accounts: sign up, log in, see only your own to-dos | #7 | 2026-10-09 |
 | TODO-11 | Share a list with other users by username | #11 | 2026-10-09 |
 | TODO-12 | Clear completed: delete all done to-dos of a list | #12 | 2026-10-09 |
-| TODO-20 | Repeat a to-do every day, week or month | #20 | 2026-10-09 |
+| TODO-20 | Repeat a to-do every day, week or month | #20 | 2026-10-10 |
 | TODO-25 | Drag and drop for a manual order | #25 | 2026-10-10 |
 | TODO-48 | Make a daily backup when `make run` starts | #48 | 2026-10-11 |
 | TODO-49 | List names ignore case for every letter, also æ, ø, å | #49 | 2026-10-11 |
 | TODO-50 | Recurring: Undo keeps a changed copy | #50 | 2026-10-11 |
 | TODO-52 | Cleanups: rename `/` view to `home`, lighter list HTML | #52 | 2026-10-11 |
-| BUG-19 | Flaky CUJ test `test_plan_and_finish` | #19 | 2026-10-09 |
+| BUG-19 | Flaky CUJ test `test_plan_and_finish` | #19 | 2026-10-10 |
 
 ## Related documents
 

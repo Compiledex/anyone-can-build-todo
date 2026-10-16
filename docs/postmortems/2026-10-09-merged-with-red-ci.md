@@ -43,7 +43,7 @@ rounded.
 | 21:44 | **PR #12 merged**, with the `push` run still red. |
 | 21:45-21:46 | The `push` run is rerun: green. |
 | 22:49 | The same kind of failure on PR #15 (run 37939477153). Its rerun at 23:38 is green. |
-| 2026-10-10 00:10 | **PR #19** merged: fixes the flaky `test_plan_and_finish` and four similar journeys. |
+| 2026-10-10 00:10 | **PR #19** merged: fixes the flaky `test_plan_and_finish`, four more journeys and the sign-up helper with the same pattern. |
 | 2026-10-10 00:29 | **PR #22** merged: fixes the same race in `test_break_a_todo_into_steps`. |
 | 2026-10-11 13:14 | The GitHub ruleset on `main` is created (`lint` and `test` required). |
 
@@ -71,7 +71,7 @@ people and tools learn to look past red. Flaky tests make the safety check worth
 
 - The code itself was correct; the rerun proved it.
 - The flaky test was not hidden or skipped. PR #19 found the real reason in Playwright's
-  documented behaviour and fixed the pattern in five journeys, with a comment at the top of
+  documented behaviour and fixed the pattern in five journeys and a sign-up helper, with a comment at the top of
   `todos/tests/cuj/test_journeys.py` that explains the rule.
 - PR #19 and PR #22 were tested hard: `make cuj` 20 times in a row with a busy CPU, 20 of 20 green.
 

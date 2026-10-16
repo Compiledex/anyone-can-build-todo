@@ -9,14 +9,14 @@
 | Date | 2026-10-16 |
 | Data | MIXED (see below) |
 
+> **SIMULATED.** The people, quotes, numbers and sessions in this document are invented for
+> practice. The app has no real users besides its owner. Real facts are marked with their source.
+
 > **What this document is.** *On call* means one named person answers when something breaks. An
 > *incident* is a problem that hurts users or their data now. This runbook says how bad each kind
 > of incident is, who acts, and the exact steps for the common ones. Without it, people guess under
 > stress, and a guess like "delete the database and start again" can turn a small problem into
 > data loss.
-
-> **SIMULATED.** The people, quotes, numbers and sessions in this document are invented for
-> practice. The app has no real users besides its owner. Real facts are marked with their source.
 
 Only the rota (who is on call in a team) is simulated. The levels and playbooks are real.
 
@@ -40,9 +40,9 @@ monitoring: the owner notices a problem when they use the app, or sees CI on Git
 
 | Week | Primary | Secondary | Handover |
 |---|---|---|---|
-| 1 | Ingrid | Tomas | Monday 10:00 Tokyo |
-| 2 | Tomas | Amara | Monday 10:00 Tokyo |
-| 3 | Amara | Kenji | Monday 10:00 Tokyo |
+| 1 | Hanna | Jonas | Monday 10:00 Tokyo |
+| 2 | Jonas | Leila | Monday 10:00 Tokyo |
+| 3 | Leila | Mateo | Monday 10:00 Tokyo |
 
 The primary answers within 15 minutes for S1 and within 4 hours for S2. If not, the secondary
 takes it.

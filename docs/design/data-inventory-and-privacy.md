@@ -57,7 +57,7 @@ The landing page at `/` is rendered with **no** database data.
 | Item | What it holds | How long |
 |---|---|---|
 | Session (database table, Django's default) | The user id, and for 15 minutes the last delete's snapshot. | 2 weeks (Django's default `SESSION_COOKIE_AGE`; not changed in `config/settings.py`). Logout empties it. |
-| Undo snapshot, `session["undo_delete"]` | A deleted to-do's fields, notes, tag names and steps (`todos/undo.py`). | Usable 15 minutes. Removed by the next list page after that (`drop_expired`), by a new delete, by Undo, or by logout. If none of these happens, it stays in the session row until the session ends. |
+| Undo snapshot, `session["undo_delete"]` | A deleted to-do's fields, notes, tag names and steps (`todos/undo.py`). | Usable 15 minutes. Removed by the next list page after that (`drop_expired`), by a new delete, by Undo, or by logout. If none of these happens, it stays in the session row, also after the session expires (gap 2). |
 | Messages cookie (Django's default storage: a cookie first) | Short notes for the next page, like "Deleted “<title>”." or "Restored “<title>”." | Read on the next page, then removed. Signed (cannot be changed), but **not encrypted**: the title is readable in the browser's cookie. |
 | CSRF cookie | A random token. | Django's default (one year). |
 
@@ -85,7 +85,7 @@ only.
 - **No logs of to-do text** from the app itself: `send_reminders` prints one line with a count and
   the username, never a title, and never `osascript`'s error output.
 - Small leak to know about: a search is a `GET` address (`?q=...`), so the development server
-  prints the search words in the terminal. It is not saved to a file.
+  prints the search words in the terminal. It is not saved to a file (gap 5).
 
 ## 6. How to delete data
 
@@ -108,7 +108,13 @@ only.
    them; copy them only to a safe place.
 4. **The messages cookie shows to-do titles in clear text** in the browser. Fine on the owner's own
    Mac; on a shared computer, use the session message storage instead.
-5. **If it ever runs on a server:** add HTTPS (already forced with debug off), a password-attempt
+5. **Search words are printed in the terminal.** The development server shows each request line,
+   also `?q=<search words>`. It is not saved to a file, but it can be seen on screen or in the
+   terminal's scroll-back. Accepted on the owner's own Mac.
+6. **The admin log keeps object names.** `django_admin_log` stores the name of every object
+   changed in `/admin/` (for example a to-do's title), also after the object is deleted. Delete
+   old rows in the admin if that matters.
+7. **If it ever runs on a server:** add HTTPS (already forced with debug off), a password-attempt
    limit, closed or invited sign-up, a privacy notice, and backups off the machine.
 
 ## Related documents

@@ -27,7 +27,7 @@
 
 When `make_next_copy` makes a copy, it stores a **fingerprint** in `Todo.copy_fingerprint`: a
 SHA-256 hash (a short code computed from data; the same data always gives the same code) of the
-copied fields (`COPIED_FIELDS`: title, notes, priority, repeat), the due date, the tag names and
+copied fields (`COPIED_FIELDS`: `title`, `description` (the notes), `priority`, `repeat`), the due date, the tag names and
 the step titles. Undo computes the hash again (`changed_since_copy`). If it differs, the copy is
 kept: "... was kept, because it was changed after it was made."
 

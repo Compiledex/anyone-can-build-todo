@@ -72,7 +72,9 @@
 ## 3. Findings (simulated)
 
 Severity: **High** (blocks the task or loses data), **Medium** (slows or confuses most people),
-**Low** (small annoyance).
+**Low** (small annoyance). This is a *usability* scale, for how much a finding hurts a person
+doing a task. Bugs use the S1 to S4 scale in [bug triage](../bug-reports/README.md#severity-levels);
+a High finding that is also a bug (like F2) would get its own S level there.
 
 | # | Finding | Severity | Seen by | Recommendation |
 |---|---|---|---|---|
@@ -85,7 +87,7 @@ Severity: **High** (blocks the task or loses data), **Medium** (slows or confuse
 | F7 | Turning on Repeat without a due date gave an error far from the date field. | Medium | P1, P2 | Show the error on the due-date field. |
 | F8 | Some people did not see the drag handle and did not know about Move up / Move down until told to choose "Sort by: Manual". | Medium | P1, P2, P5 | Explain where the manual order is (help text or the landing page). |
 | F9 | "Clear completed" removed to-dos a family member had added; Sofie was surprised. | Low | P5 | Keep, but say "of the whole list" in the confirm text. |
-| F10 | As a member, Ines looked for "Rename" and did not find it. | Low | P5 | None: only the owner can rename (decided in the sharing plan). |
+| F10 | In the second part of T7, logged in as the member `ines`, Sofie looked for "Rename" and did not find it. | Low | P5 | None: only the owner can rename (decided in the sharing plan). |
 
 ### Which findings match a real change
 

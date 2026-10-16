@@ -2,7 +2,7 @@
 name: Feature request
 about: Ask for a new feature or a change; it becomes a plan in docs/plans/
 title: "<Short name of the feature>"
-labels: feature
+labels: enhancement
 ---
 
 <!--

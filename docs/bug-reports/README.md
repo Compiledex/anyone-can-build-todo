@@ -9,13 +9,13 @@
 | Date | 2026-10-16 |
 | Data | MIXED (see below) |
 
+> **SIMULATED.** The people, quotes, numbers and sessions in this document are invented for
+> practice. The app has no real users besides its owner. Real facts are marked with their source.
+
 > **What this document is.** A team writes down how bugs are reported and sorted, so every bug
 > gets the same care and the worst ones are fixed first. *Triage* means sorting by how bad
 > something is, like in a hospital. Without it, bugs are lost in chat, or a cosmetic bug is fixed
 > while data is being lost.
-
-> **SIMULATED.** The people, quotes, numbers and sessions in this document are invented for
-> practice. The app has no real users besides its owner. Real facts are marked with their source.
 
 The process, the template and the severity levels are real rules for this project. Only the
 meeting cadence is simulated (marked).
@@ -24,7 +24,9 @@ meeting cadence is simulated (marked).
 
 File it as a GitHub issue with the label `bug` (it exists in the repo), or as a file
 `BUG-00N-short-name.md` in this folder when the bug was found and fixed in a pull request.
-Copy this template:
+A new GitHub issue gets the same fields from
+[`.github/ISSUE_TEMPLATE/bug_report.md`](../../.github/ISSUE_TEMPLATE/bug_report.md). For a file,
+copy this template:
 
 ```markdown
 # BUG-00N: <what goes wrong, in one line>

@@ -43,9 +43,14 @@ Copy this into `NNNN-short-title.md` (the next free number):
 
 | | |
 |---|---|
+| Type | Architecture decision record |
+| Phase | Design |
+| Written by | <roles of the people who decided> |
 | Status | Proposed / Accepted / Superseded by NNNN |
 | Date | YYYY-MM-DD |
-| Deciders | <roles> |
+| Data | REAL |
+
+> **What this document is.** One or two sentences: which choice this ADR is about.
 
 ## Context
 What problem do we have? What forces matter (safety, time, size, people)?

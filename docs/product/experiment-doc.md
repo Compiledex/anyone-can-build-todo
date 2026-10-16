@@ -9,15 +9,15 @@
 | Date | 2026-10-16 |
 | Data | SIMULATED (see below) |
 
-> **What this document is.** A data scientist writes an experiment doc before an A/B test starts,
-> and adds the results when it ends. An **A/B test** shows two versions of a feature to two random
-> groups of people and compares what they do. The doc fixes the question, the metric and the
-> stopping rule in advance, so nobody can pick the result they like after the fact.
-
 > **SIMULATED.** The people, quotes, numbers and sessions in this document are invented for
 > practice. The app has no real users besides its owner. Real facts are marked with their source.
 > This experiment was never run. The app has no analytics (see the
 > [tracking plan](tracking-plan.md)).
+
+> **What this document is.** A data scientist writes an experiment doc before an A/B test starts,
+> and adds the results when it ends. An **A/B test** shows two versions of a feature to two random
+> groups of people and compares what they do. The doc fixes the question, the metric and the
+> stopping rule in advance, so nobody can pick the result they like after the fact.
 
 ## 1. Background
 

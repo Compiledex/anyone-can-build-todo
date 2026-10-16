@@ -44,7 +44,9 @@ state, and the id of its next copy. The snapshot goes in `request.session["undo_
 - Limit: if the restored to-do does not match the page's filter, its row is not shown, and the
   page opens at the top (accepted).
 - Privacy: the snapshot (title, notes, tags, steps) sits in the session table until it is replaced,
-  dropped, or the session ends. See [Data inventory](../design/data-inventory-and-privacy.md).
+  dropped, or the person logs out. If the session just expires, its row (with the snapshot) stays
+  in the database, because nothing runs `clearsessions` (a known gap). See
+  [Data inventory](../design/data-inventory-and-privacy.md), section 7.
 
 ## Alternatives considered
 

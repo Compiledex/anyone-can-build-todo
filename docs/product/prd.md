@@ -5,7 +5,7 @@
 | Type | Product requirements document (PRD) |
 | Phase | Idea |
 | Written by | Product manager (in this project: the owner and Claude) |
-| Status | Approved (all requirements built, PR #1 to #53) |
+| Status | Approved (all requirements built; PR #1 to #53, 51 merged) |
 | Date | 2026-10-16 |
 | Data | MIXED: problem, users, goals, non-goals and requirements are real; success measures are simulated |
 
@@ -115,6 +115,10 @@ team would set, and how they could be checked **locally**, without tracking anyo
 4. Will it ever run on a **server**? Then: a persistent database, a password-attempt limit, closed
    sign-up, and backups off the machine.
 5. Should the app show a hint about the manual order? (Simulated UX finding F8.)
+6. Which of the smaller privacy gaps should be closed: expired sessions are never cleared, the
+   messages cookie is signed but not encrypted, search words appear in the development server's
+   terminal, and the admin log keeps object names? ([data inventory](../design/data-inventory-and-privacy.md),
+   gaps 2 and 4 to 6.)
 
 ## Related documents
 

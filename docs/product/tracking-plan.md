@@ -9,23 +9,25 @@
 | Date | 2026-10-16 |
 | Data | MIXED (see below) |
 
+> **SIMULATED.** The people, quotes, numbers and sessions in this document are invented for
+> practice. The app has no real users besides its owner. Real facts are marked with their source.
+
 > **What this document is.** A product analyst writes a tracking plan before anyone adds
 > analytics to a product. It lists the questions the team wants answered, and the exact events
 > (things the app records, like "a to-do was deleted") that answer them, with their properties.
 > Without it, teams collect too much, collect personal data by accident, or collect data that
 > answers nothing.
 
-> **SIMULATED.** The people, quotes, numbers and sessions in this document are invented for
-> practice. The app has no real users besides its owner. Real facts are marked with their source.
-
 ## 1. The real situation today
 
 This part is real.
 
-- The app collects **no analytics**. It records no events and sends **nothing** to any other
-  computer. This is on purpose: privacy is a feature of the app.
-- The app runs only on the owner's Mac (a decision recorded in the project notes; there is no
-  deploy). The data is in one SQLite file, `db.sqlite3`, which is not in git (`AGENTS.md`).
+- The app collects **no analytics**. It records no usage events and sends **nothing** to any
+  other computer. This is on purpose: privacy is a feature of the app. (The only records of
+  activity are Django's admin log and the development server's request lines in the terminal;
+  see the [data inventory](../design/data-inventory-and-privacy.md), section 7.)
+- The app runs only on the owner's Mac (decided on 2026-10-10, `docs/plans/reminders.md`; there
+  is no deploy). The data is in one SQLite file, `db.sqlite3`, which is not in git (`AGENTS.md`).
 - The pages load no scripts from other sites. The landing page has "No JavaScript and nothing
   from other sites" (`AGENTS.md`, `todos/templates/todos/landing.html`). The only app script is
   `todos/static/todos/reorder.js` (drag and drop).
@@ -67,7 +69,7 @@ code (like a sort key).
 | `completed_cleared` | "Clear completed" deletes done to-dos | `list_id`, `deleted_count` |
 | `list_viewed` | The list page is shown | `list_id`, `sort` (a key of `SORT_OPTIONS`), `status` (empty for All, `open` or `done`), `has_search` (bool, never the words) |
 
-Every event also has `id`, `created_at` (Tokyo time, `timezone.now()`), and `actor_is_owner`
+Every event also has `id`, `created_at` (`timezone.now()`: stored in UTC, shown in Tokyo time), and `actor_is_owner`
 (bool: the list owner or a member). It does **not** store who the actor is.
 
 For Q3, "active" means: a shared list has at least one `todo_created`, `todo_toggled` or
