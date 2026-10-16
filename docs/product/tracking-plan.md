@@ -24,7 +24,7 @@ This part is real.
 
 - The app collects **no analytics**. It records no usage events and sends **nothing** to any
   other computer. This is on purpose: privacy is a feature of the app. (The only records of
-  activity are Django's admin log and the development server's request lines in the terminal;
+  activity are Django's admin log (without names) and the development server's request lines in the terminal;
   see the [data inventory](../design/data-inventory-and-privacy.md), section 7.)
 - The app runs only on the owner's Mac (decided on 2026-10-10, `docs/plans/reminders.md`; there
   is no deploy). The data is in one SQLite file, `db.sqlite3`, which is not in git (`AGENTS.md`).
