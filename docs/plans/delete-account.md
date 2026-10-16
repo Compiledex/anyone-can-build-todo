@@ -185,7 +185,11 @@ in `logout()` never touches it.
 
 - With **session storage** (after privacy-small-fixes): the message goes into the new, empty
   session; the session is then not empty, so `SessionMiddleware` saves it with a new key and sets
-  the cookie. The landing page reads and removes it. That session holds no user.
+  the cookie. The landing page reads and removes it. That session holds no user. After the
+  message is shown, Django 5.2.17 saves the row as `{}` (no user id, no text) and sets the
+  `sessionid` cookie again for two weeks: the session has a key, so `is_empty()` is False. The
+  `{}` row stays until `clearsessions` deletes it once it expires (`make run` runs
+  `clearsessions` after privacy-small-fixes).
 - With today's **fallback storage** (cookie first): the message goes into the messages cookie.
 
 The message would survive also if it were added before `logout()`, for the same reason (the
@@ -361,7 +365,7 @@ readme-to-runbooks → privacy-small-fixes → admin-log-without-names → **del
 | `accounts/tests/integration/test_delete_account.py` (new) | The integration tests below. |
 | `todos/tests/cuj/test_account.py` (new) | The one browser journey. |
 | `AGENTS.md` | "What this is": a person can delete their own account (what goes, what stays). Rows: `accounts/` (no models; plus delete account), `accounts/forms.py` (`DeleteAccountForm`), `accounts/urls.py`/`views.py` (the addresses and views `login`, `logout`, `signup`, `account_delete`; `account_delete`: GET, HEAD, POST; a delete in one transaction with the user's sessions, then logout, then the message), new row `accounts/deletion.py`, `accounts/templates/registration/` (the delete page extends `base.html`, not `site_base.html`), `base.html` (the header link), `todos/tests/cuj/` (the new file). The open-views list in Rules stays `login`, `logout`, `signup`, `home`. In Rules, "Only my data", a **second exception** next to the reminders one: `account_delete` acts only on `request.user` (no id in the address, no user field in the form) and deletes through `user.delete()` (Django's cascade); `account_summary` reads `user.todo_lists` and `user.shared_lists` only to count. Its "other user" test is "bob's POST deletes only bob", not a 404. |
-| `docs/design/data-inventory-and-privacy.md` | Section 6 row "Delete an account": the page, what goes (also sessions), what stays. Section 7 gap 1: marked closed, with a link to this plan. Retention row for accounts. Retention row for sessions: after the delete, one new session row holds only the message "Your account was deleted." (no user id; with session storage). It stays in `django_session` until `clearsessions` runs, also after the landing page has shown the message. |
+| `docs/design/data-inventory-and-privacy.md` | Section 6 row "Delete an account": the page, what goes (also sessions), what stays. Section 7 gap 1: marked closed, with a link to this plan. Retention row for accounts. Retention row for sessions: after the delete (with session storage), one new session row holds only the message "Your account was deleted." (no user id) until the landing page shows it; then it is saved as `{}` (no user id, no text) and the `sessionid` cookie is set again for two weeks. That `{}` row stays in `django_session` until `clearsessions` (run by `make run`) deletes it after it expires. |
 | `docs/design/design-doc.md` | Remove the known-limit row "No "delete my account" page"; one line in 7.7 (lists, sharing) on what happens to shared lists. |
 | `docs/product/prd.md` | Open question 1: answered (yes, with this plan). |
 | `CHANGELOG.md` | A new version: Added "Delete your own account", Security "its sessions go too". |
@@ -501,7 +505,8 @@ Second plan review (2026-10-16): APPROVE WITH CHANGES. All findings applied:
 4. Racing requests (500 on a racing add, 400 on a racing session save, a racing login is
    harmless) are written down and accepted.
 5. A double submit ends on the login page and loses the message; written down, accepted.
-6. The data inventory says the message-only session row still holds the message text.
+6. The data inventory says the message-only session row holds the message text until it is
+   shown, then `{}` (checked on Django 5.2.17), until `clearsessions`.
 7. `form.is_valid()` runs inside the transaction (`check_password` may save a new hash).
 8. The form keeps `autocomplete="current-password"` and adds a hidden `username` input for
    password managers; autofill may make the confirmation one press, accepted.
