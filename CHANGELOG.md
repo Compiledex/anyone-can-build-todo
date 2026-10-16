@@ -21,6 +21,12 @@ Added, Changed, Fixed, Security, plus "Under the hood" for changes you cannot se
 
 ## [Unreleased]
 
+### Added
+
+- Delete your own account: click "Logged in as <name>" at the top. The page shows what will go,
+  asks for your password, and then deletes your lists, their to-dos and your tags; members of your
+  shared lists lose them, and lists shared with you stay with their owners (PR #60).
+
 ### Changed
 
 - The steps to switch on the Mac reminders, and the notes for a server, moved from the README to
@@ -37,6 +43,7 @@ Added, Changed, Fixed, Security, plus "Under the hood" for changes you cannot se
 - The admin log at `/admin/` keeps no names: a row says `todo 42`, not the to-do's title, list
   name, step or username. A data migration replaces the names in the rows already there. Run
   `make backup` before `migrate` (PR #59).
+- Deleting an account also deletes every session of that account, on every browser (PR #60).
 
 ### Under the hood
 

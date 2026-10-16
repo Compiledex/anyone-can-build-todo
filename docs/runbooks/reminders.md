@@ -91,7 +91,8 @@ the Terminal. These steps change your Mac's settings, so you do them yourself (n
    could not go into the project folder (see step 1).
 8. **To change or stop it:** run the `bootout` line, change the file (or fill it in again with
    step 5), and run `bootstrap` again. To stop it for good, run `bootout` and delete the file from
-   `~/Library/LaunchAgents/`.
+   `~/Library/LaunchAgents/`. If you delete that account, remove the launchd job too, or a new
+   account with the same name gets its reminders.
 
 If the Mac is asleep at 08:00, the job runs when it wakes up. If the Mac is shut down, it does not
 run that day: run the command by hand. The job runs the code that is in the project folder now, so

@@ -22,4 +22,5 @@ urlpatterns = [
         name="logout",
     ),
     path("signup/", views.signup, name="signup"),
+    path("delete/", views.account_delete, name="account_delete"),
 ]

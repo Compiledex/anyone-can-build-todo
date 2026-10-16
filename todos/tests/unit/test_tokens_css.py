@@ -113,3 +113,32 @@ class TokensCssTests(SimpleTestCase):
                 continue
             with self.subTest(path=path.name):
                 self.assertIsNone(re.search(r"\.actions\b", path.read_text()))
+
+
+def media_block(css, query):
+    """The text inside `@media <query> { ... }`, with its nested braces."""
+    start = css.index("{", css.index(query)) + 1
+    depth = 1
+    for index in range(start, len(css)):
+        depth += {"{": 1, "}": -1}.get(css[index], 0)
+        if depth == 0:
+            return css[start:index]
+    raise AssertionError(f"{query} has no end")
+
+
+class TouchCssTests(SimpleTestCase):
+    def test_account_link_is_tall_enough_to_tap(self):
+        # "Logged in as <name>" in the header is the link to the account page.
+        coarse = media_block(
+            COMMENT.sub("", APP_CSS.read_text()), "@media (pointer: coarse)"
+        )
+        rules = re.findall(r"([^{}]+)\{([^{}]*)\}", coarse)
+        heights = [
+            body
+            for selectors, body in rules
+            if "a.who" in [s.strip().split()[-1] for s in selectors.split(",")]
+        ]
+        self.assertTrue(
+            any("min-height: var(--control-height-touch)" in b for b in heights),
+            "a.who needs min-height: var(--control-height-touch) under a finger",
+        )

@@ -92,7 +92,8 @@ The app follows the light or dark setting of your computer or phone. It works on
 
 Every page needs a login. A person sees only their own lists and the lists shared with them;
 someone else's list gives "not found", as if it did not exist. A visitor who is not logged in only
-sees a front page that explains the app, with **Create an account** and **Log in**.
+sees a front page that explains the app, with **Create an account** and **Log in**. You can
+delete your account (click your name at the top); your lists and to-dos go with it.
 
 Optional: your Mac can show you **one notification each morning** with the to-dos due that day.
 It is off until you set it up; see [Reminders on your Mac](#reminders-on-your-mac).
@@ -176,9 +177,9 @@ numbers grow with the app):
 
 ```
 Test layers
-  CUJ          30 passed
-  Integration  577 passed
-  Unit         124 passed
+  CUJ          31 passed
+  Integration  626 passed
+  Unit         143 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,

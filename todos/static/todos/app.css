@@ -37,6 +37,16 @@ h1 {
   min-width: 0;
 }
 
+/* The name is the link to "Delete your account": muted like the text it was,
+   with an underline, so it reads as a link. */
+.user a.who {
+  text-decoration: underline;
+}
+
+.user a.who:hover {
+  color: var(--text);
+}
+
 h2 {
   font-size: 1.125rem;
 }
@@ -1016,6 +1026,13 @@ details.leave {
 
   .list-actions {
     gap: var(--space-2);
+  }
+
+  /* "Logged in as <name>", the link to the account page. */
+  .user a.who {
+    display: inline-flex;
+    align-items: center;
+    min-height: var(--control-height-touch);
   }
 }
 

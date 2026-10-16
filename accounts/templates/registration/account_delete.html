@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% comment %}
+  "Delete your account" (view accounts.views.account_delete). It shows what will go,
+  from accounts.deletion.account_summary: only numbers, and the names of the person's
+  OWN shared lists. Never a member's name, and never the name of a list someone else
+  shared with them. A logged-in page, so base.html (not site_base.html).
+{% endcomment %}
+
+{% block title %}{% if form.errors %}Error: {% endif %}Delete your account – To-do list{% endblock %}
+
+{% block content %}
+  <h1>Delete your account</h1>
+  {% with summary as s %}
+    {% if s.list_count %}
+      <p class="lead">{{ s.list_count }} list{{ s.list_count|pluralize }} and {{ s.list_count|pluralize:"its,their" }} {{ s.todo_count }} to-do{{ s.todo_count|pluralize }} (with {{ s.todo_count|pluralize:"its,their" }} steps){% if s.tag_count %}, and your {{ s.tag_count }} tag{{ s.tag_count|pluralize }}{% endif %} will be deleted.</p>
+    {% else %}
+      <p class="lead">You have no lists.{% if s.tag_count %} Your {{ s.tag_count }} tag{{ s.tag_count|pluralize }} will be deleted.{% endif %}</p>
+    {% endif %}
+    {% if s.shared_lists %}
+      <ul>
+        {% for the_list in s.shared_lists %}
+          <li>“{{ the_list.name }}” ({{ the_list.member_count }} member{{ the_list.member_count|pluralize }}) — they will lose this list.</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+    {% if s.joined_count %}
+      <p>You will leave {{ s.joined_count }} list{{ s.joined_count|pluralize }} that someone else shared with you.
+        {% if s.joined_count == 1 %}It stays with its owner, and the to-dos you added there stay in it.{% else %}They stay with their owners, and the to-dos you added there stay in them.{% endif %}</p>
+    {% endif %}
+  {% endwith %}
+  {% if user.is_staff %}
+    <p>You are an admin. After this, make a new admin with <code>uv run python manage.py createsuperuser</code> if you need <code>/admin/</code>.</p>
+  {% endif %}
+  <p class="muted">This cannot be undone. Copies in the <code>backups/</code> folder still hold your data. A daily copy is removed by itself after 14 newer ones; delete other copies by hand. If you may want your to-dos back, run <code>make backup</code> first.</p>
+
+  <form class="page-form" method="post" action="{% url 'account_delete' %}">
+    {% csrf_token %}
+    {% if form.errors %}
+      {# Focus goes here when the page opens, so a screen reader reads it first. #}
+      <p class="form-error-summary" role="alert" tabindex="-1" autofocus>Not deleted. Fix what is marked below.</p>
+    {% endif %}
+    {# For a password manager: which account the password is for. The form never reads it. #}
+    <input type="text" name="username" value="{{ user.username }}" autocomplete="username" readonly hidden>
+    {% for field in form %}{% include "todos/_field.html" %}{% endfor %}
+    <div class="form-actions">
+      <button class="button button-danger" type="submit">Delete my account</button>
+      <a href="{% url 'home' %}">Cancel</a>
+    </div>
+  </form>
+{% endblock %}

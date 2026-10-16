@@ -106,8 +106,8 @@ team would set, and how they could be checked **locally**, without tracking anyo
 
 ## 7. Open questions
 
-1. Should a person be able to **delete their own account**? Today only the admin can
-   ([data inventory](../design/data-inventory-and-privacy.md), gap 1).
+1. Should a person be able to **delete their own account**? Answered: yes. "Delete your account"
+   (click your name at the top), built with the plan [delete-account](../plans/delete-account.md).
 2. Should the daily **reminders** be switched on? It needs the owner's own launchd setup
    ([reminders runbook](../runbooks/reminders.md)).
 3. Should members of a shared list also get reminders? Needs a per-person "reminded" table

@@ -1,3 +1,4 @@
+from django import forms
 from django.contrib.auth.forms import AuthenticationForm, UserCreationForm
 
 from todos.forms import NoColon
@@ -25,3 +26,30 @@ class SignupForm(NoColon, UserCreationForm):
             " and not too close to your username."
         )
         self.fields["password2"].help_text = "Type the same password again."
+
+
+class DeleteAccountForm(NoColon, forms.Form):
+    """The password of the person who wants to delete their account.
+
+    The view gives the user (always request.user); the form has no user field,
+    so a posted username or user id is never read.
+    """
+
+    password = forms.CharField(
+        label="Password",
+        strip=False,  # A space is part of a password.
+        widget=forms.PasswordInput(attrs={"autocomplete": "current-password"}),
+    )
+
+    def __init__(self, user, *args, **kwargs):
+        self.user = user
+        super().__init__(*args, **kwargs)
+
+    def clean_password(self):
+        password = self.cleaned_data["password"]
+        # Django's own check (a constant-time compare). It may save a new hash.
+        if not self.user.check_password(password):
+            raise forms.ValidationError(
+                "Wrong password. Nothing was deleted.", code="wrong_password"
+            )
+        return password
