@@ -133,7 +133,7 @@ result agrees with it; a real experiment could have disagreed.
 ## Related documents
 
 - [Tracking plan](tracking-plan.md): the events this experiment needs (`todo_deleted`, `todo_undo_delete`)
-- [Retrospective](../retrospectives/2026-10-16-first-week.md)
+- [Retrospective](../retrospectives/2026-10-16-project-retrospective.md)
 - [PRD](./prd.md)
 - [User research notes](./user-research-notes.md)
 - [UX test plan and findings](../design/ux-test-plan-and-findings.md)

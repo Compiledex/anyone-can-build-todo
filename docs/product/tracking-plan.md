@@ -128,7 +128,7 @@ has more users, start from this plan, and run the privacy review again.
 ## Related documents
 
 - [Experiment doc](experiment-doc.md): the Undo-window experiment that would use these events
-- [Retrospective](../retrospectives/2026-10-16-first-week.md)
+- [Retrospective](../retrospectives/2026-10-16-project-retrospective.md)
 - [Data inventory and privacy](../design/data-inventory-and-privacy.md)
 - [PRD](./prd.md)
 - [Design doc](../design/design-doc.md)

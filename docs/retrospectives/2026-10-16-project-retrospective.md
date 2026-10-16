@@ -111,7 +111,7 @@ Numbers (from `gh pr list --state all`):
 
 - [Tracking plan](../product/tracking-plan.md)
 - [Experiment doc](../product/experiment-doc.md)
-- [Postmortems](../postmortems/)
+- [Postmortem: merged with red CI](../postmortems/2026-10-09-merged-with-red-ci.md)
 - [Changelog (release notes)](../../CHANGELOG.md)
 - [Test plan](../process/test-plan.md)
 - [PR review by risk](../process/pr-review-by-risk.md)
