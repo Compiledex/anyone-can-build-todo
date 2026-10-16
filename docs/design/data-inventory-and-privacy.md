@@ -26,8 +26,8 @@ Everything is on **the owner's Mac only**. The app is not deployed.
 |---|---|---|
 | `db.sqlite3` (project folder) | Every table below. | No (`.gitignore`) |
 | `backups/*.sqlite3` | Whole copies of `db.sqlite3`, mode 600 (only the Mac user can read them). | No (`.gitignore`) |
-| The browser's cookies | The session id, the CSRF token, sometimes the messages cookie. | No |
-| The terminal running `make run` | Django's development server prints each request line, including the address. | No |
+| The browser's cookies | The session id and the CSRF token. Messages are in the session, not in a cookie. | No |
+| The terminal running `make run` | Django's development server prints each request line: the method, the address **without** its query string, the status code (`config/logging_filters.py`). | No |
 | `~/Library/Logs/anyone-can-build-todo-reminders.log` | Only if the owner installs the reminders job (not done today). | No |
 
 ## 2. Tables and fields
@@ -46,7 +46,7 @@ Everything is on **the owner's Mac only**. The app is not deployed.
 | `Tag.name`, `Tag.owner` | Yes | Tags. Always the **list owner's** tags, also when a member types one, so tags never leak between users. | Owner and members of a list with that tag. |
 | `Subtask.title`, `done`, `created_at` | Yes | Steps of a to-do. | Whoever can see the to-do. |
 | `django_session.session_data` | Yes | Login, and the **undo snapshot** (below). | The server only. |
-| `django_admin_log` | Yes (object names, like a to-do title) | Django records changes made in `/admin/`. | The admin. |
+| `django_admin_log` | Yes, but **no names**: a label like `todo 42`, the time, the admin user, the action and the labels of the changed fields (like "Title"). A step's title becomes "name not kept". | Django records changes made in `/admin/` (`todos/admin_log.py`). | The admin. |
 
 Access rules: every view finds data through `visible_to`, `get_visible_todo` or
 `get_visible_subtask`; someone else's data gives 404 ([ADR 0003](../adr/0003-404-for-other-peoples-data.md)).
@@ -57,8 +57,9 @@ The landing page at `/` is rendered with **no** database data.
 | Item | What it holds | How long |
 |---|---|---|
 | Session (database table, Django's default) | The user id, and for 15 minutes the last delete's snapshot. | 2 weeks (Django's default `SESSION_COOKIE_AGE`; not changed in `config/settings.py`). Logout empties it. |
-| Undo snapshot, `session["undo_delete"]` | A deleted to-do's fields, notes, tag names and steps (`todos/undo.py`). | Usable 15 minutes. Removed by the next list page after that (`drop_expired`), by a new delete, by Undo, or by logout. If none of these happens, it stays in the session row, also after the session expires (gap 2). |
-| Messages cookie (Django's default storage: a cookie first) | Short notes for the next page, like "Deleted “<title>”." or "Restored “<title>”." | Read on the next page, then removed. Signed (cannot be changed), but **not encrypted**: the title is readable in the browser's cookie. |
+| Undo snapshot, `session["undo_delete"]` | A deleted to-do's fields, notes, tag names and steps (`todos/undo.py`). | Usable 15 minutes. Removed by the next list page after that (`drop_expired`), by a new delete, by Undo, or by logout. If none of these happens, it stays in the session row until `make run` deletes the expired session (`clearsessions`). |
+| Messages, `session["_messages"]` (`MESSAGE_STORAGE` is the session storage, never a cookie) | Short notes for the next page, like "Deleted “<title>”." or "Restored “<title>”." | Read on the next page, then removed from the session. Logout empties it. A message shown to a visitor who is not logged in leaves an empty session row (`{}`, no text), which `clearsessions` removes after it expires. |
+| The admin's success messages | For a staff user in `/admin/`: a note with a name, like "The to-do “…” was deleted successfully." It is kept in the session too, like the app's messages (the row above), never in a cookie. | Until the next admin page shows it, then removed. Accepted: only the owner uses `/admin/`. |
 | CSRF cookie | A random token. | Django's default (one year). |
 
 With `DJANGO_DEBUG=False` (only on a server), the session and CSRF cookies are sent over HTTPS
@@ -72,8 +73,8 @@ only.
 | A deleted to-do | Gone from `db.sqlite3` at once (no soft delete, [ADR 0005](../adr/0005-delete-undo-session-snapshot.md)). It can still be in the session for a short time, and in backups. |
 | Daily backups (`make run`) | The newest 14 daily copies (`DAILY_KEEP = 14` in `todos/backup.py`). Older daily copies are deleted. |
 | Manual backups (`make backup`, `make reset`) | **Forever**, until the owner deletes them by hand. |
-| Expired session rows | Stay in `django_session` until `manage.py clearsessions` runs. Nothing runs it today (known gap). |
-| Sessions after an account delete | Every session row of the deleted user goes in the same transaction. With session message storage, one new session row then holds only the message "Your account was deleted." (no user id) until the landing page shows it; then it is saved as `{}` (no user id, no text) and the `sessionid` cookie is set again for two weeks. That `{}` row stays in `django_session` until `clearsessions` deletes it after it expires. |
+| Expired session rows | Deleted by `make run` (Django's `clearsessions`, after the daily copy, before the server starts). The daily copy of that day can still hold them, for 14 days. |
+| Sessions after an account delete | Every session row of the deleted user goes in the same transaction. Messages are kept in the session, so one new session row then holds only the message "Your account was deleted." (no user id) until the landing page shows it; then it is saved as `{}` (no user id, no text) and the `sessionid` cookie is set again for two weeks. That `{}` row stays in `django_session` until `clearsessions` (run by `make run`) deletes it after it expires. |
 
 ## 5. What is never collected
 
@@ -85,8 +86,13 @@ only.
   by email ([ADR 0008](../adr/0008-mac-notifications-via-osascript.md)).
 - **No logs of to-do text** from the app itself: `send_reminders` prints one line with a count and
   the username, never a title, and never `osascript`'s error output.
-- Small leak to know about: a search is a `GET` address (`?q=...`), so the development server
-  prints the search words in the terminal. It is not saved to a file (gap 5).
+- **No search words in the terminal**: a search is a `GET` address (`?q=...`), but the
+  development server prints its request lines without the query string (`DropQueryString` in
+  `config/logging_filters.py`). Known limits, both only with hand-made requests (tools like
+  `curl` or `nc`, never from the app's own pages): a raw space in the query gives a "Bad request
+  syntax" line in which the words after the space are still printed; and a `?` written as `%3F`
+  in the path (`/lists/3/%3Fq=secret`) is part of the path, not a query string, so it is printed
+  as it is.
 
 ## 6. How to delete data
 
@@ -96,26 +102,29 @@ only.
 | Delete the done to-dos of a list | "Clear completed". | Cannot be undone. |
 | Delete a list | "Delete list" (owner only). | Its to-dos and member rows go too. |
 | Stop seeing a shared list | "Leave this list" (member). | The to-dos the member added stay in the list. |
-| Delete an account | "Delete your account" (`/accounts/delete/`; click "Logged in as <name>" at the top), with the password. The admin can also delete a user at `/admin/`. | Cascade: the user's own lists (with all their to-dos, also those members added, and their steps), their tags, their memberships, their admin log rows, and every session of the user go. Members of the user's shared lists lose those lists. Lists shared *with* the user stay with their owners, with the to-dos the user added there. Copies in `backups/` still hold the data (the page says so). |
+| Delete an account | "Delete your account" (`/accounts/delete/`; click "Logged in as <name>" at the top), with the password. The admin can also delete a user at `/admin/`. | Cascade: the user's own lists (with all their to-dos, also those members added, and their steps), their tags, their memberships, the admin log rows they made (by CASCADE; rows another admin made about their things stay, with no names), and every session of the user go. Members of the user's shared lists lose those lists. Lists shared *with* the user stay with their owners, with the to-dos the user added there. Copies in `backups/` still hold the data (the page says so). |
 | Delete everything | `make reset` (asks `yes` first). | It makes a backup first. |
 | Remove data from backups | Delete the files in `backups/` by hand. | A daily copy leaves by itself after 14 newer ones. |
 
 ## 7. Known gaps and recommendations
 
-1. ~~**No self-service account delete.**~~ Closed: a person can delete their own account
-   (POST, password check, its sessions go too); see the plan
+1. **Closed.** There was no self-service account delete: now a person can delete their own
+   account (POST, password check, its sessions go too); see the plan
    [delete-account](../plans/delete-account.md).
-2. **Expired sessions are not cleaned.** Run `clearsessions` now and then, or from `make run`.
+2. **Closed.** Expired sessions were not cleaned: now `make run` runs `clearsessions` after the
+   daily copy.
 3. **Manual backups never expire** and hold every account and to-do. The README says: do not share
    them; copy them only to a safe place.
-4. **The messages cookie shows to-do titles in clear text** in the browser. Fine on the owner's own
-   Mac; on a shared computer, use the session message storage instead.
-5. **Search words are printed in the terminal.** The development server shows each request line,
-   also `?q=<search words>`. It is not saved to a file, but it can be seen on screen or in the
-   terminal's scroll-back. Accepted on the owner's own Mac.
-6. **The admin log keeps object names.** `django_admin_log` stores the name of every object
-   changed in `/admin/` (for example a to-do's title), also after the object is deleted. Delete
-   old rows in the admin if that matters.
+4. **Closed.** The messages cookie showed to-do titles in clear text: now messages are kept in
+   the session on the server (`MESSAGE_STORAGE`).
+5. **Closed.** Search words were printed in the terminal: now the development server's request
+   lines have no query string (section 5 names the one known limit).
+6. **Closed: the admin log keeps no names.** `django_admin_log` stores a label like `todo 42`
+   (the model's name and the row number) instead of a to-do's title, a list's name or a
+   username, and a step's title becomes "name not kept" (`todos/admin_log.py`). The data
+   migration `0023_blank_admin_log_names` replaced the names in the rows that were already
+   there. Two limits: backups made before that migration still hold the old names, and SQLite
+   can keep the old bytes in free pages of `db.sqlite3` until it reuses them.
 7. **If it ever runs on a server:** add HTTPS (already forced with debug off), a password-attempt
    limit, closed or invited sign-up, a privacy notice, and backups off the machine.
 

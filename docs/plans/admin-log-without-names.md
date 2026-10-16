@@ -1,6 +1,6 @@
 # Plan: the admin log keeps no names
 
-Status: approved (2026-10-16) — not started
+Status: **done** (2026-10-16)
 
 Builds on: **foundation** and **accounts** (`/admin/`, `todos/admin.py`, Django's own `User`
 admin), **subtasks** (the steps inline on a to-do's admin page), **list-name-casefold** (the

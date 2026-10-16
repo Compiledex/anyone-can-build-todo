@@ -109,16 +109,12 @@ team would set, and how they could be checked **locally**, without tracking anyo
 1. Should a person be able to **delete their own account**? Answered: yes. "Delete your account"
    (click your name at the top), built with the plan [delete-account](../plans/delete-account.md).
 2. Should the daily **reminders** be switched on? It needs the owner's own launchd setup
-   (`README.md`, "Reminders on your Mac").
+   ([reminders runbook](../runbooks/reminders.md)).
 3. Should members of a shared list also get reminders? Needs a per-person "reminded" table
    (`docs/plans/reminders.md`).
 4. Will it ever run on a **server**? Then: a persistent database, a password-attempt limit, closed
    sign-up, and backups off the machine.
 5. Should the app show a hint about the manual order? (Simulated UX finding F8.)
-6. Which of the smaller privacy gaps should be closed: expired sessions are never cleared, the
-   messages cookie is signed but not encrypted, search words appear in the development server's
-   terminal, and the admin log keeps object names? ([data inventory](../design/data-inventory-and-privacy.md),
-   gaps 2 and 4 to 6.)
 
 ## Related documents
 

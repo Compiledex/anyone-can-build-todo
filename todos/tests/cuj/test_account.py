@@ -1,15 +1,14 @@
 """Delete my account in a real browser: the link in the header, the confirm page, the end."""
 
-import re
-
 from playwright.sync_api import expect
 
 from accounts.tests.helpers import TEST_PASSWORD, make_user
 from todos.models import TodoList
 from todos.tests.cuj.browser import BrowserTestCase
+from todos.tests.cuj.helpers import LOGIN_PAGE, PASSWORD, make_user_with_inbox
 
-# A small phone. The header must stay one short bar there.
-PHONE = {"width": 375, "height": 812}
+# A small phone (narrower than helpers.PHONE). The header must stay one short bar there.
+SMALL_PHONE = {"width": 375, "height": 812}
 
 HEADER_SIZES = """() => ({
     header: document.querySelector("header.site").getBoundingClientRect().height,
@@ -21,9 +20,8 @@ HEADER_SIZES = """() => ({
 
 class DeleteAccountJourney(BrowserTestCase):
     def test_delete_my_account(self):
-        alice = make_user("alice")
+        alice = make_user_with_inbox()  # alice, with "Inbox".
         bob = make_user("bob")
-        TodoList.objects.create(owner=alice, name="Inbox")
         TodoList.objects.create(owner=alice, name="Family").members.add(bob)
         TodoList.objects.create(owner=bob, name="Bob's list")
 
@@ -36,7 +34,7 @@ class DeleteAccountJourney(BrowserTestCase):
         expect(bob_lists.get_by_role("link", name="Family (alice)")).to_be_visible()
 
         page = self.page
-        page.set_viewport_size(PHONE)
+        page.set_viewport_size(SMALL_PHONE)
         self.log_in_as(alice)
         page.goto(self.live_server_url)
         expect(page.get_by_role("heading", name="Inbox")).to_be_visible()
@@ -62,9 +60,9 @@ class DeleteAccountJourney(BrowserTestCase):
         expect(page).to_have_url(f"{self.live_server_url}/")
 
         # Her password no longer logs in.
-        page.goto(f"{self.live_server_url}/accounts/login/")
+        page.goto(f"{self.live_server_url}{LOGIN_PAGE}")
         page.get_by_label("Username").fill("alice")
-        page.get_by_label(re.compile(r"^Password$")).fill(TEST_PASSWORD)
+        page.get_by_label(PASSWORD).fill(TEST_PASSWORD)
         page.get_by_role("button", name="Log in").click()
         expect(page.get_by_text("Please enter a correct username")).to_be_visible()
 

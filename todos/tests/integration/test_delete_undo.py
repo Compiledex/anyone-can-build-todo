@@ -6,8 +6,10 @@ from datetime import date, timedelta
 from unittest.mock import patch
 
 from django.contrib.messages import constants
-from django.contrib.messages.storage.cookie import CookieStorage
+from django.contrib.messages.storage.session import SessionStorage
 from django.db import connection
+from django.http import HttpResponse
+from django.test import RequestFactory
 from django.urls import reverse
 from django.utils import timezone
 
@@ -263,12 +265,17 @@ class UndoTests(DeleteUndoTestCase):
         self.assertEqual(self.undo_forms(response), [])
 
     def test_no_undo_button_for_a_message_without_its_snapshot_after_login(self):
-        # A message tagged undo-delete-7 but a new session (logged out and in).
-        storage = CookieStorage(None)
-        storage.add(constants.SUCCESS, "Deleted “X”.", extra_tags="undo-delete-7")
-        self.client.cookies[storage.cookie_name] = storage._encode(
-            list(storage._queued_messages)
+        # A message tagged undo-delete-7 but a new session (logged out and in):
+        # the message is in the session, its undo_delete snapshot is not.
+        request = RequestFactory().get("/")
+        request.session = self.client.session
+        request._messages = SessionStorage(request)
+        request._messages.add(
+            constants.SUCCESS, "Deleted “X”.", extra_tags="undo-delete-7"
         )
+        request._messages.update(HttpResponse())
+        request.session.save()
+        self.assertNotIn(SESSION_KEY, self.client.session)
         response = self.client.get(self.list_url)
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "Deleted “X”.")

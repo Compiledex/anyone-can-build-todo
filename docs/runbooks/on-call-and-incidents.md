@@ -63,6 +63,7 @@ Then follow the playbook below.
 | `ImproperlyConfigured: DJANGO_DEBUG must be True or False. It is set to something else (length N).` | `DJANGO_DEBUG` is set to something like `1`, `yes` or empty | `echo $DJANGO_DEBUG` to see it. On the laptop, remove it: `unset DJANGO_DEBUG`. Check `~/.zshrc` if it comes back. (`config/env.py`) |
 | `ImproperlyConfigured: DJANGO_SECRET_KEY is not set. DJANGO_DEBUG is False ...` | `DJANGO_DEBUG=False` on the laptop | `unset DJANGO_DEBUG`. The laptop does not need a secret key. |
 | `You have N unapplied migration(s)...` and pages fail with `no such column` or `no such table` | New code, old database | `make backup`, then `uv run python manage.py migrate` |
+| `Warning: could not remove expired sessions (see the message above). The app starts anyway.` | `clearsessions` failed: the database is locked, or it has no tables yet (`no such table: django_session`) | Read the message above it. No tables: `make setup` (or `uv run python manage.py migrate`). Locked: stop the other program that uses `db.sqlite3`. The app still works; the next `make run` tries again. |
 | `command not found: uv` | uv is not installed, or the terminal is old | Install uv (see the [deployment runbook](deployment.md)), open a new terminal |
 
 After the fix: `make run`, then the health check in the [deployment runbook](deployment.md#5-health-check).

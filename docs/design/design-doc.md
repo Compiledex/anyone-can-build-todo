@@ -30,8 +30,8 @@ notes, steps and a repeat rule. The owner of a list can share it with other user
 | Who uses it? | The owner, and a few people they share lists with. |
 | Where does it run? | Only on the owner's Mac, at <http://127.0.0.1:8000>. Not deployed. |
 | Where is the data? | One SQLite file, `db.sqlite3`, next to the code. Not in git. |
-| How big is it? | 16 Python files in `todos/`, 22 migrations, 731 tests. |
-| Status | All planned features merged (33 plans; PR #1 to #53, of which 51 merged and 2 replaced). |
+| How big is it? | 17 Python files in `todos/`, 23 migrations, 769 tests. |
+| Status | 38 plans; all built. PR #1 to #60, of which 58 merged, 2 replaced. |
 
 ## 2. Goals and non-goals
 
@@ -269,7 +269,7 @@ done ([ADR 0004](../adr/0004-today-in-asia-tokyo.md)).
 
 | Command | What it does |
 |---|---|
-| `make run` | A daily backup (at most one a day, newest 14 kept), then the server at 127.0.0.1:8000. |
+| `make run` | A daily backup (at most one a day, newest 14 kept), then `clearsessions` (expired sessions), then the server at 127.0.0.1:8000. |
 | `make backup` | A copy of `db.sqlite3` in `backups/`, kept until deleted by hand. |
 | `make reset` | Asks (`yes` only), copies, then makes an empty database. |
 | `make check` | Every commit check, the migration check, all tests. |
@@ -291,8 +291,8 @@ secure cookies and HSTS turn on. No message shows a secret value (PR #36).
 | Layer | Folder | Tool | Count |
 |---|---|---|---|
 | CUJ | `*/tests/cuj/` | Chromium driven by Playwright | 31 |
-| Integration | `*/tests/integration/` | Django's test client | 602 |
-| Unit | `*/tests/unit/` | One function, no database | 129 |
+| Integration | `*/tests/integration/` | Django's test client | 626 |
+| Unit | `*/tests/unit/` | One function, no database | 143 |
 
 Rule: test each rule once, in the lowest layer where a person would notice it (test-pyramid,
 PR #1). `config/test_runner.py` stops before running if a test is in the wrong folder or class.
@@ -313,10 +313,6 @@ on every push; a ruleset on `main` requires both green. Reviewers break the code
 | Custom SQL functions | Other SQLite tools cannot run search or title sort. |
 | No threaded test for two requests at once | `IMMEDIATE` and idempotent toggles cover the known cases. |
 | Open sign-up, no password-attempt limit | Must change before going public. |
-| Expired sessions are never cleared | Their rows (with any undo snapshot) stay in `django_session`; nothing runs `clearsessions` (gap 2). |
-| Messages cookie is signed, not encrypted | A to-do title in "Deleted “…”." can be read in the browser's cookies (gap 4). |
-| Search words in the server log | A search is a `GET` address, so the development server prints `?q=...` in the terminal (gap 5). |
-| Admin log keeps object names | `django_admin_log` keeps the name of each object changed in `/admin/` (for example a to-do's title), also after the object is deleted (gap 6). |
 | Hosting | Many hosts lose the SQLite file on deploy; not built for it. |
 
 ## 13. Glossary

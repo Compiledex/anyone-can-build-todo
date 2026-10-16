@@ -25,11 +25,29 @@ Added, Changed, Fixed, Security, plus "Under the hood" for changes you cannot se
 
 - Delete your own account: click "Logged in as <name>" at the top. The page shows what will go,
   asks for your password, and then deletes your lists, their to-dos and your tags; members of your
-  shared lists lose them, and lists shared with you stay with their owners (delete-account).
+  shared lists lose them, and lists shared with you stay with their owners (PR #60).
+
+### Changed
+
+- The steps to switch on the Mac reminders, and the notes for a server, moved from the README to
+  the runbooks; the README links to them (PR #56).
 
 ### Security
 
-- Deleting an account also deletes every session of that account, on every browser (delete-account).
+- `make run` now deletes expired sessions (and any old undo snapshot in them) after the daily
+  backup, before the server starts (PR #58).
+- Messages like "Deleted “Buy milk”." are kept in the session on the server, never in a browser
+  cookie (PR #58).
+- The development server's terminal no longer shows search words: request lines are printed
+  without the part after `?` (PR #58).
+- The admin log at `/admin/` keeps no names: a row says `todo 42`, not the to-do's title, list
+  name, step or username. A data migration replaces the names in the rows already there. Run
+  `make backup` before `migrate` (PR #59).
+- Deleting an account also deletes every session of that account, on every browser (PR #60).
+
+### Under the hood
+
+- The browser tests are split into one file per journey; the same 30 tests (PR #57).
 
 ## [0.5.1] - 2026-10-16
 
