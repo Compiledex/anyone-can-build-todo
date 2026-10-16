@@ -19,6 +19,12 @@ work, so the history is easy to read. Dates are Tokyo dates (the app's `TIME_ZON
 names its pull request (PR). The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/):
 Added, Changed, Fixed, Security, plus "Under the hood" for changes you cannot see.
 
+## [Unreleased]
+
+### Under the hood
+
+- The browser tests are split into one file per journey; the same 30 tests (PR #N).
+
 ## [0.5.1] - 2026-10-16
 
 ### Fixed
