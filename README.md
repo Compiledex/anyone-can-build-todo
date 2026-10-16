@@ -176,9 +176,9 @@ numbers grow with the app):
 
 ```
 Test layers
-  CUJ          28 passed
-  Integration  483 passed
-  Unit         123 passed
+  CUJ          30 passed
+  Integration  577 passed
+  Unit         124 passed
 ```
 
 On a Mac, `make` does the same in fewer words: `make setup` is steps 3 to 6, `make run` is step 7,
