@@ -30,8 +30,8 @@ notes, steps and a repeat rule. The owner of a list can share it with other user
 | Who uses it? | The owner, and a few people they share lists with. |
 | Where does it run? | Only on the owner's Mac, at <http://127.0.0.1:8000>. Not deployed. |
 | Where is the data? | One SQLite file, `db.sqlite3`, next to the code. Not in git. |
-| How big is it? | 16 Python files in `todos/`, 22 migrations, 731 tests. |
-| Status | All planned features merged (33 plans; PR #1 to #53, of which 51 merged and 2 replaced). |
+| How big is it? | 16 Python files in `todos/`, 22 migrations, 748 tests. |
+| Status | 38 plans; all but two are built (admin-log-without-names and delete-account are approved, not built yet). PR #1 to #58, of which 56 merged, 2 replaced. |
 
 ## 2. Goals and non-goals
 
@@ -289,8 +289,8 @@ secure cookies and HSTS turn on. No message shows a secret value (PR #36).
 | Layer | Folder | Tool | Count |
 |---|---|---|---|
 | CUJ | `*/tests/cuj/` | Chromium driven by Playwright | 30 |
-| Integration | `*/tests/integration/` | Django's test client | 577 |
-| Unit | `*/tests/unit/` | One function, no database | 124 |
+| Integration | `*/tests/integration/` | Django's test client | 587 |
+| Unit | `*/tests/unit/` | One function, no database | 131 |
 
 Rule: test each rule once, in the lowest layer where a person would notice it (test-pyramid,
 PR #1). `config/test_runner.py` stops before running if a test is in the wrong folder or class.

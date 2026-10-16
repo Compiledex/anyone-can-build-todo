@@ -235,85 +235,9 @@ first asks you to type `yes` (anything else stops, and nothing is deleted), then
 
 ## Reminders on your Mac
 
-Once a day, at 08:00, your Mac can show **one notification** with the to-dos in **your own lists**
-that are **due today** and not done (not the lists others shared with you). If nothing is due,
-there is no notification. A to-do is shown only once a day.
-
-You can run it by hand at any time (replace `alice` with your username on the site):
-
-```bash
-uv run python manage.py send_reminders --user alice
-```
-
-It prints `Showed 1 notification (2 to-dos) for alice.` or `No to-dos due today for alice.`
-
-To run it every morning, the Mac's own scheduler, **launchd**, starts it. You set this up once, in
-the Terminal. These steps change your Mac's settings, so you do them yourself (not the AI).
-
-1. **Move the project out of `Documents` (recommended).** macOS protects `Documents` from programs
-   that start in the background, so launchd cannot go into the project folder, and the job fails
-   with an empty log. Move it, for example to `~/code/anyone-can-build-todo`, and run `make setup`
-   again there. Do not give Python "Full Disk Access" instead: that gives every Python script on
-   the Mac access to all your files. (iCloud "Desktop & Documents" can also touch `db.sqlite3`
-   while the app writes to it.)
-2. **Get the database ready**, after you pull this feature:
-
-   ```bash
-   uv run python manage.py migrate
-   ```
-
-3. **Allow notifications first.** Show one test notification:
-
-   ```bash
-   osascript -e 'display notification "Test" with title "To-do list"'
-   ```
-
-   Open **System Settings → Notifications → Script Editor** and turn on **Allow notifications**.
-   Run the line again and check that you see "Test", and that a Focus mode (like Do Not Disturb)
-   is off. Do this before step 4: `osascript` says "it worked" even when notifications are not
-   allowed, and then the to-dos are marked as reminded although you saw nothing.
-4. **Try the command by hand.** Make a to-do due today in one of your own lists, then run
-   `uv run python manage.py send_reminders --user <your username>`. To try again the same day,
-   make a **new** to-do due today: the shown ones are now marked.
-5. **Fill in the template** `deploy/macos/com.anyone-can-build-todo.reminders.plist`. In the
-   project folder (replace `alice` with your username):
-
-   ```bash
-   mkdir -p ~/Library/LaunchAgents
-   sed -e "s|__REPO_PATH__|$(pwd)|g" -e "s|__HOME__|$HOME|g" -e "s|__USERNAME__|alice|g" \
-     deploy/macos/com.anyone-can-build-todo.reminders.plist \
-     > ~/Library/LaunchAgents/com.anyone-can-build-todo.reminders.plist
-   plutil -lint ~/Library/LaunchAgents/com.anyone-can-build-todo.reminders.plist
-   ```
-
-   `plutil -lint` must say `OK`. The project folder's path must not contain `&` or `|`: `sed`
-   reads them as special characters, and the paths in the file would be wrong.
-6. **Turn it on.** An error from `bootout` the first time is normal.
-
-   ```bash
-   launchctl bootout gui/$(id -u)/com.anyone-can-build-todo.reminders
-   launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.anyone-can-build-todo.reminders.plist
-   ```
-
-   If "Background Items Added" comes up, check **System Settings → General → Login Items →
-   Allow in the Background**. If it is off, the job never runs.
-7. **Test it now** (make a new to-do due today first):
-
-   ```bash
-   launchctl kickstart -k gui/$(id -u)/com.anyone-can-build-todo.reminders
-   cat ~/Library/Logs/anyone-can-build-todo-reminders.log
-   launchctl print gui/$(id -u)/com.anyone-can-build-todo.reminders | grep "last exit code"
-   ```
-
-   `last exit code = 0` means it worked. Another number with an empty log usually means launchd
-   could not go into the project folder (see step 1).
-8. **To change or stop it:** run the `bootout` line, change the file (or fill it in again with
-   step 5), and run `bootstrap` again. To stop it for good, run `bootout` and delete the file from
-   `~/Library/LaunchAgents/`.
-
-If the Mac is asleep at 08:00, the job runs when it wakes up. If the Mac is shut down, it does not
-run that day: run the command by hand. The job runs the code that is in the project folder now, so
-after you pull new code, run `uv run python manage.py migrate` once.
+Once a day, at 08:00, your Mac can show **one notification** with the to-dos in **your own
+lists** that are **due today**. It is off until you set it up once, yourself, in the Terminal:
+the steps are in the [reminders runbook](docs/runbooks/reminders.md).
 
 ## Tests
 
@@ -356,7 +280,7 @@ runs the same checks and the tests on every push.
 | `todos/templates/` | The HTML of each page |
 | `todos/static/` | The CSS, the JavaScript and the landing page's pictures |
 | `todos/tests/` | The tests, one folder per layer (unit, integration, CUJ) |
-| `deploy/macos/` | The launchd template for the morning reminders on a Mac |
+| `deploy/macos/` | The launchd template for the morning reminders on a Mac (set up with the [reminders runbook](docs/runbooks/reminders.md)) |
 | `scripts/` | The tool behind `make landing-shots` |
 | `docs/` | The documentation: one example of each document a team writes, from the idea to the retrospective ([index](docs/README.md)) |
 | `docs/plans/` | The plan for each feature, written before the code; history, not a description of the code today |
@@ -367,47 +291,10 @@ Each file's job is in `AGENTS.md`.
 ## Put it on the internet
 
 > [!WARNING]
-> **Your data can disappear on a host.** All accounts, lists and to-dos are in one file,
-> `db.sqlite3`, in the project folder. Many hosts (for example Render's web services) throw away
-> every file the app wrote each time you deploy or the server restarts. Then the database starts
-> empty again, and everything is gone, without an error.
->
-> Before you put real data online, check how your host keeps files:
->
-> - Choose a host or plan with a **persistent disk** (storage that survives a deploy and a
->   restart), and make sure `db.sqlite3` is on that disk. Today the app always keeps the file in
->   the project folder; a setting to put it somewhere else is not built yet.
-> - Or use a hosted database such as PostgreSQL. That needs a small code change in
->   `config/settings.py`, which is not built yet either.
-> - Either way, **make backups**: run `make backup` regularly (see [Back up your data](#back-up-your-data)).
->
-> On your own laptop this does not happen: `db.sqlite3` stays until you delete it.
+> On many hosts the SQLite database file, `db.sqlite3`, is deleted at every deploy or restart,
+> and all accounts and to-dos are gone; read the runbook before you put real data online.
 
-A live server needs three environment variables. Never put their real values in the code.
-
-| Variable | Value |
-|---|---|
-| `DJANGO_SECRET_KEY` | A long random string. Make one with `uv run python -c "import secrets; print(secrets.token_urlsafe(50))"` |
-| `DJANGO_DEBUG` | `False`. Only `True` or `False` are allowed (upper or lower case); any other value, also an empty one, stops the app |
-| `DJANGO_ALLOWED_HOSTS` | The site's address without `https://`, for example `my-todo.onrender.com` |
-
-With `DJANGO_DEBUG` set to `False`, the site only works over HTTPS, and the app stops at once if
-`DJANGO_SECRET_KEY` is missing or weak (fewer than 50 characters, fewer than 5 different
-characters, or starting with `django-insecure-`).
-
-The build uses the settings too, so set the three variables for the build as well as for the start.
-(On most hosts, for example Render, the variables on the settings page are used for both.)
-
-Build command:
-
-```bash
-pip install uv && uv sync --locked --no-dev && uv run --no-dev python manage.py check --deploy --fail-level WARNING && uv run --no-dev python manage.py collectstatic --no-input && uv run --no-dev python manage.py migrate
-```
-
-If the build stops, read the last line of the error: it says which variable to set.
-
-Start command:
-
-```bash
-uv run --no-dev gunicorn config.wsgi
-```
+The app runs on your own computer. Before you put it on a server, read
+[If it ever runs on a server](docs/runbooks/deployment.md#if-it-ever-runs-on-a-server) in the
+deployment runbook: it says how to keep the database, and which three environment variables a
+live server needs.
