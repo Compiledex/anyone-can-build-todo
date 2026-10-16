@@ -112,6 +112,8 @@ class AdminLogTests(TestCase):
 
     def only_entry(self):
         (entry,) = LogEntry.objects.all()
+        # The admin user who did it, never the owner of the object (carol).
+        self.assertEqual(entry.user_id, self.staffer.pk)
         return entry
 
     def add_through_admin(self):

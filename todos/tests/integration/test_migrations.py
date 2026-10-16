@@ -393,6 +393,39 @@ class BlankAdminLogNamesMigrationTests(TransactionTestCase):
         )
         self.assertEqual(after, before)
 
+    def test_more_rows_than_one_chunk(self):
+        LogEntry = self.make_rows()
+        migration = importlib.import_module(
+            "todos.migrations.0023_blank_admin_log_names"
+        )
+        # Two full chunks and part of a third: every chunk must be saved.
+        count = migration.CHUNK * 2 + 201
+        todo_type = self.rows["added"].content_type
+        staffer = self.rows["added"].user
+        LogEntry.objects.bulk_create(
+            LogEntry(
+                user=staffer,
+                content_type=todo_type,
+                object_id=str(1000 + number),
+                object_repr=f"Secret to-do {number}",
+                action_flag=1,
+                change_message="",
+            )
+            for number in range(count)
+        )
+
+        migrate_to_newest()
+
+        LogEntry = self.newest_log()
+        first_rows = [row.pk for row in self.rows.values()]
+        many = LogEntry.objects.exclude(pk__in=first_rows).values_list(
+            "object_id", "object_repr"
+        )
+        self.assertEqual(len(many), count)
+        for object_id, label in many:
+            self.assertEqual(label, f"todo {object_id}")
+        self.assert_no_names(LogEntry)
+
     def test_migration_goes_back(self):
         self.make_rows()
         migrate_to_newest()
