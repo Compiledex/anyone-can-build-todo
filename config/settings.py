@@ -143,6 +143,47 @@ LOGIN_REDIRECT_URL = "home"
 LOGOUT_REDIRECT_URL = "login"
 
 
+# Messages (like "Deleted “Buy milk”.") are kept in the session on the server,
+# never in a cookie, so a to-do title is never readable in the browser.
+# SessionMiddleware must come before MessageMiddleware in MIDDLEWARE (it does).
+MESSAGE_STORAGE = "django.contrib.messages.storage.session.SessionStorage"
+
+# The development server's request lines (logger django.server) are printed
+# without the query string, so search words (?q=...) never show in the
+# terminal (config/logging_filters.py). The rest is Django's own default
+# logging (DEFAULT_LOGGING in django.utils.log): this repeats Django's
+# formatter, handler and logger for django.server, and adds the filter.
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "drop_query_string": {"()": "config.logging_filters.DropQueryString"},
+    },
+    "formatters": {
+        "django.server": {
+            "()": "django.utils.log.ServerFormatter",
+            "format": "[{server_time}] {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "django.server": {
+            "level": "INFO",
+            "class": "logging.StreamHandler",
+            "formatter": "django.server",
+        },
+    },
+    "loggers": {
+        "django.server": {
+            "handlers": ["django.server"],
+            "level": "INFO",
+            "propagate": False,
+            "filters": ["drop_query_string"],
+        },
+    },
+}
+
+
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 

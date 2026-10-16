@@ -461,13 +461,15 @@ class DailyBackupTests(TempDatabaseTestCase):
 
 
 # A stand-in for `uv`: it writes its arguments to $UV_LOG, and for backup_db
-# also whether db.sqlite3 is still there. FAKE_BACKUP_EXIT=1 makes the copy fail.
+# also whether db.sqlite3 is still there. FAKE_BACKUP_EXIT=1 makes the copy fail,
+# FAKE_CLEAR_EXIT=1 makes clearsessions fail.
 FAKE_UV = """#!/bin/sh
 echo "$*" >> "$UV_LOG"
 case "$*" in
   *backup_db*)
     if [ -f db.sqlite3 ]; then echo "db still there" >> "$UV_LOG"; fi
     exit "${FAKE_BACKUP_EXIT:-0}";;
+  *clearsessions*) exit "${FAKE_CLEAR_EXIT:-0}";;
 esac
 exit 0
 """
@@ -504,10 +506,12 @@ class FakeUvTestCase(SimpleTestCase):
         self.env["PATH"] = f"{bin_dir}{os.pathsep}{os.environ.get('PATH', '')}"
         self.env["UV_LOG"] = str(self.log)
 
-    def run_make(self, *args, answer="", backup_fails=False):
+    def run_make(self, *args, answer="", backup_fails=False, clear_fails=False):
         env = dict(self.env)
         if backup_fails:
             env["FAKE_BACKUP_EXIT"] = "1"
+        if clear_fails:
+            env["FAKE_CLEAR_EXIT"] = "1"
         return subprocess.run(
             [self.make, *args],
             cwd=self.tmp,
@@ -593,23 +597,43 @@ class MakeResetRecipeTests(SimpleTestCase):
 class MakeRunTests(FakeUvTestCase):
     """`make run` for real, with a fake `uv`: no server starts, no port is used."""
 
-    def assert_backup_then_server(self):
+    BACKUP_WARNING = "Warning: the daily backup did not work"
+    CLEAR_WARNING = "Warning: could not remove expired sessions"
+
+    def assert_backup_then_clear_then_server(self):
         lines = self.logged()
         backup = lines.index("run python manage.py backup_db --daily")
+        clear = lines.index("run python manage.py clearsessions")
         server = lines.index("run python manage.py runserver")
-        self.assertLess(backup, server)
+        self.assertLess(backup, clear)
+        self.assertLess(clear, server)
 
     def test_run_backs_up_then_starts(self):
         result = self.run_make("run")
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assert_backup_then_server()
+        self.assert_backup_then_clear_then_server()
         self.assertNotIn("Warning", result.stdout)
 
     def test_failed_backup_still_starts_with_a_warning(self):
         result = self.run_make("run", backup_fails=True)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assert_backup_then_server()
-        self.assertIn("Warning: the daily backup did not work", result.stdout)
+        self.assert_backup_then_clear_then_server()
+        self.assertIn(self.BACKUP_WARNING, result.stdout)
+        self.assertNotIn(self.CLEAR_WARNING, result.stdout)
+
+    def test_failed_clearsessions_still_starts_with_a_warning(self):
+        result = self.run_make("run", clear_fails=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_backup_then_clear_then_server()
+        self.assertIn(self.CLEAR_WARNING, result.stdout)
+        self.assertNotIn(self.BACKUP_WARNING, result.stdout)
+
+    def test_both_fail_both_warn_and_start(self):
+        result = self.run_make("run", backup_fails=True, clear_fails=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assert_backup_then_clear_then_server()
+        self.assertIn(self.BACKUP_WARNING, result.stdout)
+        self.assertIn(self.CLEAR_WARNING, result.stdout)
 
     def test_backup_target_has_no_daily_flag(self):
         result = self.run_make("backup")

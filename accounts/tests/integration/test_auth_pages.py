@@ -7,7 +7,7 @@ a label, and the help and error texts are linked to their input.
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.messages.storage.cookie import CookieStorage
+from django.contrib.messages.storage.session import SessionStorage
 from django.contrib.staticfiles import finders
 from django.http import HttpResponse
 from django.templatetags.static import static
@@ -260,14 +260,20 @@ class FormFieldTests(TestCase):
 
 
 class MessagesTests(TestCase):
-    def test_a_message_shows_on_the_login_page(self):
-        # Make a message the way a view does, and give its cookie to the client.
+    def add_message(self, text):
+        """Make a message the way a view does, in the client's session.
+
+        Messages are kept in the session (MESSAGE_STORAGE), never in a cookie.
+        """
         request = RequestFactory().get("/")
-        request._messages = CookieStorage(request)
-        messages.info(request, "Your session ended. Please log in again.")
-        response = HttpResponse()
-        request._messages.update(response)
-        self.client.cookies.update(response.cookies)
+        request.session = self.client.session
+        request._messages = SessionStorage(request)
+        messages.info(request, text)
+        request._messages.update(HttpResponse())
+        request.session.save()
+
+    def test_a_message_shows_on_the_login_page(self):
+        self.add_message("Your session ended. Please log in again.")
 
         response = self.client.get(LOGIN_URL)
         parts = parse_page(response)
@@ -279,6 +285,19 @@ class MessagesTests(TestCase):
             parts.position("div", **{"class": "container messages"}),
             parts.position("h1", id="auth-title"),
         )
+
+    def test_a_message_survives_login(self):
+        # Not a user flow (no page adds a message before login today): a guard
+        # that login() keeps the session's data (cycle_key), not flush().
+        make_user("alice")
+        self.add_message("A note from before the login.")
+        response = self.client.post(
+            LOGIN_URL,
+            {"username": "alice", "password": TEST_PASSWORD},
+            follow=True,
+        )
+        self.assertTrue(response.wsgi_request.user.is_authenticated)
+        self.assertContains(response, "A note from before the login.")
 
     def test_no_message_box_without_a_message(self):
         for url in [LOGIN_URL, SIGNUP_URL, "/"]:
