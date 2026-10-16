@@ -16,7 +16,8 @@
 
 **Where the app runs:** only on the owner's Mac, at <http://127.0.0.1:8000>. It is not deployed to
 a server (a decision). All data is in one file, `db.sqlite3`, which is not in git. Every command
-below exists in the `Makefile` or `README.md`. Run them in the project folder.
+below exists in the `Makefile` or `README.md`, except the server commands in the last section,
+which live only here. Run them in the project folder.
 
 ## 1. First install
 
@@ -113,33 +114,79 @@ was not tested against real data. Prefer A.
 
 ## If it ever runs on a server
 
-This section is **not in use**: the app runs only locally. It summarises the "Put it on the
-internet" part of `README.md` and the safe-settings plan (PR #36), so nobody starts from zero.
+This section is **not in use**: the app runs only locally. It holds what was the "Put it on the
+internet" part of `README.md` until 2026-10-16 (this PR), with the facts of the safe-settings plan
+(PR #36), so nobody starts from zero.
 
-- **Environment variables** (never in the code):
+### Data loss on a host
 
-  | Variable | Value | If wrong |
-  |---|---|---|
-  | `DJANGO_SECRET_KEY` | A long random string: `uv run python -c "import secrets; print(secrets.token_urlsafe(50))"` | With debug off, missing or weak (under 50 characters, under 5 different characters, or starting with `django-insecure-`) stops the app with `ImproperlyConfigured` (`config/env.py`) |
-  | `DJANGO_DEBUG` | `False` | Only `True` or `False` (any case). Any other value, also empty, stops the app |
-  | `DJANGO_ALLOWED_HOSTS` | The site's address without `https://`, commas between several | Requests to other names get 400 |
+> [!WARNING]
+> **Your data can disappear on a host.** All accounts, lists and to-dos are in one file,
+> `db.sqlite3`, in the project folder. Many hosts (for example Render's web services) throw away
+> every file the app wrote each time you deploy or the server restarts. Then the database starts
+> empty again, and everything is gone, without an error.
+>
+> Before you put real data online, check how your host keeps files:
+>
+> - Choose a host or plan with a **persistent disk** (storage that survives a deploy and a
+>   restart), and make sure `db.sqlite3` is on that disk. Today the app always keeps the file in
+>   the project folder; a setting to put it somewhere else is not built yet.
+> - Or use a hosted database such as PostgreSQL. That needs a small code change in
+>   `config/settings.py`, which is not built yet either.
+> - Either way, **make backups**: run `make backup` regularly (see [Back up your data](../../README.md#back-up-your-data)).
+>
+> On your own laptop this does not happen: `db.sqlite3` stays until you delete it.
 
-- With `DJANGO_DEBUG=False`, the site only works over HTTPS (`SECURE_SSL_REDIRECT` in
-  `config/settings.py`).
-- **Build command** (the variables must be set for the build too):
-  `pip install uv && uv sync --locked --no-dev && uv run --no-dev python manage.py check --deploy --fail-level WARNING && uv run --no-dev python manage.py collectstatic --no-input && uv run --no-dev python manage.py migrate`.
-  `check --deploy` is Django's list of production safety checks; with `--fail-level WARNING` any
-  warning stops the build.
-- **Start command:** `uv run --no-dev gunicorn config.wsgi`.
-- **Data-loss risk:** many hosts throw away files the app wrote at each deploy or restart. Then
-  `db.sqlite3` starts empty, with no error. Use a *persistent disk* (storage that survives a
-  restart), or move to PostgreSQL (a code change, not built). Neither a setting for the database
-  path nor PostgreSQL support exists today. Back up regularly either way.
+### Environment variables
+
+A live server needs three environment variables. Never put their real values in the code.
+
+| Variable | Value | If wrong |
+|---|---|---|
+| `DJANGO_SECRET_KEY` | A long random string: `uv run python -c "import secrets; print(secrets.token_urlsafe(50))"` | With debug off, missing or weak (under 50 characters, under 5 different characters, or starting with `django-insecure-`) stops the app with `ImproperlyConfigured` (`config/env.py`) |
+| `DJANGO_DEBUG` | `False` | Only `True` or `False` (any case). Any other value, also empty, stops the app |
+| `DJANGO_ALLOWED_HOSTS` | The site's address without `https://`, for example `my-todo.onrender.com`; commas between several | Requests to other names get 400 |
+
+With `DJANGO_DEBUG` set to `False`, the site only works over HTTPS (`SECURE_SSL_REDIRECT` in
+`config/settings.py`), and a missing or weak `DJANGO_SECRET_KEY` stops the app at once (see the
+table).
+
+### Build and start
+
+The build uses the settings too, so set the three variables for the build as well as for the start.
+(On most hosts, for example Render, the variables on the settings page are used for both.)
+
+Build command:
+
+```bash
+pip install uv && uv sync --locked --no-dev && uv run --no-dev python manage.py check --deploy --fail-level WARNING && uv run --no-dev python manage.py collectstatic --no-input && uv run --no-dev python manage.py migrate
+```
+
+`check --deploy` is Django's list of production safety checks; with `--fail-level WARNING` any
+warning stops the build. If the build stops, read the last line of the error: it says which
+variable to set.
+
+Start command:
+
+```bash
+uv run --no-dev gunicorn config.wsgi
+```
+
+### Logs
+
+On a server, check what the web server (for example gunicorn and the host's proxy) and Django
+write to their logs. A request line holds the whole address, and a search address holds the
+search words (`?q=...`), so the log can hold what people searched for. Keep such logs short, or
+leave the query string out.
+
+### Not on a server
+
 - The reminders (`send_reminders`) only work on a Mac and are not part of a server.
 
 ## Related documents
 
 - [On-call and incident runbook](on-call-and-incidents.md)
+- [Reminders runbook](reminders.md)
 - [CHANGELOG](../../CHANGELOG.md), [QA run and bug bash](../process/qa-run-and-bug-bash.md)
 - [Design document](../design/design-doc.md), [ADRs](../adr/)
 - Plans: [`local-safety.md`](../plans/local-safety.md), [`backup-on-run.md`](../plans/backup-on-run.md),
