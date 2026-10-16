@@ -1,6 +1,6 @@
 # Plan: move the reminders and server instructions from the README into runbooks
 
-Status: approved (2026-10-16) — not started
+Status: **done** (2026-10-16)
 
 Builds on: **reminders** (PR #27: `send_reminders` and the launchd template), **safe-settings**
 (PR #36: the three `DJANGO_*` variables), the README host warning (PR #37), and the documentation
