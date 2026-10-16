@@ -1,3 +1,5 @@
+"""The look and feel in a real browser: colors, layout, touch sizes, focus, reduced motion."""
+
 from datetime import timedelta
 
 from django.utils import timezone
