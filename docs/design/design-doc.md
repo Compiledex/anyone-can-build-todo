@@ -30,8 +30,8 @@ notes, steps and a repeat rule. The owner of a list can share it with other user
 | Who uses it? | The owner, and a few people they share lists with. |
 | Where does it run? | Only on the owner's Mac, at <http://127.0.0.1:8000>. Not deployed. |
 | Where is the data? | One SQLite file, `db.sqlite3`, next to the code. Not in git. |
-| How big is it? | 16 Python files in `todos/`, 22 migrations, 748 tests. |
-| Status | 38 plans; all but two are built (admin-log-without-names and delete-account are approved, not built yet). PR #1 to #58, of which 56 merged, 2 replaced. |
+| How big is it? | 17 Python files in `todos/`, 23 migrations, 769 tests. |
+| Status | 38 plans; all but one are built (delete-account is approved, not built yet). PR #1 to #59, of which 57 merged, 2 replaced. |
 
 ## 2. Goals and non-goals
 
@@ -289,8 +289,8 @@ secure cookies and HSTS turn on. No message shows a secret value (PR #36).
 | Layer | Folder | Tool | Count |
 |---|---|---|---|
 | CUJ | `*/tests/cuj/` | Chromium driven by Playwright | 30 |
-| Integration | `*/tests/integration/` | Django's test client | 587 |
-| Unit | `*/tests/unit/` | One function, no database | 131 |
+| Integration | `*/tests/integration/` | Django's test client | 601 |
+| Unit | `*/tests/unit/` | One function, no database | 138 |
 
 Rule: test each rule once, in the lowest layer where a person would notice it (test-pyramid,
 PR #1). `config/test_runner.py` stops before running if a test is in the wrong folder or class.
@@ -312,7 +312,6 @@ on every push; a ruleset on `main` requires both green. Reviewers break the code
 | No threaded test for two requests at once | `IMMEDIATE` and idempotent toggles cover the known cases. |
 | Open sign-up, no password-attempt limit | Must change before going public. |
 | No "delete my account" page | Only the admin can delete a user ([data inventory](data-inventory-and-privacy.md), gap 1). |
-| Admin log keeps object names | `django_admin_log` keeps the name of each object changed in `/admin/` (for example a to-do's title), also after the object is deleted (gap 6). |
 | Hosting | Many hosts lose the SQLite file on deploy; not built for it. |
 
 ## 13. Glossary

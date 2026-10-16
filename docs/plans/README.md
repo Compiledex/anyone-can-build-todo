@@ -48,5 +48,6 @@ In the order they were built:
 | [readme-to-runbooks](readme-to-runbooks.md) | Reminders and server steps move from the README to the runbooks | [#56](https://github.com/Compiledex/anyone-can-build-todo/pull/56) | 2026-10-16 |
 | [split-browser-tests](split-browser-tests.md) | Split the browser tests into one file per journey | [#57](https://github.com/Compiledex/anyone-can-build-todo/pull/57) | 2026-10-16 |
 | [privacy-small-fixes](privacy-small-fixes.md) | make run removes expired sessions, messages in the session, no search words in the log | [#58](https://github.com/Compiledex/anyone-can-build-todo/pull/58) | 2026-10-16 |
+| [admin-log-without-names](admin-log-without-names.md) | The admin log keeps no names | [#59](https://github.com/Compiledex/anyone-can-build-todo/pull/59) | 2026-10-16 |
 
 The plans themselves were merged in PRs #3, #4 (fixes), #26 (reminders), #30 (redesign), #34, #39, #42, #47 and #55.

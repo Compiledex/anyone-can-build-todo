@@ -115,8 +115,6 @@ team would set, and how they could be checked **locally**, without tracking anyo
 4. Will it ever run on a **server**? Then: a persistent database, a password-attempt limit, closed
    sign-up, and backups off the machine.
 5. Should the app show a hint about the manual order? (Simulated UX finding F8.)
-6. Should the admin log stop keeping object names? ([data inventory](../design/data-inventory-and-privacy.md),
-   gap 6; gaps 2, 4 and 5 are closed.)
 
 ## Related documents
 

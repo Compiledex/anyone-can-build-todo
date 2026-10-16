@@ -34,6 +34,9 @@ Added, Changed, Fixed, Security, plus "Under the hood" for changes you cannot se
   cookie (PR #58).
 - The development server's terminal no longer shows search words: request lines are printed
   without the part after `?` (PR #58).
+- The admin log at `/admin/` keeps no names: a row says `todo 42`, not the to-do's title, list
+  name, step or username. A data migration replaces the names in the rows already there. Run
+  `make backup` before `migrate` (PR #59).
 
 ### Under the hood
 

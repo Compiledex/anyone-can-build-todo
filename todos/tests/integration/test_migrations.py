@@ -13,6 +13,7 @@ import contextlib
 import datetime
 import importlib
 import io
+import json
 import unicodedata
 
 import django.apps
@@ -32,6 +33,12 @@ LISTS_AFTER = [("todos", "0007_todo_list_required")]
 # The list name key (list-name-casefold): before it, the new field, the fill.
 BEFORE_NAME_KEY = [("todos", "0018_todo_ordering_tiebreak")]
 NAME_KEY_FIELD = [("todos", "0019_todolist_name_key")]
+# The admin log without names (admin-log-without-names): the moment before it.
+BEFORE_ADMIN_LOG = [
+    ("todos", "0022_todo_copy_fingerprint"),
+    ("admin", "0003_logentry_add_action_flag_choices"),
+    ("contenttypes", "0002_remove_content_type_name"),
+]
 
 
 def migrate_to_newest():
@@ -263,3 +270,174 @@ class FillListNameKeyMigrationTests(TransactionTestCase):
         # The old rule (A to Z) is back.
         with self.assertRaises(IntegrityError), transaction.atomic():
             TodoList.objects.create(owner=ana, name="work")
+
+
+class BlankAdminLogNamesMigrationTests(TransactionTestCase):
+    """0023: the names in the admin log become labels like "todo 42"."""
+
+    COLUMNS = [
+        "pk",
+        "action_time",
+        "user_id",
+        "action_flag",
+        "object_id",
+        "content_type_id",
+    ]
+
+    def tearDown(self):
+        migrate_to_newest()
+
+    def make_rows(self):
+        """Log rows as the old admin wrote them, with names. Returns them by kind."""
+        apps = migrate(BEFORE_ADMIN_LOG)
+        User = apps.get_model(settings.AUTH_USER_MODEL)
+        ContentType = apps.get_model("contenttypes", "ContentType")
+        LogEntry = apps.get_model("admin", "LogEntry")
+        staffer = User.objects.create(username="staffer", is_staff=True)
+        todo_type = ContentType.objects.get_or_create(app_label="todos", model="todo")[
+            0
+        ]
+        user_type = ContentType.objects.get_or_create(app_label="auth", model="user")[0]
+
+        def row(**fields):
+            return LogEntry.objects.create(user=staffer, **fields)
+
+        self.rows = {
+            "added": row(
+                content_type=todo_type,
+                object_id="7",
+                object_repr="Buy secret milk",
+                action_flag=1,
+                change_message='[{"added": {}}]',
+            ),
+            "changed": row(
+                content_type=todo_type,
+                object_id="7",
+                object_repr="Buy secret milk",
+                action_flag=2,
+                change_message=json.dumps(
+                    [
+                        {"changed": {"fields": ["Title"]}},
+                        {"added": {"name": "subtask", "object": "Call the bank"}},
+                    ]
+                ),
+            ),
+            "user": row(
+                content_type=user_type,
+                object_id="3",
+                object_repr="carol",
+                action_flag=3,
+                change_message="",
+            ),
+            "no_type": row(
+                content_type=None,
+                object_id="9",
+                object_repr="Secret thing",
+                action_flag=3,
+                change_message="",
+            ),
+            "plain": row(
+                content_type=todo_type,
+                object_id="8",
+                object_repr="Secret plan",
+                action_flag=2,
+                change_message="Changed title to Secret.",
+            ),
+        }
+        return LogEntry
+
+    def newest_log(self):
+        executor = MigrationExecutor(connection)
+        apps = executor.loader.project_state(executor.loader.graph.leaf_nodes()).apps
+        return apps.get_model("admin", "LogEntry")
+
+    def assert_no_names(self, LogEntry):
+        for repr_, message in LogEntry.objects.values_list(
+            "object_repr", "change_message"
+        ):
+            for text in (repr_, message):
+                for name in ("secret", "carol", "call the bank"):
+                    self.assertNotIn(name, text.lower())
+
+    def test_names_are_replaced(self):
+        self.make_rows()
+
+        migrate_to_newest()
+
+        LogEntry = self.newest_log()
+        got = {kind: LogEntry.objects.get(pk=row.pk) for kind, row in self.rows.items()}
+        self.assertEqual(got["added"].object_repr, "todo 7")
+        self.assertEqual(json.loads(got["added"].change_message), [{"added": {}}])
+        self.assertEqual(got["changed"].object_repr, "todo 7")
+        self.assertEqual(
+            json.loads(got["changed"].change_message),
+            [
+                {"changed": {"fields": ["Title"]}},
+                {"added": {"name": "subtask", "object": "name not kept"}},
+            ],
+        )
+        self.assertEqual(got["user"].object_repr, "user 3")
+        self.assertEqual(got["no_type"].object_repr, "object 9")
+        self.assertEqual(got["plain"].object_repr, "todo 8")
+        self.assertEqual(got["plain"].change_message, "")
+        self.assert_no_names(LogEntry)
+
+    def test_other_columns_do_not_change(self):
+        LogEntry = self.make_rows()
+        before = list(LogEntry.objects.order_by("pk").values_list(*self.COLUMNS))
+
+        migrate_to_newest()
+
+        after = list(
+            self.newest_log().objects.order_by("pk").values_list(*self.COLUMNS)
+        )
+        self.assertEqual(after, before)
+
+    def test_more_rows_than_one_chunk(self):
+        LogEntry = self.make_rows()
+        migration = importlib.import_module(
+            "todos.migrations.0023_blank_admin_log_names"
+        )
+        # Two full chunks and part of a third: every chunk must be saved.
+        count = migration.CHUNK * 2 + 201
+        todo_type = self.rows["added"].content_type
+        staffer = self.rows["added"].user
+        LogEntry.objects.bulk_create(
+            LogEntry(
+                user=staffer,
+                content_type=todo_type,
+                object_id=str(1000 + number),
+                object_repr=f"Secret to-do {number}",
+                action_flag=1,
+                change_message="",
+            )
+            for number in range(count)
+        )
+
+        migrate_to_newest()
+
+        LogEntry = self.newest_log()
+        first_rows = [row.pk for row in self.rows.values()]
+        many = LogEntry.objects.exclude(pk__in=first_rows).values_list(
+            "object_id", "object_repr"
+        )
+        self.assertEqual(len(many), count)
+        for object_id, label in many:
+            self.assertEqual(label, f"todo {object_id}")
+        self.assert_no_names(LogEntry)
+
+    def test_migration_goes_back(self):
+        self.make_rows()
+        migrate_to_newest()
+
+        LogEntry = migrate(BEFORE_ADMIN_LOG).get_model("admin", "LogEntry")
+        labels = dict(LogEntry.objects.values_list("pk", "object_repr"))
+        self.assertEqual(labels[self.rows["user"].pk], "user 3")
+        self.assert_no_names(LogEntry)
+
+        # Forward again: running it on rows with labels changes nothing.
+        migrate_to_newest()
+        LogEntry = self.newest_log()
+        self.assertEqual(
+            dict(LogEntry.objects.values_list("pk", "object_repr")), labels
+        )
