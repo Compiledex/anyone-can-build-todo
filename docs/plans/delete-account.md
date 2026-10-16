@@ -1,6 +1,6 @@
 # Plan: Delete my account
 
-Status: approved (2026-10-16) — not started
+Status: **done** (2026-10-16)
 
 Builds on: **accounts** (Django's `User`, login, sign-up, `LoggedInTestCase`), **lists** and
 **sharing** (`TodoList.owner`, `members`, `visible_to`, "Leave this list"), **tags** (`Tag.owner`),
