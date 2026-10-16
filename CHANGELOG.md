@@ -24,7 +24,11 @@ Added, Changed, Fixed, Security, plus "Under the hood" for changes you cannot se
 ### Changed
 
 - The steps to switch on the Mac reminders, and the notes for a server, moved from the README to
-  the runbooks; the README links to them (this PR).
+  the runbooks; the README links to them (PR #56).
+
+### Under the hood
+
+- The browser tests are split into one file per journey; the same 30 tests (PR #57).
 
 ## [0.5.1] - 2026-10-16
 

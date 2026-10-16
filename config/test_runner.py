@@ -31,7 +31,7 @@ def layer_of(test_id):
     """The layer a test is in, from its id, or None if it is in no layer folder.
 
     The id also works for an error in setUpClass, which unittest reports as
-    "setUpClass (todos.tests.cuj.test_journeys.SomeTests)".
+    "setUpClass (todos.tests.cuj.test_todo_basics.SomeTests)".
     """
     match = LAYER_IN_ID.search(test_id)
     return match.group(1) if match else None
