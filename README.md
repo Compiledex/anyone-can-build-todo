@@ -355,7 +355,9 @@ runs the same checks and the tests on every push.
 | `todos/tests/` | The tests, one folder per layer (unit, integration, CUJ) |
 | `deploy/macos/` | The launchd template for the morning reminders on a Mac |
 | `scripts/` | The tool behind `make landing-shots` |
+| `docs/` | The documentation: one example of each document a team writes, from the idea to the retrospective ([index](docs/README.md)) |
 | `docs/plans/` | The plan for each feature, written before the code; history, not a description of the code today |
+| `CHANGELOG.md` | What is new in each version |
 
 Each file's job is in `AGENTS.md`.
 
