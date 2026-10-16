@@ -9,8 +9,8 @@ change code, say which file changed and why.
 The most basic to-do list, in Django. A person can add a to-do, edit it, mark it done (or undo
 that), delete it (with an Undo button for 15 minutes), and clear all the done to-dos of a list at
 once. A to-do can repeat (daily, weekly or monthly): marking it done makes its next copy, and
-"Undo" removes that copy again (unless a step of the copy is already done, or the copy was changed
-after it was made). Turning on Repeat for a to-do that is already done makes its next copy at once.
+"Undo" removes that copy again (unless the copy is already done, is in another list, has a done
+step, or was changed after it was made). Turning on Repeat for a to-do that is already done makes its next copy at once.
 In the "Manual" order, the to-dos of a list can be put in any order by drag and drop or the Move
 buttons; that order belongs to the list, so everyone who sees it sees the same order. Each person
 has an account. A person can have several lists (make, rename and delete a list); each to-do is in
@@ -129,8 +129,9 @@ Add a package with `uv add <name>`, never with `pip install`. After changing `mo
 - **Put each test in the folder for its layer**: `tests/unit/`, `tests/integration/` or
   `tests/cuj/`. The folder is the layer. Test each rule once, in the lowest layer where a person
   would notice it. A unit test must be a `SimpleTestCase` (no database). A CUJ test must extend
-  `BrowserTestCase` from `todos/tests/cuj/browser.py`. The test runner stops if a test breaks
-  these rules.
+  `BrowserTestCase` from `todos/tests/cuj/browser.py` (it starts the browser). The test runner
+  stops if a test breaks these rules; for the CUJ layer it only checks the looser rule that the
+  test is a `StaticLiveServerTestCase` (which `BrowserTestCase` is).
 - **Never pass text from a request to `order_by`.** Add an entry to `SORT_OPTIONS` in
   `todos/queries.py` instead; the `sort` field of `TodoQueryForm` only accepts its keys.
 - **Never build AppleScript from user text.** The script is fixed in `todos/reminders.py`; pass
