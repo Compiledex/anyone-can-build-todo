@@ -46,8 +46,8 @@ The view calls `user.delete()`. Every foreign key to `User` already says what ha
 | `TodoList` | `owner` → alice | CASCADE | Every list alice **owns** is deleted. |
 | `Todo` | `todo_list` → her list | CASCADE | Every to-do in her lists is deleted (also to-dos that members added). |
 | `Subtask` | `todo` → her to-do | CASCADE | Their steps are deleted. |
-| `Todo.repeated_from` | another to-do | SET_NULL | A copy is always in the same list as its original (`make_next_copy`; a to-do never moves to another list: `todo_list` is not in any form), so both go. Nothing outside her lists changes. |
-| `Tag` | `owner` → alice | CASCADE | Her tags are deleted, and the tag links of her to-dos. `set_tags` always uses the **list owner's** tags, so no to-do in someone else's list has one of alice's tags. |
+| `Todo.repeated_from` | another to-do | SET_NULL | A copy is always in the same list as its original (`make_next_copy`; a to-do never moves to another list: `todo_list` is not in any form), so both go. Through the app nothing outside her lists changes. Through `/admin/` a staff user could link a to-do in bob's list to one in hers; then bob's to-do only loses that link (SET_NULL). Nothing of bob's is deleted. |
+| `Tag` | `owner` → alice | CASCADE | Her tags are deleted, and the tag links of her to-dos. `set_tags` always uses the **list owner's** tags, so through the app no to-do in someone else's list has one of alice's tags. If a staff user put one there in `/admin/`, bob's to-do only loses that tag link; the to-do stays. |
 | `TodoList.members` rows where alice is a **member** | alice | (M2M, deleted) | Alice leaves every list shared with her. Those lists, their to-dos and their other members stay with their owners. |
 | `TodoList.members` rows of alice's **own** lists | her list | (M2M, deleted) | Her members lose those lists (the lists are gone). Their own lists are not touched. |
 | To-dos alice added to **bob's** list | bob's list | — | They stay: they belong to bob's list (as with "Leave this list" today). Their steps and (bob's) tags stay too. |
@@ -74,13 +74,18 @@ transaction.** Reasons:
   sessions; a two-week session of alice would stay.
 
 How: a small function `delete_sessions_of(user)` in the new module `accounts/deletion.py`. It goes
-through `Session.objects.iterator()`, reads each with `get_decoded()`, and deletes the rows where
-`get(SESSION_KEY) == str(user.pk)` (`SESSION_KEY` from `django.contrib.auth`). This reads every
-session row; on one Mac that is a handful of rows. A broken row decodes to `{}` and is skipped.
+through `Session.objects.iterator()`, reads each with `get_decoded()`, and **collects** the keys of
+the rows where `get(SESSION_KEY) == str(user.pk)` (`SESSION_KEY` from `django.contrib.auth`). Only
+after the loop it deletes them with one `Session.objects.filter(session_key__in=keys).delete()`,
+inside the same `transaction.atomic()` as `user.delete()`. It never deletes while it iterates: on
+SQLite, reads and writes on one connection are not isolated from each other, so a delete during
+the loop could change what the loop still reads. This reads every session row; on one Mac that
+is a handful of rows. A broken row decodes to `{}` and is skipped.
 
-This only works with the database session engine. The module docstring says so, and a test checks
-that a second browser's session row of alice is gone. If `SESSION_ENGINE` ever changes, that test
-fails.
+This only works with the database session engine. The module docstring says so. A test first
+checks that `SESSION_ENGINE` is `django.contrib.sessions.backends.db` and that a second browser's
+session row exists and decodes to alice, then that it is gone after the delete. If
+`SESSION_ENGINE` ever changes, that test fails.
 
 Not deleted: a snapshot in **another person's** session. If carol (a member of alice's list)
 deleted a to-do there a minute ago, her Undo now says "Could not undo: you can no longer see the
@@ -95,7 +100,7 @@ expires). A test checks carol's Undo restores nothing.
 
 - **Your lists**: "3 lists and their 12 to-dos (with their steps), and your 5 tags will be deleted."
   The to-do count comes from `user.todo_lists.annotate(todo_count=Count("todos", distinct=True),
-  member_count=Count("members", distinct=True))`, summed in Python (one query). A person with no
+  member_count=Count("members", distinct=True))`, summed in Python. The page needs about three queries in all (the own lists with their counts, the tags, the lists shared with her), whatever the number of lists. A person with no
   lists sees "You have no lists."
 - **Your shared lists**: for each own list with members, its name and the number of members:
   "“Family” (2 members) — they will lose this list." In the list menu's order
@@ -155,20 +160,22 @@ messages.success(request, "Your account was deleted.")
 return redirect("home")
 ```
 
-**Why the message survives**: `logout()` empties the session **before** the message is added. The
-message is stored only when the response leaves the view: `MessageMiddleware.process_response`
-runs before `SessionMiddleware.process_response` (middleware answer in the reverse order of
-`MIDDLEWARE`, and messages come after sessions there).
+**Why the message survives**: `messages.success()` only puts the message in a queue in memory
+(`request._messages`). It is written only when the response leaves the view, after `logout()`:
+`MessageMiddleware.process_response` runs before `SessionMiddleware.process_response` (middleware
+answer in the reverse order of `MIDDLEWARE`, and messages come after sessions there). So the flush
+in `logout()` never touches it.
 
 - With **session storage** (after privacy-small-fixes): the message goes into the new, empty
   session; the session is then not empty, so `SessionMiddleware` saves it with a new key and sets
   the cookie. The landing page reads and removes it. That session holds no user.
 - With today's **fallback storage** (cookie first): the message goes into the messages cookie.
 
-A message added **before** `logout()` would be lost with session storage (the flush throws it
-away). So the order above is a rule, written as a comment in the view. The integration test runs
-with both storages (`override_settings`), so it passes before and after privacy-small-fixes is
-merged.
+The message would survive also if it were added before `logout()`, for the same reason (the
+queue is in memory, not in the session). The order above is only the plain reading order: first
+the account goes, then the person is logged out, then they are told. It is not a safety rule. The
+integration test runs with both storages (two `override_settings` test classes), so it passes
+before and after privacy-small-fixes is merged.
 
 `logout()` sends the `user_logged_out` signal with the deleted user object; nothing in this repo
 listens to it. The session sweep already deleted this browser's own session row; `flush()` then
@@ -250,9 +257,10 @@ admin-log-without-names) builds in parallel with this plan; merge order split-br
 readme-to-runbooks → privacy-small-fixes → admin-log-without-names → **delete-account (last)**.
 
 - **split-browser-tests**: this plan's CUJ test is a **new file**
-  `todos/tests/cuj/test_account_journeys.py` in that layout. Before merging, rebase on main and
-  check the split's file names; if it already made an accounts file, put the class there instead,
-  and update the CUJ count it records.
+  `todos/tests/cuj/test_account_journeys.py` in that layout (coordinator's decision: a new file,
+  not `test_auth_pages.py`). It imports only from `todos/tests/cuj/helpers.py` (made by
+  split-browser-tests) or `todos/tests/cuj/browser.py`, never from another journey file. Expected
+  CUJ count after the merge: 31.
 - **privacy-small-fixes**: sets `MESSAGE_STORAGE` to session storage and runs `clearsessions` from
   `make run`. Decision 5 is designed for session storage, and the test runs with both storages.
   After the rebase, run the message test again with the real setting.
@@ -288,8 +296,8 @@ readme-to-runbooks → privacy-small-fixes → admin-log-without-names → **del
 | `accounts/tests/unit/__init__.py`, `accounts/tests/unit/test_delete_account_form.py` (new) | The form on its own (no database). |
 | `accounts/tests/integration/test_delete_account.py` (new) | The integration tests below. |
 | `todos/tests/cuj/test_account_journeys.py` (new) | The one browser journey. |
-| `AGENTS.md` | "What this is": a person can delete their own account (what goes, what stays). Rows: `accounts/` (no models; plus delete account), `accounts/forms.py` (`DeleteAccountForm`), `accounts/urls.py`/`views.py` (`account_delete`: GET, HEAD, POST; the order "delete, logout, then message"), new row `accounts/deletion.py`, `accounts/templates/registration/` (the delete page extends `base.html`, not `site_base.html`), `base.html` (the header link), `todos/tests/cuj/` (the new file). The open-views list in Rules stays `login`, `logout`, `signup`, `home`. |
-| `docs/design/data-inventory-and-privacy.md` | Section 6 row "Delete an account": the page, what goes (also sessions), what stays. Section 7 gap 1: marked closed, with a link to this plan. Retention row for accounts. |
+| `AGENTS.md` | "What this is": a person can delete their own account (what goes, what stays). Rows: `accounts/` (no models; plus delete account), `accounts/forms.py` (`DeleteAccountForm`), `accounts/urls.py`/`views.py` (`account_delete`: GET, HEAD, POST; a delete in one transaction with the user's sessions, then logout, then the message), new row `accounts/deletion.py`, `accounts/templates/registration/` (the delete page extends `base.html`, not `site_base.html`), `base.html` (the header link), `todos/tests/cuj/` (the new file). The open-views list in Rules stays `login`, `logout`, `signup`, `home`. |
+| `docs/design/data-inventory-and-privacy.md` | Section 6 row "Delete an account": the page, what goes (also sessions), what stays. Section 7 gap 1: marked closed, with a link to this plan. Retention row for accounts. Retention row for sessions: after the delete, the new session that only carried the message is empty once the landing page has read it; that empty row stays in `django_session` until `clearsessions` runs. |
 | `docs/design/design-doc.md` | Remove the known-limit row "No "delete my account" page"; one line in 7.7 (lists, sharing) on what happens to shared lists. |
 | `docs/product/prd.md` | Open question 1: answered (yes, with this plan). |
 | `CHANGELOG.md` | A new version: Added "Delete your own account", Security "its sessions go too". |
@@ -305,10 +313,10 @@ readme-to-runbooks → privacy-small-fixes → admin-log-without-names → **del
 3. `accounts/forms.py`: `DeleteAccountForm`. Run the unit tests: green.
 4. `accounts/deletion.py`: `account_summary`, `delete_sessions_of`.
 5. `accounts/views.py` and `accounts/urls.py`: `account_delete` exactly as decision 5, with the
-   comment "Add the message after logout(): logout empties the session."
+   comment "The message is written after the view, so logout() does not remove it."
 6. The template and the header link.
 7. Docs (the table above), `AGENTS.md` rows.
-8. `make check` (all three layers green; the CUJ count goes up by one, the unit and integration
+8. `make check` (all three layers green; the CUJ count goes from 30 to 31, the unit and integration
    counts by the new tests). Then the Status line commit.
 
 ## Tests
@@ -324,20 +332,21 @@ own". carol owns "Carol's list". Every test counts rows per table before and aft
 | Test | Checks |
 |---|---|
 | `test_page_shows_what_will_be_deleted` | GET: 200, "2 lists", "2 to-dos", "1 tag"; "“Family” (1 member)"; "You will leave 1 list"; "cannot be undone"; `make backup`; the `backups/` sentence; a password field with `autocomplete="current-password"`; a CSRF token. |
-| `test_page_names_no_member_and_no_other_list` | The page does not contain "carol", "bob" or "Bob's list" (no member or other owner, no names of lists shared with alice). |
+| `test_page_names_no_member_and_no_other_list` | In this test the member and the other owner have names that cannot appear in a CSRF token or in markup (for example "Zoë-member" and "Øystein-owner", and the list "Øystein's list"). The page's **visible text** (`parse_page`, all text nodes joined) contains neither name nor the list name; a raw check uses `django.utils.html.escape(...)` of each, so an escaped apostrophe cannot make it pass by accident. The "something shows" side: the same text does contain "Family". |
 | `test_page_for_a_person_with_no_lists` | A new user with no lists: "You have no lists.", no shared-lists section; the form is there. |
 | `test_get_and_head_delete_nothing` | GET (also `?password=<right>`) and HEAD: every row count unchanged, alice still logged in. |
 | `test_other_methods_are_405` | PUT, PATCH, DELETE: 405, nothing deleted. |
 | `test_anonymous_goes_to_login` | Logged out, GET and POST: redirect to `/accounts/login/?next=/accounts/delete/`; no user deleted. |
 | `test_post_without_csrf_token_is_403` | `Client(enforce_csrf_checks=True)`, logged in, right password, no token: 403, alice exists. |
-| `test_wrong_password_deletes_nothing` | 200, "Wrong password. Nothing was deleted.", `Error: ` in the title, the summary line; every row count unchanged; still logged in; the typed password is not in the page. |
-| `test_empty_password_deletes_nothing` | 200, "This field is required.", nothing deleted. |
+| `test_wrong_password_deletes_nothing` | 200, "Wrong password. Nothing was deleted.", `Error: ` in the title, the summary line; every row count unchanged; still logged in. |
+| `test_empty_password_deletes_nothing` | Every row count unchanged, still logged in. (The error text is checked in the unit test.) |
 | `test_right_password_deletes_exactly_alices_rows` | (The "something happens" case of the two above.) alice is gone; "Inbox" and "Family", their to-dos, steps and alice's tags are gone; bob, carol, "Bob's list" with "Alice's idea" (its step and its tag "work") and "Bob's own", bob's tags, "Carol's list" all remain; exact row counts per table. |
 | `test_lists_shared_with_her_lose_only_her` | `bob_list.members` no longer has alice; its other data unchanged. |
 | `test_member_loses_her_shared_list` | carol: GET the old "Family" address is 404; carol's `visible_to` is only "Carol's list"; `/` sends carol to her own list. |
-| `test_logged_out_with_message_on_landing` | Redirect to `/`; following it renders `todos/landing.html` with "Your account was deleted." inside `role="status"`, no "Logged in as"; `_auth_user_id` not in `client.session`. A `subTest` per storage: `FallbackStorage` and `SessionStorage` (`override_settings(MESSAGE_STORAGE=...)`). |
+| `test_logged_out_with_message_on_landing` | Redirect to `/`; following it renders `todos/landing.html` with "Your account was deleted." inside `role="status"`, no "Logged in as"; `_auth_user_id` not in `client.session`. Written in a mixin `MessageAfterDeleteChecks`, run by two classes: `MessageAfterDeleteFallbackTests` with `override_settings(MESSAGE_STORAGE="django.contrib.messages.storage.fallback.FallbackStorage")` and `MessageAfterDeleteSessionTests` with `...session.SessionStorage` (not `subTest`: the database is only rolled back per test method, and the first delete would leave nothing to delete). |
 | `test_message_is_shown_once` | A second GET of `/` has no "Your account was deleted." |
-| `test_her_other_sessions_are_deleted` | A second client logged in as alice (another browser), and bob logged in: after the delete, no `Session` row decodes to alice's id; the second client's `/` is the landing page; bob's session row still exists and bob is still logged in. |
+| `test_her_other_sessions_are_deleted` | `settings.SESSION_ENGINE` is the db backend. A second client logged in as alice (another browser), and bob logged in; **before** the delete, the second client's session row exists and decodes to alice's id. After the delete, no `Session` row decodes to alice's id; the second client's `/` is the landing page; bob's session row still exists and bob is still logged in. |
+| `test_failed_delete_changes_nothing` | `User.delete` patched to raise: the POST raises (or 500); every row count is unchanged, and alice's second session row still exists and decodes to her (the session sweep was rolled back with the transaction). |
 | `test_her_admin_log_rows_go` | One `LogEntry` by alice and one by bob: after the delete only bob's remains. |
 | `test_bob_deletes_only_bob` | bob's client posts bob's password (and an extra `username=alice`): bob, "Bob's list" (with "Alice's idea") and bob's tags are gone; alice, "Inbox", "Family", their to-dos, steps and alice's tag stay; carol is untouched. |
 | `test_staff_user_can_delete_themselves` | A superuser with lists: right password deletes them (decision 7); the admin line is on their GET page and not on alice's. |
@@ -353,7 +362,7 @@ An unsaved `User(username="alice")` with `set_password(TEST_PASSWORD)` (no datab
 | `test_right_password_is_valid` | `is_valid()` is True. |
 | `test_wrong_password_is_invalid` | False, the error text, code `wrong_password`. |
 | `test_empty_password_is_invalid` | False, "This field is required.". |
-| `test_password_is_not_stripped_or_rendered` | `" " + password` is wrong (no strip); the bound form's HTML does not contain the typed value; the label is "Password" without a colon. |
+| `test_password_is_not_stripped_or_rendered` | `" " + password` is wrong (no strip); the bound form's HTML does not contain the typed value (the one place this is checked); the label is "Password" without a colon. |
 
 ### CUJ — `todos/tests/cuj/test_account_journeys.py` (`DeleteAccountJourney(BrowserTestCase)`)
 
@@ -374,7 +383,29 @@ An unsaved `User(username="alice")` with `set_password(TEST_PASSWORD)` (no datab
 
 ## Review
 
-(Filled in after the plan review.)
+Plan review (2026-10-16): APPROVE WITH CHANGES. All findings applied:
+
+1. Decision 5 said a message added before `logout()` would be lost. That was wrong: messages wait
+   in memory and are written after the view. The order stays (it reads naturally), but it is no
+   longer called a rule; the reason, the step 5 comment and the `AGENTS.md` row text are fixed.
+2. The message test used `subTest` per storage, which cannot work (the database is rolled back
+   per test method, not per sub-test). Now a mixin run by two `override_settings` classes.
+3. `delete_sessions_of` deleted while iterating; on SQLite one connection sees its own writes
+   during a read. Now it collects the keys, then deletes them in one query, in the same
+   transaction.
+4. The other-sessions test could pass without checking anything. It now first checks the engine
+   and that the second session row exists and belongs to alice.
+5. The "no names" test was a tautology ("Bob's list" is escaped in HTML) and "bob" could appear
+   in a CSRF token. Now it checks the visible text, with names that cannot be in a token.
+6. Decision 1 said nothing outside her lists changes. True through the app; through `/admin/` a
+   staff user could link across lists. Now it says so, and that bob's row only loses the link.
+7. New test: a failed `user.delete()` changes no row and keeps her other session.
+8. Each rule tested once: "This field is required." and "not rendered" only in the unit test.
+9. Decision 3 said "one query"; it is about three.
+10. The CUJ journey is a new file `todos/tests/cuj/test_account_journeys.py`, imports only from
+    `helpers.py` or `browser.py`; the CUJ count becomes 31.
+11. The data inventory retention row now says the empty session row left after the message stays
+    until `clearsessions` runs.
 
 ## Decided by the person
 
